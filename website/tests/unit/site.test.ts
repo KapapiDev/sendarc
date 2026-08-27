@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { buildCanonical, DOWNLOAD_ROUTE, SUPPORT_EMAIL } from "../../src/lib/site";
 import { json, text, visitorHash } from "../../functions/api/_shared";
 import { onRequestPost as submitBeta } from "../../functions/api/business-beta";
@@ -30,5 +32,12 @@ describe("site configuration", () => {
     const request = new Request("https://example.com/api/business-beta", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
     const response = await submitBeta({ request, env: {} });
     expect(response.status).toBe(503);
+  });
+
+  it("routes production API requests through Pages Functions", () => {
+    const routesPath = fileURLToPath(new URL("../../public/_routes.json", import.meta.url));
+    const routes = JSON.parse(readFileSync(routesPath, "utf8")) as { include: string[]; exclude: string[] };
+    expect(routes.include).toContain("/api/*");
+    expect(routes.exclude).not.toContain("/*");
   });
 });

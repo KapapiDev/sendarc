@@ -163,16 +163,18 @@ Describe "SendArc installer round-trip" {
             $x86Before = (Get-FileHash -Algorithm SHA256 -Path $x86Path).Hash
 
             # Touch both files to a known earlier mtime so a silent skip leaves them stale.
-            (Get-Item $x64Path).LastWriteTime = (Get-Date).AddDays(-1)
-            (Get-Item $x86Path).LastWriteTime = (Get-Date).AddDays(-1)
+            $staleTime = (Get-Date).AddDays(-1)
+            (Get-Item $x64Path).LastWriteTime = $staleTime
+            (Get-Item $x86Path).LastWriteTime = $staleTime
 
             # Reinstall silently WITHOUT prior uninstall — this is the T4 repro case.
             $proc = Start-Process -FilePath $script:SetupExe -ArgumentList '/S',"/D=$($script:InstallDir)" -Wait -PassThru
             $proc.ExitCode | Should -Be 0
 
-            # Both DLLs MUST have a fresh mtime (overwrite happened).
-            (Get-Item $x64Path).LastWriteTime | Should -BeGreaterThan (Get-Date).AddMinutes(-2)
-            (Get-Item $x86Path).LastWriteTime | Should -BeGreaterThan (Get-Date).AddMinutes(-2)
+            # NSIS preserves the packaged files' build timestamps, so compare
+            # against the deliberately stale value instead of wall-clock time.
+            (Get-Item $x64Path).LastWriteTime | Should -BeGreaterThan $staleTime
+            (Get-Item $x86Path).LastWriteTime | Should -BeGreaterThan $staleTime
 
             # Hashes should match the prior install (same binaries shipped — confirms the
             # overwrite happened with a real File write rather than NSIS skipping).
@@ -227,6 +229,10 @@ Describe "SendArc installer round-trip" {
             Test-Path $orphan64  | Should -BeFalse -Because "uninstaller MUST scrub *.old.<pid> orphans in `$INSTDIR (W7)"
             Test-Path $orphanDll | Should -BeFalse -Because "uninstaller MUST scrub *.old.<pid> orphans in `$INSTDIR (W7)"
             Test-Path $orphan32  | Should -BeFalse -Because "uninstaller MUST scrub *.old.<pid> orphans in `$PROGRAMFILES32\SendArc (W7)"
+
+            # Leave the product installed for the dedicated uninstall context.
+            $reinstall = Start-Process -FilePath $script:SetupExe -ArgumentList '/S',"/D=$($script:InstallDir)" -Wait -PassThru
+            $reinstall.ExitCode | Should -Be 0
         }
     }
 
@@ -272,8 +278,10 @@ Describe "SendArc installer round-trip" {
             $out = & cmdkey /list:$script:CredTarget 2>&1 | Out-String
             # cmdkey output contains 'Target:' lines when an entry matches, or a
             # "NONE" / locale-dependent "no credentials" message when nothing matches.
-            # Safe assertion: no line containing the literal target string.
-            $out | Should -Not -Match ([regex]::Escape($script:CredTarget)) -Because "cmdkey should find no credentials under target '$($script:CredTarget)' after uninstall"
+            # The filter heading repeats the requested target even when it says
+            # "* NONE *". Only an actual `Target:` record means it still exists.
+            $entryPattern = '(?im)^\s*Target:\s*.*' + [regex]::Escape($script:CredTarget)
+            $out | Should -Not -Match $entryPattern -Because "cmdkey should find no credentials under target '$($script:CredTarget)' after uninstall"
         }
 
         # D-21 item 13

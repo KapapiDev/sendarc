@@ -193,9 +193,11 @@ SectionEnd
 ;------------------------------------------------------------------------------
 
 Function BackupPreviousMailClient
-  ; `$APPDATA\..\..\ProgramData` resolves to `%ProgramData%` at install time
-  ; (admin context). Same primitive used by the uninstaller section stub.
-  CreateDirectory "$APPDATA\..\..\ProgramData\SendArc\uninst"
+  ; Resolve the machine-wide ProgramData directory directly. Deriving it from
+  ; $APPDATA is incorrect on modern Windows (`AppData\Roaming\..\..` lands at
+  ; the user profile, not C:\ProgramData).
+  ReadEnvStr $5 PROGRAMDATA
+  CreateDirectory "$5\SendArc\uninst"
 
   ReadRegStr $0 HKLM "SOFTWARE\Clients\Mail" ""
 
@@ -229,7 +231,7 @@ Function BackupPreviousMailClient
   Pop $3   ; stdout (timestamp + trailing CRLF)
   StrCpy $3 $3 -2   ; strip trailing \r\n
 
-  FileOpen  $1 "$APPDATA\..\..\ProgramData\SendArc\uninst\previous-mail-client.json" w
+  FileOpen  $1 "$5\SendArc\uninst\previous-mail-client.json" w
   StrCmp $4 "" BackupWriteNative32
   FileWrite $1 '{"previousClient":"$0","previousClient32":"$4","backedUpAt":"$3"}'
   Goto BackupWriteDone
@@ -252,7 +254,7 @@ BackupNull:
   Call EscapeJsonString
   Pop $4
 
-  FileOpen  $1 "$APPDATA\..\..\ProgramData\SendArc\uninst\previous-mail-client.json" w
+  FileOpen  $1 "$5\SendArc\uninst\previous-mail-client.json" w
   StrCmp $4 "" BackupNullNoWow
   FileWrite $1 '{"previousClient":null,"previousClient32":"$4","backedUpAt":"$3"}'
   Goto BackupNullDone
@@ -343,12 +345,22 @@ EANR_PollLoop:
 
 EANR_Timeout:
   DetailPrint "ERROR: SendArc.exe did not exit within 10s"
+  IfSilent EANR_ForceClose
   Pop $1
   Pop $0
-  IfSilent EANR_SilentAbort
   MessageBox MB_OK|MB_ICONSTOP "SendArc did not close within 10 seconds. Please close it manually and re-run the installer."
-EANR_SilentAbort:
   Abort "SendArc.exe still running after 10s close poll."
+
+EANR_ForceClose:
+  ; Unattended installs cannot ask the user to close a wedged process. After
+  ; the full graceful-close budget, force termination so upgrades remain
+  ; recoverable and the replacement binary is not left half-installed.
+  nsExec::ExecToStack 'taskkill /F /T /IM SendArc.exe'
+  Pop $0
+  Pop $1
+  DetailPrint "taskkill /F /T /IM SendArc.exe rc=$0"
+  Sleep 1000
+  Goto EANR_Exited
 
 EANR_Exited:
   DetailPrint "SendArc.exe exited after $0 poll iterations"
@@ -708,8 +720,8 @@ Section "Uninstall"
 
   ; 5. %ProgramData%\SendArc\uninst\ — remove AFTER the restore (step 4) since
   ; the restore reads from this directory
-  RMDir /r "$APPDATA\..\..\ProgramData\SendArc\uninst"
-  RMDir    "$APPDATA\..\..\ProgramData\SendArc"   ; only if empty (non-recursive)
+  RMDir /r "$0\SendArc\uninst"
+  RMDir    "$0\SendArc"   ; only if empty (non-recursive)
 
   ; 6. %TEMP%\SendArc\ — best-effort. Under elevated uninstall this is the
   ; SYSTEM user's TEMP, not the real user's. Real users' temp already
@@ -762,6 +774,8 @@ SectionEnd
 ;   3. the restoration target's subkey still exists under HKLM\SOFTWARE\Clients\Mail\
 ; Otherwise: try fallbacks (Microsoft Outlook -> Outlook -> Windows Mail) or clear to "".
 Function un.RestorePreviousMailClient
+  ReadEnvStr $6 PROGRAMDATA
+
   ; Guard 1: only restore if current (Default) is still our claim
   ReadRegStr $0 HKLM "SOFTWARE\Clients\Mail" ""
   StrCmp $0 "SendArc" 0 DoneRestore
@@ -783,8 +797,8 @@ Function un.RestorePreviousMailClient
   ;   - previousClient=null:        exit 0, stdout = "" (just trailing CRLF)
   ;   - previousClient="<name>":    exit 0, stdout = "<name>" + trailing CRLF
   StrCpy $1 ""  ; candidate name
-  IfFileExists "$APPDATA\..\..\ProgramData\SendArc\uninst\previous-mail-client.json" 0 NoBackup
-  nsExec::ExecToStack 'powershell.exe -NoProfile -Command "try { $$j = Get-Content -LiteralPath ''$APPDATA\..\..\ProgramData\SendArc\uninst\previous-mail-client.json'' -Raw | ConvertFrom-Json; if ($$null -ne $$j.previousClient) { Write-Output $$j.previousClient } exit 0 } catch { exit 1 }"'
+  IfFileExists "$6\SendArc\uninst\previous-mail-client.json" 0 NoBackup
+  nsExec::ExecToStack 'powershell.exe -NoProfile -Command "try { $$j = Get-Content -LiteralPath ''$6\SendArc\uninst\previous-mail-client.json'' -Raw | ConvertFrom-Json; if ($$null -ne $$j.previousClient) { Write-Output $$j.previousClient } exit 0 } catch { exit 1 }"'
   Pop $4    ; exit code
   Pop $1    ; stdout (empty if null or parse error)
   StrCmp $4 "0" 0 TryFallbacks
@@ -839,8 +853,8 @@ DoneRestore:
   ; is present and contains a non-null previousClient32 value, write it
   ; back to the 32-bit view's (Default). Parse via PowerShell's
   ; ConvertFrom-Json — same pattern as the native-view restore above.
-  IfFileExists "$APPDATA\..\..\ProgramData\SendArc\uninst\previous-mail-client.json" 0 NoWow6432
-  nsExec::ExecToStack 'powershell.exe -NoProfile -Command "try { $$j = Get-Content -LiteralPath ''$APPDATA\..\..\ProgramData\SendArc\uninst\previous-mail-client.json'' -Raw | ConvertFrom-Json; if ($$null -ne $$j.previousClient32) { Write-Output $$j.previousClient32 } exit 0 } catch { exit 1 }"'
+  IfFileExists "$6\SendArc\uninst\previous-mail-client.json" 0 NoWow6432
+  nsExec::ExecToStack 'powershell.exe -NoProfile -Command "try { $$j = Get-Content -LiteralPath ''$6\SendArc\uninst\previous-mail-client.json'' -Raw | ConvertFrom-Json; if ($$null -ne $$j.previousClient32) { Write-Output $$j.previousClient32 } exit 0 } catch { exit 1 }"'
   Pop $4    ; exit code
   Pop $1    ; stdout
   StrCmp $4 "0" 0 NoWow6432
@@ -1014,12 +1028,19 @@ unEANR_PollLoop:
 
 unEANR_Timeout:
   DetailPrint "ERROR: SendArc.exe did not exit within 10s"
+  IfSilent unEANR_ForceClose
   Pop $1
   Pop $0
-  IfSilent unEANR_SilentAbort
   MessageBox MB_OK|MB_ICONSTOP "SendArc did not close within 10 seconds. Please close it manually and re-run the uninstaller."
-unEANR_SilentAbort:
   Abort "SendArc.exe still running after 10s close poll."
+
+unEANR_ForceClose:
+  nsExec::ExecToStack 'taskkill /F /T /IM SendArc.exe'
+  Pop $0
+  Pop $1
+  DetailPrint "taskkill /F /T /IM SendArc.exe rc=$0"
+  Sleep 1000
+  Goto unEANR_Exited
 
 unEANR_Exited:
   DetailPrint "SendArc.exe exited after $0 poll iterations"

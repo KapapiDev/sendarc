@@ -94,8 +94,9 @@ Section "Install" SecInstall
   ;
   ; QUICK-260423-ntu T3c — dual-bitness layout: x64 DLL lands in $INSTDIR
   ; (= $PROGRAMFILES64\SendArc) for native MAPI callers; x86 DLL lands in
-  ; $PROGRAMFILES32\SendArc for legacy 32-bit MAPI callers. Registry
-  ; DLLPath writes below route each view to the matching-bitness DLL.
+  ; $PROGRAMFILES32\SendArc for legacy 32-bit MAPI callers. The shared Mail
+  ; client registry key stores a REG_EXPAND_SZ DLLPath so each caller expands
+  ; %PROGRAMFILES% using its own process bitness.
   ; PHASE 11.1 T4 (D-04): explicit Delete + SetOverwrite try collapses transient
   ; AV/filter holds into a no-op rather than aborting the installer. RESEARCH
   ; §Pattern 1 + §Pitfall 1. NSIS default SetOverwrite is `on`, which makes
@@ -135,22 +136,19 @@ Section "Install" SecInstall
   Call BackupPreviousMailClient
 
   ; D-09 — MAPI handler registration (machine-wide).
-  ; Subkey + DLLPath are set first; the HKLM\SOFTWARE\Clients\Mail\(Default)
-  ; overwrite happens AFTER the backup call above.
+  ; HKLM\SOFTWARE\Clients is shared between the 32-bit and 64-bit registry
+  ; views on Windows 7 and later. A second SetRegView write would therefore
+  ; overwrite the same DLLPath. Instead, store a single REG_EXPAND_SZ path.
+  ; WOW64 gives a 32-bit caller ProgramFiles=Program Files (x86), while a
+  ; 64-bit caller gets Program Files. Uppercase PROGRAMFILES deliberately
+  ; avoids WOW64's case-sensitive write-time rewrite of `%ProgramFiles%` to
+  ; `%ProgramFiles(x86)%`; environment expansion itself is case-insensitive.
+  ; Subkey + DLLPath are set first; the Mail (Default) overwrite happens only
+  ; after the backup call above.
   SetRegView 64
   WriteRegStr HKLM "SOFTWARE\Clients\Mail\SendArc" "" "SendArc"
-  WriteRegStr HKLM "SOFTWARE\Clients\Mail\SendArc" "DLLPath" "$INSTDIR\SendArc.dll"
+  WriteRegExpandStr HKLM "SOFTWARE\Clients\Mail\SendArc" "DLLPath" "%PROGRAMFILES%\SendArc\SendArc.dll"
   WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" "SendArc"
-
-  ; QUICK-260423-ntu T3c — 32-bit registry view. SetRegView 32 redirects
-  ; HKLM reads/writes into the WOW6432Node subtree, matching the existing
-  ; pattern used by DetectWebView2 (lines 269/282/292/300). This routes
-  ; 32-bit MAPI callers to the i686 DLL at $PROGRAMFILES32\SendArc.
-  SetRegView 32
-  WriteRegStr HKLM "SOFTWARE\Clients\Mail\SendArc" "" "SendArc"
-  WriteRegStr HKLM "SOFTWARE\Clients\Mail\SendArc" "DLLPath" "$PROGRAMFILES32\SendArc\SendArc.dll"
-  WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" "SendArc"
-  SetRegView 64
 
   ; Uninstaller binary
   WriteUninstaller "$INSTDIR\uninstall.exe"
@@ -203,28 +201,18 @@ Function BackupPreviousMailClient
   SetRegView 64
   ReadRegStr $0 HKLM "SOFTWARE\Clients\Mail" ""
 
-  ; QUICK-260423-ntu T3c — also capture the WOW6432 view's (Default)
-  ; Mail client so the uninstaller can restore both views symmetrically.
-  SetRegView 32
-  ReadRegStr $4 HKLM "SOFTWARE\Clients\Mail" ""
-  SetRegView 64
-
   ; Upgrade case: existing install. Preserve original backup, skip write.
   StrCmp $0 "SendArc" AlreadyUs
   ; Clean install with no prior default Mail client.
   StrCmp $0 "" BackupNull
 
-  ; WR-02: escape $0 (and $4) for JSON string context before interpolation.
+  ; WR-02: escape $0 for JSON string context before interpolation.
   ; A mail client display name may legally contain `"` or `\` (e.g. locale-
   ; specific or custom enterprise names) which would otherwise produce
   ; invalid JSON and break the uninstaller's restore path.
   Push $0
   Call EscapeJsonString
   Pop $0
-
-  Push $4
-  Call EscapeJsonString
-  Pop $4
 
   ; Get ISO-8601 UTC timestamp via Windows PowerShell (not pwsh — end-user
   ; machines may only have PS 5.1 per §Anti-Patterns in 10-RESEARCH.md).
@@ -234,14 +222,9 @@ Function BackupPreviousMailClient
   StrCpy $3 $3 -2   ; strip trailing \r\n
 
   FileOpen  $1 "$5\SendArc\uninst\previous-mail-client.json" w
-  StrCmp $4 "" BackupWriteNative32
-  FileWrite $1 '{"previousClient":"$0","previousClient32":"$4","backedUpAt":"$3"}'
-  Goto BackupWriteDone
-BackupWriteNative32:
-  FileWrite $1 '{"previousClient":"$0","previousClient32":null,"backedUpAt":"$3"}'
-BackupWriteDone:
+  FileWrite $1 '{"previousClient":"$0","backedUpAt":"$3"}'
   FileClose $1
-  DetailPrint "Previous Mail client backed up: native='$0' wow6432='$4'"
+  DetailPrint "Previous Mail client backed up: '$0'"
   Return
 
 BackupNull:
@@ -250,21 +233,10 @@ BackupNull:
   Pop $3
   StrCpy $3 $3 -2
 
-  ; Also escape $4 for the WOW6432 side of the null-backup path (it may
-  ; still have a non-empty value even when the native view is empty).
-  Push $4
-  Call EscapeJsonString
-  Pop $4
-
   FileOpen  $1 "$5\SendArc\uninst\previous-mail-client.json" w
-  StrCmp $4 "" BackupNullNoWow
-  FileWrite $1 '{"previousClient":null,"previousClient32":"$4","backedUpAt":"$3"}'
-  Goto BackupNullDone
-BackupNullNoWow:
-  FileWrite $1 '{"previousClient":null,"previousClient32":null,"backedUpAt":"$3"}'
-BackupNullDone:
+  FileWrite $1 '{"previousClient":null,"backedUpAt":"$3"}'
   FileClose $1
-  DetailPrint "No previous native Mail client (wow6432='$4' backed up)"
+  DetailPrint "No previous Mail client"
   Return
 
 AlreadyUs:
@@ -692,14 +664,9 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\SendArc.lnk"
   SetShellVarContext current
 
-  ; 3. MAPI handler key (native view)
+  ; 3. MAPI handler key. `SOFTWARE\Clients` is shared across registry views.
   SetRegView 64
   DeleteRegKey HKLM "SOFTWARE\Clients\Mail\SendArc"
-
-  ; 3b. QUICK-260423-ntu T3c — WOW6432 MAPI handler key (32-bit view)
-  SetRegView 32
-  DeleteRegKey HKLM "SOFTWARE\Clients\Mail\SendArc"
-  SetRegView 64
 
   ; 4. Restore (Default) Mail client from backup (D-11)
   Call un.RestorePreviousMailClient
@@ -853,33 +820,6 @@ ClearDefault:
   WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" ""
   DetailPrint "No fallback Mail client available — cleared (Default)"
 DoneRestore:
-  ; QUICK-260423-ntu T3c — symmetric WOW6432 restore. If the backup JSON
-  ; is present and contains a non-null previousClient32 value, write it
-  ; back to the 32-bit view's (Default). Parse via PowerShell's
-  ; ConvertFrom-Json — same pattern as the native-view restore above.
-  IfFileExists "$6\SendArc\uninst\previous-mail-client.json" 0 NoWow6432
-  nsExec::ExecToStack 'powershell.exe -NoProfile -Command "try { $$j = Get-Content -LiteralPath ''$6\SendArc\uninst\previous-mail-client.json'' -Raw | ConvertFrom-Json; if ($$null -ne $$j.previousClient32) { Write-Output $$j.previousClient32 } exit 0 } catch { exit 1 }"'
-  Pop $4    ; exit code
-  Pop $1    ; stdout
-  StrCmp $4 "0" 0 NoWow6432
-  StrLen $4 $1
-  IntCmp $4 2 0 WowSkipTrim 0
-  StrCpy $1 $1 -2
-WowSkipTrim:
-  StrCmp $1 "" NoWow6432
-  SetRegView 32
-  ReadRegStr $5 HKLM "SOFTWARE\Clients\Mail\$1" ""
-  StrCmp $5 "" WowKeyGone
-  WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" "$1"
-  DetailPrint "Restored WOW6432 Mail (Default) to: $1"
-  Goto WowDone
-WowKeyGone:
-  DetailPrint "WOW6432 previous client subkey missing — skipping restore"
-WowDone:
-  SetRegView 64
-  Goto Wow6432End
-NoWow6432:
-Wow6432End:
 FunctionEnd
 
 ; Helper: case-sensitive substring check. Push haystack, push needle. Pops "1" (found) or "0".

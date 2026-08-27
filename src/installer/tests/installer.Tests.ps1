@@ -42,7 +42,6 @@ BeforeAll {
     $script:CredTarget   = 'SendArc:oauth-tokens'
     # QUICK-260423-ntu T3d — dual-bitness install surfaces
     $script:InstallDir32 = "${env:ProgramFiles(x86)}\SendArc"
-    $script:MapiKey32    = 'HKLM:\SOFTWARE\WOW6432Node\Clients\Mail\SendArc'
 
     # Phase 11.1 D-03 / D-18 case 4: %APPDATA% path is the negative-assertion target.
     # The %ProgramData% path is already $script:Shortcut (set by Phase 10).
@@ -75,10 +74,26 @@ Describe "SendArc installer round-trip" {
         }
 
         # D-21 item 3
-        It "3. HKLM MAPI handler key is registered with DLLPath" {
+        It "3. HKLM MAPI handler key is registered with expandable DLLPath" {
             Test-Path $script:MapiKey | Should -BeTrue
-            $props = Get-ItemProperty -Path $script:MapiKey
-            $props.DLLPath | Should -Match 'SendArc\.dll$'
+            $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+                [Microsoft.Win32.RegistryHive]::LocalMachine,
+                [Microsoft.Win32.RegistryView]::Registry64
+            )
+            $key = $null
+            try {
+                $key = $base.OpenSubKey('SOFTWARE\Clients\Mail\SendArc')
+                $key.GetValueKind('DLLPath') | Should -Be ([Microsoft.Win32.RegistryValueKind]::ExpandString)
+                $raw = $key.GetValue(
+                    'DLLPath',
+                    $null,
+                    [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+                )
+                $raw | Should -Be '%PROGRAMFILES%\SendArc\SendArc.dll'
+            } finally {
+                if ($null -ne $key) { $key.Dispose() }
+                $base.Dispose()
+            }
             # (Default) value read via Get-ItemProperty with '(default)' property name
             (Get-ItemProperty -Path $script:MapiKey -Name '(default)').'(default)' | Should -Be 'SendArc'
         }
@@ -146,13 +161,31 @@ Describe "SendArc installer round-trip" {
             Get-PeMagic (Join-Path $script:InstallDir32 'SendArc.dll') | Should -Be 0x10B
         }
 
-        # QUICK-260423-ntu item 18 — WOW6432Node DLLPath points at the x86 DLL
-        It "18. HKLM WOW6432Node MAPI key is registered with 32-bit DLLPath" {
-            # Path-based read: HKLM:\SOFTWARE\WOW6432Node\... resolves directly
-            # without SetRegView, so Get-ItemProperty hits the 32-bit hive.
-            Test-Path $script:MapiKey32 | Should -BeTrue
-            $props = Get-ItemProperty -Path $script:MapiKey32
-            $props.DLLPath | Should -Match '(?i)Program Files \(x86\)\\SendArc\\SendArc\.dll$'
+        # QUICK-260423-ntu item 18 — shared REG_EXPAND_SZ resolves per caller bitness
+        It "18. shared DLLPath resolves to the matching x64 and x86 DLL" {
+            $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+                [Microsoft.Win32.RegistryHive]::LocalMachine,
+                [Microsoft.Win32.RegistryView]::Registry64
+            )
+            $key = $null
+            try {
+                $key = $base.OpenSubKey('SOFTWARE\Clients\Mail\SendArc')
+                $raw = $key.GetValue(
+                    'DLLPath',
+                    $null,
+                    [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+                )
+            } finally {
+                if ($null -ne $key) { $key.Dispose() }
+                $base.Dispose()
+            }
+
+            [Environment]::ExpandEnvironmentVariables($raw) |
+                Should -Be (Join-Path $script:InstallDir 'SendArc.dll')
+
+            $powershell32 = "$env:WINDIR\SysWOW64\WindowsPowerShell\v1.0\powershell.exe"
+            $expanded32 = & $powershell32 -NoProfile -Command '[Environment]::ExpandEnvironmentVariables($args[0])' $raw
+            $expanded32 | Should -Be (Join-Path $script:InstallDir32 'SendArc.dll')
         }
 
         # Phase 11.1 D-05 / D-18 case 3 — silent reinstall overwrites both DLLs (T4 regression)
@@ -183,9 +216,24 @@ Describe "SendArc installer round-trip" {
             (Get-FileHash -Algorithm SHA256 -Path $x64Path).Hash | Should -Be $x64Before
             (Get-FileHash -Algorithm SHA256 -Path $x86Path).Hash | Should -Be $x86Before
 
-            # Registry DLLPath values must still point to the right bitness in both views.
-            (Get-ItemProperty -Path $script:MapiKey).DLLPath   | Should -Match '(?i)Program Files\\SendArc\\SendArc\.dll$'
-            (Get-ItemProperty -Path $script:MapiKey32).DLLPath | Should -Match '(?i)Program Files \(x86\)\\SendArc\\SendArc\.dll$'
+            # The shared expandable path must remain intact after reinstall.
+            $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+                [Microsoft.Win32.RegistryHive]::LocalMachine,
+                [Microsoft.Win32.RegistryView]::Registry64
+            )
+            $key = $null
+            try {
+                $key = $base.OpenSubKey('SOFTWARE\Clients\Mail\SendArc')
+                $raw = $key.GetValue(
+                    'DLLPath',
+                    $null,
+                    [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+                )
+                $raw | Should -Be '%PROGRAMFILES%\SendArc\SendArc.dll'
+            } finally {
+                if ($null -ne $key) { $key.Dispose() }
+                $base.Dispose()
+            }
         }
 
         # Phase 11.1 D-03 / D-18 case 4 — Start Menu shortcut location regression
@@ -319,9 +367,9 @@ Describe "SendArc installer round-trip" {
             Test-Path (Join-Path $script:InstallDir32 'SendArc.dll') | Should -BeFalse
         }
 
-        # QUICK-260423-ntu item 20 — WOW6432Node MAPI key removed
-        It "20. HKLM WOW6432Node MAPI handler key is gone after uninstall" {
-            Test-Path $script:MapiKey32 | Should -BeFalse
+        # QUICK-260423-ntu item 20 — shared MAPI key removed
+        It "20. HKLM MAPI handler key is gone after uninstall" {
+            Test-Path $script:MapiKey | Should -BeFalse
         }
     }
 }

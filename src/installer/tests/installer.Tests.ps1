@@ -89,8 +89,10 @@ Describe "SendArc installer round-trip" {
             $json = Get-Content $script:BackupJson -Raw | ConvertFrom-Json
             $json.PSObject.Properties.Name | Should -Contain 'previousClient'
             $json.PSObject.Properties.Name | Should -Contain 'backedUpAt'
-            # backedUpAt should look like an ISO-8601 timestamp
-            $json.backedUpAt | Should -Match '^\d{4}-\d{2}-\d{2}T'
+            # PowerShell 7 may deserialize an ISO-8601 JSON string directly to
+            # DateTime, so validate parseability instead of its runtime type.
+            $parsedTimestamp = [DateTimeOffset]::MinValue
+            [DateTimeOffset]::TryParse([string]$json.backedUpAt, [ref]$parsedTimestamp) | Should -BeTrue
         }
 
         # D-21 item 5 — AUMID stamped on shortcut

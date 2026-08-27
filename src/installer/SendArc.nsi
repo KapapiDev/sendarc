@@ -137,6 +137,7 @@ Section "Install" SecInstall
   ; D-09 — MAPI handler registration (machine-wide).
   ; Subkey + DLLPath are set first; the HKLM\SOFTWARE\Clients\Mail\(Default)
   ; overwrite happens AFTER the backup call above.
+  SetRegView 64
   WriteRegStr HKLM "SOFTWARE\Clients\Mail\SendArc" "" "SendArc"
   WriteRegStr HKLM "SOFTWARE\Clients\Mail\SendArc" "DLLPath" "$INSTDIR\SendArc.dll"
   WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" "SendArc"
@@ -149,7 +150,7 @@ Section "Install" SecInstall
   WriteRegStr HKLM "SOFTWARE\Clients\Mail\SendArc" "" "SendArc"
   WriteRegStr HKLM "SOFTWARE\Clients\Mail\SendArc" "DLLPath" "$PROGRAMFILES32\SendArc\SendArc.dll"
   WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" "SendArc"
-  SetRegView default
+  SetRegView 64
 
   ; Uninstaller binary
   WriteUninstaller "$INSTDIR\uninstall.exe"
@@ -199,13 +200,14 @@ Function BackupPreviousMailClient
   ReadEnvStr $5 PROGRAMDATA
   CreateDirectory "$5\SendArc\uninst"
 
+  SetRegView 64
   ReadRegStr $0 HKLM "SOFTWARE\Clients\Mail" ""
 
   ; QUICK-260423-ntu T3c — also capture the WOW6432 view's (Default)
   ; Mail client so the uninstaller can restore both views symmetrically.
   SetRegView 32
   ReadRegStr $4 HKLM "SOFTWARE\Clients\Mail" ""
-  SetRegView default
+  SetRegView 64
 
   ; Upgrade case: existing install. Preserve original backup, skip write.
   StrCmp $0 "SendArc" AlreadyUs
@@ -691,12 +693,13 @@ Section "Uninstall"
   SetShellVarContext current
 
   ; 3. MAPI handler key (native view)
+  SetRegView 64
   DeleteRegKey HKLM "SOFTWARE\Clients\Mail\SendArc"
 
   ; 3b. QUICK-260423-ntu T3c — WOW6432 MAPI handler key (32-bit view)
   SetRegView 32
   DeleteRegKey HKLM "SOFTWARE\Clients\Mail\SendArc"
-  SetRegView default
+  SetRegView 64
 
   ; 4. Restore (Default) Mail client from backup (D-11)
   Call un.RestorePreviousMailClient
@@ -775,6 +778,7 @@ SectionEnd
 ; Otherwise: try fallbacks (Microsoft Outlook -> Outlook -> Windows Mail) or clear to "".
 Function un.RestorePreviousMailClient
   ReadEnvStr $6 PROGRAMDATA
+  SetRegView 64
 
   ; Guard 1: only restore if current (Default) is still our claim
   ReadRegStr $0 HKLM "SOFTWARE\Clients\Mail" ""
@@ -872,7 +876,7 @@ WowSkipTrim:
 WowKeyGone:
   DetailPrint "WOW6432 previous client subkey missing — skipping restore"
 WowDone:
-  SetRegView default
+  SetRegView 64
   Goto Wow6432End
 NoWow6432:
 Wow6432End:

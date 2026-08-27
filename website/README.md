@@ -28,7 +28,7 @@ The Playwright suite covers 1440×900 desktop, 768×1024 tablet, and 390×844 mo
 - Functions directory: `functions`
 - D1 binding name: `SENDARC_DB`
 
-Create a free D1 database named `sendarc-leads`, bind it to the Pages project as `SENDARC_DB`, then apply `migrations/0001_business_beta.sql`. The checked-in `wrangler.jsonc` intentionally contains no made-up database UUID; bind the actual database in Cloudflare or add its real ID to the configuration before deployment.
+The free D1 database `sendarc-leads` is recorded in `wrangler.jsonc` and binds as `SENDARC_DB`. Apply `migrations/0001_business_beta.sql` after creating a replacement database or when initializing another environment.
 
 For local Functions testing after a build:
 

@@ -7,3 +7,4 @@ test-results/
 coverage/
 .env
 .dev.vars
+*.zip

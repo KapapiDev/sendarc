@@ -61,13 +61,13 @@ Status meanings:
 
 | Requirement | Status | Evidence | Gap / release gate |
 |---|---|---|---|
-| Reference-matched scrolling website | Verified locally; deployment verification pending | Astro/Cloudflare site; desktop/tablet/mobile Playwright and axe checks; full-page production-build capture and comparison in [WEBSITE_VISUAL_QA.md](WEBSITE_VISUAL_QA.md) | Repeat the visual check on the deployed Cloudflare URL |
-| Truthful Gmail-only claims/no dead buttons | Verified locally | Nine static routes build; broken-link scan passes; Playwright exercises navigation, FAQ and beta form | Repeat against deployed production URL and real release asset |
-| Affixa-alternative route and independence wording | Implemented; deployment verification pending | `/affixa-alternative/`, official retirement link, canonical metadata, and independence wording | Verify live external link and deployed metadata |
-| Privacy/terms/licenses/security/support routes | Verified locally | All routes build and pass link/accessibility/browser checks | Repeat on deployed URLs |
-| Business-beta form | Implemented; deployment verification pending | Pages Function + D1 `SENDARC_DB`; D1 database `sendarc-leads` provisioned, bound, and migrated; [MARKET_VALIDATION.md](MARKET_VALIDATION.md) | Deploy, then submit/retrieve/delete/rate-limit test against the live endpoint |
-| Privacy-minimized analytics | In progress | Allowlisted event design and optional Cloudflare Web Analytics documented | Deploy, verify exact payloads/retention, and record dashboard/retrieval access |
-| Public Cloudflare deployment | In progress | Cloudflare Pages project `sendarc` is provisioned | Upload the built site, then run functional/visual verification on the generated URL |
+| Reference-matched scrolling website | Verified | Astro/Cloudflare site; full-page production-build capture; 20 deployed desktop/tablet/mobile/landscape Playwright and axe scenarios passed on 2026-08-28; [WEBSITE_VISUAL_QA.md](WEBSITE_VISUAL_QA.md) | None before the release asset changes the download state |
+| Truthful Gmail-only claims/no dead buttons | Verified for current release-pending state | Nine static routes build; broken-link scan passes; deployed Playwright exercises navigation, FAQ and beta form | Repeat after publishing the real release asset |
+| Affixa-alternative route and independence wording | Verified | Deployed `/affixa-alternative/`, canonical metadata, official retirement link, and independence wording | None |
+| Privacy/terms/licenses/security/support routes | Verified | All deployed routes pass link, accessibility, and browser checks | None |
+| Business-beta form | Verified | Production Pages Function + D1 returned 201, stored the exact test fields, and the synthetic row was retrieved and deleted on 2026-08-28; [MARKET_VALIDATION.md](MARKET_VALIDATION.md) | Continue operational retention/deletion review after real submissions begin |
+| Privacy-minimized analytics | Verified for first-party event pipeline | Production allowlisted event returned 204, an invalid event returned 400, D1 retrieval succeeded, and the synthetic event/abuse rows were deleted | Optional Cloudflare Web Analytics remains nonessential |
+| Public Cloudflare deployment | Verified | `https://sendarc.pages.dev` production deployment; Functions bundle and D1 binding active; 20 live cross-viewport tests passed | Custom domain remains deferred |
 | Custom `SendArc.app` domain | Deferred | Owner explicitly deferred purchase/connection; [DECISIONS.md](../DECISIONS.md) | No purchase or payment; generated Cloudflare URL is acceptable |
 | Operator/support identity | Verified decision | 장형진 / `maxtop9843@gmail.com` in policies and decisions | Recheck all public pages/Google consent metadata |
 | GitHub issue forms | Implemented; verification pending | Bug, compatibility, and feature forms under `.github/ISSUE_TEMPLATE` | Push and open template chooser; confirm labels/forms render |

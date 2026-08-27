@@ -28,4 +28,4 @@ Intentional product-truth changes from the reference:
 
 ## Result
 
-The local production build is visually coherent with the supplied direction and has no observed desktop-width overflow or missing primary imagery. Deployment verification remains separate: repeat the same check on the generated Cloudflare Pages URL after the first successful upload.
+The local production build is visually coherent with the supplied direction and has no observed desktop-width overflow or missing primary imagery. The production deployment at `https://sendarc.pages.dev` was then verified at desktop, tablet, mobile, small-mobile, and mobile-landscape sizes: all 20 Playwright scenarios passed, including axe accessibility, responsive overflow, navigation/legal routes, FAQ interaction, and the declared-field form contract.

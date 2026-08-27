@@ -19,18 +19,20 @@ The website can measure steps 1–3 and GitHub can expose aggregate release-asse
 
 ## Website measurement design
 
-When deployed, the site uses Cloudflare Pages/Pages Functions with these privacy-minimized mechanisms:
+The production site at `https://sendarc.pages.dev` uses Cloudflare Pages/Pages Functions with these privacy-minimized mechanisms:
 
 - Cloudflare Web Analytics, if enabled, for aggregate page/performance statistics;
 - a first-party `/api/events` endpoint backed by D1 for an allowlist of landing/Affixa views, download CTA, beta CTA, and beta-submission events;
 - referrer **host** and allowed UTM source/campaign values only;
 - no cookie, cross-site ID, recipient/message fields, OAuth data, or stable visitor fingerprint.
 
-Until the Cloudflare Pages project, Web Analytics, Functions, and `SENDARC_DB` binding are actually deployed, the metrics above are prepared but not active.
+The first-party event endpoint and `SENDARC_DB` binding were verified in production on 2026-08-28: an allowlisted event returned 204 and was retrievable in D1, while an invalid event returned 400. The synthetic event and its abuse-window rows were deleted immediately after verification. Optional Cloudflare Web Analytics is not required for the first-party measurement path.
 
 ## Business-beta data
 
 The Cloudflare D1 binding is `SENDARC_DB`; the intended database is `sendarc-leads`. The form stores only work email, company, seat range, current workflow, optional note, allowed UTM values, and timestamps.
+
+The live Business Beta endpoint returned 201 and the submitted declared fields were retrieved from D1 on 2026-08-28. The synthetic lead was deleted immediately after verification, and a follow-up query confirmed zero matching lead and event rows.
 
 An IP + user-agent SHA-256 hash may be retained for abuse throttling for at most 24 hours; raw IP/user-agent values are not copied into the lead record. Lead data is deleted at the earlier of a valid deletion request or 12 months after the last product/beta contact.
 

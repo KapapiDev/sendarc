@@ -23,12 +23,13 @@ Last updated: 2026-08-28
 - Dedicated Google Cloud project `sendarc` created and Gmail API enabled without billing.
 - Cloudflare D1 database `sendarc-leads` provisioned, bound, and migrated; Cloudflare Pages project `sendarc` provisioned.
 - Local production website captured and compared with the supplied reference; no desktop-width overflow or missing primary imagery was observed.
+- Cloudflare Pages production deployment is live at `https://sendarc.pages.dev`; all 20 deployed desktop/tablet/mobile/landscape Playwright and axe scenarios pass.
+- Production Pages Functions and D1 were verified end to end: Business Beta returned 201 and persisted its declared fields, the allowlisted event endpoint returned 204, invalid events returned 400, and all synthetic verification rows were deleted afterward.
 
 ## In progress
 
 - Verify the application/installer/registry/AUMID/path rebrand on clean Windows runners.
 - Run the repaired Windows x64/x86 CI, interceptor harness, and installer smoke tests.
-- Deploy the already-provisioned Cloudflare Pages project on its generated URL; custom domain remains deferred.
 - Complete the dedicated Google OAuth consent screen and desktop client without committing credentials.
 
 ## Not yet complete
@@ -37,7 +38,7 @@ Last updated: 2026-08-28
 - Real Gmail test-account send verified in Gmail Sent.
 - Signed binaries. The no-payment beta is expected to be explicitly unsigned unless a legitimate free signing route becomes available.
 - GitHub `v0.1.0-beta` tag/release, installer asset, and SHA256 checksums.
-- Public Cloudflare website, working download, business-beta form, analytics, and browser/mobile QA.
+- Published GitHub release asset and working website download path.
 - Full Windows end-to-end test from a legacy MAPI application through Gmail Sent.
 
 Do not describe SendArc as launched until every acceptance item in the autonomous build prompt has been verified.

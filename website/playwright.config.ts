@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   outputDir: "./test-results",
@@ -8,16 +10,18 @@ export default defineConfig({
   ...(process.env.CI ? { workers: 2 } : {}),
   reporter: process.env.CI ? [["html", { open: "never" }], ["github"]] : "list",
   use: {
-    baseURL: "http://127.0.0.1:4321",
+    baseURL: externalBaseURL ?? "http://127.0.0.1:4321",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  webServer: {
-    command: "npm run preview:test",
-    url: "http://127.0.0.1:4321",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  ...(externalBaseURL ? {} : {
+    webServer: {
+      command: "npm run preview:test",
+      url: "http://127.0.0.1:4321",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+  }),
   projects: [
     {
       name: "desktop",

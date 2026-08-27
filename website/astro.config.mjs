@@ -11,6 +11,9 @@ export default defineConfig({
   },
   vite: {
     build: {
+      // Keep browser code in same-origin assets so the production CSP can stay
+      // strict without allowing arbitrary inline script execution.
+      assetsInlineLimit: 0,
       sourcemap: false,
     },
   },

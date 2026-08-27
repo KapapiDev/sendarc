@@ -105,6 +105,7 @@ betaForm?.addEventListener("submit", async (event) => {
   if (!betaForm.reportValidity()) return;
 
   const submit = qs<HTMLButtonElement>("button[type='submit']", betaForm);
+  const submitLabel = qs<HTMLElement>("[data-submit-label]", betaForm);
   const status = qs<HTMLElement>("[data-form-status]", betaForm);
   const fallback = qs<HTMLAnchorElement>("[data-form-fallback]", betaForm);
   const formData = new FormData(betaForm);
@@ -112,7 +113,11 @@ betaForm?.addEventListener("submit", async (event) => {
   const payload = Object.fromEntries(formData.entries());
   Object.assign(payload, { utmSource, utmCampaign });
 
-  if (submit) submit.disabled = true;
+  if (submit) {
+    submit.disabled = true;
+    submit.setAttribute("aria-busy", "true");
+  }
+  if (submitLabel) submitLabel.textContent = "Joining…";
   if (status) status.textContent = "Submitting your beta request…";
   if (fallback) fallback.hidden = true;
 
@@ -141,7 +146,11 @@ betaForm?.addEventListener("submit", async (event) => {
       fallback.hidden = false;
     }
   } finally {
-    if (submit) submit.disabled = false;
+    if (submit) {
+      submit.disabled = false;
+      submit.removeAttribute("aria-busy");
+    }
+    if (submitLabel) submitLabel.textContent = "Join Business Beta";
   }
 });
 

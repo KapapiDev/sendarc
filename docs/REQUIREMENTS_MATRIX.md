@@ -33,7 +33,7 @@ Status meanings:
 | Gmail `users.messages.send` transport | Implemented; verification pending | `internal/mapi/gmail.go` uses `/messages/send`; request/error tests in `gmail_test.go` | Current clean Windows CI and a real Gmail Sent result |
 | Exact `gmail.send` scope; no mailbox/profile scope | Implemented; verification pending | `src/app/auth.go`, [OAUTH.md](OAUTH.md) | Inspect actual consent URL/screen and Google Cloud configuration |
 | Windows Credential Manager token storage | Implemented; verification pending | Keyring service `SendArc`, account `oauth-tokens` in `src/app/auth.go` | Real Windows save/load/refresh/disconnect/reconnect evidence |
-| Local preview before transmission | Implemented; verification pending | `QueueRow.svelte` and `App.svelte`; 60 frontend tests passed locally on 2026-08-27 | Wails/Windows runtime and real MAPI foreground/preview flow |
+| Local preview before transmission | Implemented; verification pending | `QueueRow.svelte` and `App.svelte`; 64 frontend tests passed locally on 2026-08-28 | Wails/Windows runtime and real MAPI foreground/preview flow |
 | Explicit Send and Cancel/Discard; no auto-send/draft | Implemented; verification pending | `App.SendMessageForID`, manual-only settings, removed auto-mode controls; [ARCHITECTURE.md](ARCHITECTURE.md) | Current Go suite/Windows build plus runtime proof that notifications cannot send |
 | Preserve To/Cc/Bcc/subject/body/attachments/Unicode | Implemented; verification pending | Go protocol/MIME tests and C++ converter/harness tests in the worktree | x86 and x64 harness must run against exact built DLLs; representative real applications still untested |
 | Attachment/path/header validation | Implemented; verification pending | Go validation tests and C++ `fs_utils`/`message_converter` regression tests | Clean x86/x64 CTest and adversarial Windows file tests |
@@ -76,9 +76,9 @@ Status meanings:
 
 | Requirement | Status | Evidence | Gap / release gate |
 |---|---|---|---|
-| Current app/frontend tests | Partial | On 2026-08-27, frontend: 60 tests passed, Svelte check 0 errors/warnings, production build passed; `internal/mapi` Go tests passed | App Go package and all adjacent suites must pass after active rebrand merges |
+| Current app/frontend tests | Partial | On 2026-08-28, frontend: 64 tests passed, Svelte check 0 errors/warnings, production build passed; `internal/mapi` Go tests passed | App Go package and all adjacent suites must pass after active rebrand merges |
 | C++/installer CI | In progress | Workflows and harness/smoke repairs in worktree | Push and obtain unmasked green x86/x64/installer results |
-| Website CI/QA | Verified locally; clean CI pending | Lint/typecheck/build/link scan pass; 5 unit and 12 Playwright desktop/tablet/mobile tests pass with axe | Push and obtain green GitHub Actions; add full-page visual artifact |
+| Website CI/QA | Verified locally; clean CI pending | Lint/typecheck/build/link scan pass; 5 unit and 20 Playwright desktop/tablet/mobile/landscape tests pass with axe; full-page visual artifact recorded | Push and obtain green GitHub Actions |
 | Dependency/secret/security audit | In progress | Attachment/header/error hardening and policies exist | Resolve/document npm audit findings; Go/vendored/website dependency review; secret scan; update-integrity and installer command-injection review |
 | `v0.1.0-beta` tag/release | Missing | No SendArc release returned by GitHub on 2026-08-27 | Green candidate, immutable tag, versioned installer, checksums, source, complete notes |
 | Website download path | Missing | Release asset and production website do not yet exist | Verify real browser download of the exact checksummed installer |

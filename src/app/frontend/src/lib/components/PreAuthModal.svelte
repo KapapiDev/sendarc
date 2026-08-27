@@ -1,9 +1,23 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { activateModal, handleModalKeydown } from '../modal';
+
   let { onContinue, onCancel }: { onContinue: () => void; onCancel: () => void } = $props();
+  let modal: HTMLDivElement;
+
+  onMount(() => activateModal(modal));
 </script>
 
-<div class="backdrop" role="dialog" aria-modal="true" aria-labelledby="preauth-title">
-  <div class="modal">
+<div class="backdrop">
+  <div
+    class="modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="preauth-title"
+    tabindex="-1"
+    bind:this={modal}
+    onkeydown={(event) => handleModalKeydown(event, modal, onCancel)}
+  >
     <h2 id="preauth-title">One thing before we continue</h2>
     <p>
       During the beta, Google may show a warning that <strong>SendArc isn't verified</strong>.
@@ -37,6 +51,8 @@
     max-width: 28rem; width: calc(100% - 2rem);
     padding: 1.5rem;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
   }
   .modal h2 { margin-top: 0; }
   .steps { padding-left: 1.5rem; }
@@ -44,9 +60,10 @@
   .note { font-size: 0.85rem; color: #555; }
   .actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
   .actions button {
-    padding: 0.5rem 1rem; border-radius: 4px; border: 0; cursor: pointer; font-size: 0.95rem;
+    min-height: 40px; padding: 0.5rem 1rem; border-radius: 4px; border: 0; cursor: pointer; font-size: 0.95rem;
   }
   .primary { background: #1a73e8; color: white; }
   .secondary { background: #eee; color: #222; }
   .actions button:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+  .actions button:active { opacity: 0.8; }
 </style>

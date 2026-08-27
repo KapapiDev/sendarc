@@ -40,6 +40,19 @@ button {
   font-family: inherit;
 }
 
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+:where(button, a) {
+  touch-action: manipulation;
+}
+
+:where(button, a):active {
+  opacity: 0.82;
+}
+
 main {
   box-sizing: border-box;
   width: min(960px, 100%);
@@ -142,4 +155,13 @@ main {
 
 @media (max-width: 620px) {
   main { padding: var(--space-md); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

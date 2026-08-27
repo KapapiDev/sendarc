@@ -1,3 +1,7 @@
+---
+import Icon from "./Icon.astro";
+---
+
 <form class="beta-form" data-beta-form>
   <div class="form-grid">
     <label>
@@ -68,15 +72,15 @@
   </div>
 
   <button class="button button--primary beta-submit" type="submit" data-track="business_beta_submit">
-    <span>Join Business Beta</span>
-    <span aria-hidden="true" class="button-arrow">↗</span>
+    <span data-submit-label>Join Business Beta</span>
+    <Icon name="external-link" size={17} class="button-arrow" />
   </button>
 
   <p class="form-disclosure">
     No payment today. This form collects only contact and workflow information.
     <a href="/privacy/#beta-data">Privacy details</a>
   </p>
-  <p class="form-status" role="status" aria-live="polite" data-form-status></p>
+  <p class="form-status" role="status" aria-live="polite" aria-atomic="true" data-form-status></p>
   <a class="form-email-fallback" href="mailto:maxtop9843@gmail.com" hidden data-form-fallback>
     Open a prefilled support email instead
   </a>

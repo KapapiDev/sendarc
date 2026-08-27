@@ -61,7 +61,7 @@
     background: transparent;
     border: 1px solid var(--c-border);
     border-radius: 6px;
-    min-height: 36px;
+    min-height: 40px;
     padding: 6px var(--space-btn-x);
     cursor: pointer;
     color: var(--c-text);

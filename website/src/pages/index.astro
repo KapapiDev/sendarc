@@ -2,6 +2,7 @@
 import BetaForm from "../components/BetaForm.astro";
 import DownloadLink from "../components/DownloadLink.astro";
 import Faq from "../components/Faq.astro";
+import Icon from "../components/Icon.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { SITE_DESCRIPTION } from "../lib/site";
 
@@ -88,12 +89,12 @@ const structuredData = {
         </p>
         <div class="hero-actions">
           <DownloadLink />
-          <a class="text-link" href="#how-it-works">Learn how it works <span aria-hidden="true">↓</span></a>
+          <a class="text-link" href="#how-it-works">Learn how it works <Icon name="arrow-down" size={17} /></a>
         </div>
         <ul class="hero-assurances" aria-label="SendArc assurances">
-          <li><span aria-hidden="true">⌕</span> Local preview</li>
-          <li><span aria-hidden="true">⌾</span> Secure OAuth</li>
-          <li><span aria-hidden="true">↯</span> Easy setup</li>
+          <li><Icon name="eye" size={17} /> Local preview</li>
+          <li><Icon name="shield-check" size={17} /> Secure OAuth</li>
+          <li><Icon name="zap" size={17} /> Easy setup</li>
         </ul>
       </div>
 
@@ -126,22 +127,22 @@ const structuredData = {
       <h2 class="visually-hidden" id="benefits-heading">Key benefits</h2>
       <div class="benefit-grid">
         <article data-reveal>
-          <span class="line-icon" aria-hidden="true">▦</span>
+          <Icon name="grid" size={31} class="line-icon" />
           <h3>No workflow change</h3>
           <p>Keep using the Windows software your team already depends on.</p>
         </article>
         <article data-reveal>
-          <span class="line-icon" aria-hidden="true">✉</span>
+          <Icon name="mail" size={31} class="line-icon" />
           <h3>Use Gmail</h3>
           <p>Send through Gmail or Google Workspace with your existing account.</p>
         </article>
         <article data-reveal>
-          <span class="line-icon" aria-hidden="true">♙</span>
+          <Icon name="shield-check" size={31} class="line-icon" />
           <h3>Secure by design</h3>
           <p>OAuth tokens stay in Windows Credential Manager. No inbox access.</p>
         </article>
         <article data-reveal>
-          <span class="line-icon" aria-hidden="true">ϟ</span>
+          <Icon name="zap" size={31} class="line-icon" />
           <h3>Focused setup</h3>
           <p>A small Windows utility, not another desktop mail client.</p>
         </article>
@@ -159,19 +160,19 @@ const structuredData = {
       <ol class="workflow-grid">
         <li data-reveal>
           <span class="step-number">1</span>
-          <span class="step-icon" aria-hidden="true">↓</span>
+          <Icon name="download" size={36} class="step-icon" />
           <h3>Install SendArc</h3>
           <p>Install the Windows beta and let SendArc register as the Simple MAPI handler.</p>
         </li>
         <li data-reveal>
           <span class="step-number">2</span>
-          <span class="step-icon" aria-hidden="true">◎</span>
+          <Icon name="link" size={36} class="step-icon" />
           <h3>Connect Google</h3>
           <p>Sign in to one Gmail or Google Workspace account with the gmail.send permission.</p>
         </li>
         <li data-reveal>
           <span class="step-number">3</span>
-          <span class="step-icon" aria-hidden="true">✓</span>
+          <Icon name="check-circle" size={36} class="step-icon" />
           <h3>Preview, then send</h3>
           <p>Review recipients, subject, body, and attachments locally. Send only when ready.</p>
         </li>
@@ -188,17 +189,17 @@ const structuredData = {
           SendArc keeps a narrow job: help existing line-of-business software hand an outgoing message to Gmail safely.
         </p>
         <ul class="check-list">
-          <li>Works with supported Simple MAPI calls</li>
-          <li>No new desktop mail client to learn</li>
-          <li>Local-first message handling</li>
-          <li>Open-source code and inspectable releases</li>
+          <li><Icon name="check" size={18} />Works with supported Simple MAPI calls</li>
+          <li><Icon name="check" size={18} />No new desktop mail client to learn</li>
+          <li><Icon name="check" size={18} />Local-first message handling</li>
+          <li><Icon name="check" size={18} />Open-source code and inspectable releases</li>
         </ul>
       </div>
       <div class="reason-grid" data-reveal>
-        <article><span aria-hidden="true">▣</span><h3>Legacy app friendly</h3><p>Designed for the Windows send actions that older business tools still use.</p></article>
-        <article><span aria-hidden="true">⌂</span><h3>Local preview</h3><p>Review the complete outgoing message before any send request leaves the PC.</p></article>
-        <article><span aria-hidden="true">⌾</span><h3>Least privilege</h3><p>The beta asks for gmail.send, not mailbox reading or search access.</p></article>
-        <article><span aria-hidden="true">↗</span><h3>Direct to Google</h3><p>No SendArc-operated relay receives your message content.</p></article>
+        <article><Icon name="app-window" size={27} /><h3>Legacy app friendly</h3><p>Designed for the Windows send actions that older business tools still use.</p></article>
+        <article><Icon name="eye" size={27} /><h3>Local preview</h3><p>Review the complete outgoing message before any send request leaves the PC.</p></article>
+        <article><Icon name="key" size={27} /><h3>Least privilege</h3><p>The beta asks for gmail.send, not mailbox reading or search access.</p></article>
+        <article><Icon name="external-link" size={27} /><h3>Direct to Google</h3><p>No SendArc-operated relay receives your message content.</p></article>
       </div>
     </div>
   </section>

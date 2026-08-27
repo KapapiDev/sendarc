@@ -16,8 +16,9 @@ Last updated: 2026-08-28
 - Reference image copied to `docs/design/SendArc-final-reference.png`.
 - Support issue forms and privacy/security/decision/release documentation added.
 - Reference-matched Astro/Cloudflare website, legal/support/Affixa routes, real release discovery, first-party event endpoints, and D1-backed Business Beta form implemented.
-- Website lint, typecheck, build, link checks, 5 unit tests, and 12 desktop/tablet/mobile Playwright tests (including axe accessibility) pass locally.
-- Go tests and vet pass; frontend check, 60 tests, build, and dependency audit pass with zero known npm vulnerabilities.
+- Website lint, typecheck, build, link checks, 5 unit tests, and 20 desktop/tablet/mobile/landscape Playwright tests (including axe accessibility) pass locally.
+- Go tests and vet pass; frontend check, 64 tests, build, and dependency audit pass with zero known npm vulnerabilities.
+- UI/UX Pro Max audit applied: consistent SVG icon language, visible keyboard focus, accessible modal focus/escape behavior, reduced-motion handling, and explicit asynchronous form progress.
 - Gitleaks current-history scan and GitHub Actions syntax validation pass locally.
 - Dedicated Google Cloud project `sendarc` created and Gmail API enabled without billing.
 - Cloudflare D1 database `sendarc-leads` provisioned, bound, and migrated; Cloudflare Pages project `sendarc` provisioned.

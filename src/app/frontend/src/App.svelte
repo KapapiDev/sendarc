@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { EventsOn } from '../wailsjs/runtime/runtime';
-  import { SendMessageForID, DismissEmail } from '../wailsjs/go/main/App';
+  import { SendMessageForID, DismissEmail, OpenDiagnosticLogs } from '../wailsjs/go/main/App';
   import { subscribeQueue, fetchQueue, type EmailWithId } from './lib/queue';
   import {
     fetchAuthStatus,
@@ -192,6 +192,14 @@
   async function handleSignOutClick() {
     await signOut();
   }
+
+  async function handleOpenLogs() {
+    try {
+      await OpenDiagnosticLogs();
+    } catch {
+      errorMsg = 'SendArc could not open app.log. Restart the app and try again.';
+    }
+  }
 </script>
 
 {#if updateState?.updateAvailable}
@@ -207,6 +215,7 @@
     email={auth.email ?? ''}
     name={auth.name ?? ''}
     onSignOut={handleSignOutClick}
+    onOpenLogs={handleOpenLogs}
   />
 {/if}
 
@@ -217,6 +226,7 @@
     <section class="state state--error" role="alert">
       <h2>SendArc needs attention</h2>
       <p>SendArc cannot read the local email queue. Restart the app, or check app.log for details.</p>
+      <button type="button" class="state-action" onclick={handleOpenLogs}>Open diagnostic log</button>
     </section>
   {:else if queue.length === 0}
     <section class="state state--empty">

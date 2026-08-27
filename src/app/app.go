@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/marcfargas/go-mapi/internal/mapi"
+	"github.com/pkg/browser"
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -221,11 +224,18 @@ func (a *App) startup(ctx context.Context) {
 			// Detect newly arrived emails (present now but not in knownIds) and
 			// fire arrival toasts. Only emails that arrive while the app is running
 			// get toasts — seeded IDs are silently absorbed (NOTIF-04).
+			hasNewMessage := false
 			for _, e := range snap {
 				if _, seen := knownIds[e.Id]; !seen {
 					emitArrivalToast(a, e)
 					knownIds[e.Id] = struct{}{}
+					hasNewMessage = true
 				}
+			}
+			// A MAPI action is an explicit foreground workflow: bring the local
+			// review window forward so the message cannot send without preview.
+			if hasNewMessage {
+				a.showWindow()
 			}
 			// Prune knownIds for emails that left the queue (drafted / dismissed)
 			// to avoid unbounded memory growth in long-running sessions.
@@ -355,6 +365,29 @@ func (a *App) GetQueue() []mapi.EmailWithId {
 		return nil
 	}
 	return a.watcher.Snapshot()
+}
+
+// OpenDiagnosticLogs opens the privacy-filtered per-user app log in the
+// system's default text viewer. The path contains operational events only;
+// message bodies, recipients, attachment paths, and OAuth tokens are never
+// written by the logging layer.
+func (a *App) OpenDiagnosticLogs() error {
+	dir := appDataDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("diagnostics: create log directory: %w", err)
+	}
+	path := filepath.Join(dir, "app.log")
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		if err := os.WriteFile(path, nil, 0o600); err != nil {
+			return fmt.Errorf("diagnostics: create log file: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("diagnostics: inspect log file: %w", err)
+	}
+	if err := browser.OpenFile(path); err != nil {
+		return fmt.Errorf("diagnostics: open log file: %w", err)
+	}
+	return nil
 }
 
 // --- Pause / mode / backlog helpers (D-10, D-14, D-15) ---

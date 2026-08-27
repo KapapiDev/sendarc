@@ -16,7 +16,7 @@ Status meanings:
 
 | Requirement | Status | Evidence | Gap / release gate |
 |---|---|---|---|
-| Public SendArc repository | Verified | [maxtop9843-byte/sendarc](https://github.com/maxtop9843-byte/sendarc) is public | Current SendArc changes still need review, commit, and push |
+| Public SendArc repository | Verified | [maxtop9843-byte/sendarc](https://github.com/maxtop9843-byte/sendarc) is public; current work is pushed in PR #1 | Merge only after the current clean CI and release gates pass |
 | Preserve Git history and `upstream` remote | Verified | Local remotes: `origin=maxtop9843-byte/sendarc`, `upstream=marcfargas/go-mapi`; history starts from upstream | Recheck at release tag |
 | Record exact upstream baseline | Verified | `b90fcb08754f910fc318cbc922cbf24702582463` in [DECISIONS.md](../DECISIONS.md) and [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) | None |
 | Baseline build/test before modification | Verified for baseline only | GitHub Actions [run 32971058311](https://github.com/maxtop9843-byte/sendarc/actions/runs/32971058311) succeeded at the baseline SHA | This run does not validate SendArc changes; the interceptor harness coverage in that baseline was later found inadequate |
@@ -65,9 +65,9 @@ Status meanings:
 | Truthful Gmail-only claims/no dead buttons | Verified locally | Nine static routes build; broken-link scan passes; Playwright exercises navigation, FAQ and beta form | Repeat against deployed production URL and real release asset |
 | Affixa-alternative route and independence wording | Implemented; deployment verification pending | `/affixa-alternative/`, official retirement link, canonical metadata, and independence wording | Verify live external link and deployed metadata |
 | Privacy/terms/licenses/security/support routes | Verified locally | All routes build and pass link/accessibility/browser checks | Repeat on deployed URLs |
-| Business-beta form | In progress | Planned Pages Function + D1 `SENDARC_DB`; [MARKET_VALIDATION.md](MARKET_VALIDATION.md) | Provision/bind real free D1, migrate, submit/retrieve/delete/rate-limit tests |
+| Business-beta form | Implemented; deployment verification pending | Pages Function + D1 `SENDARC_DB`; D1 database `sendarc-leads` provisioned, bound, and migrated; [MARKET_VALIDATION.md](MARKET_VALIDATION.md) | Deploy, then submit/retrieve/delete/rate-limit test against the live endpoint |
 | Privacy-minimized analytics | In progress | Allowlisted event design and optional Cloudflare Web Analytics documented | Deploy, verify exact payloads/retention, and record dashboard/retrieval access |
-| Public Cloudflare deployment | Missing | Cloudflare is the selected target | Preview deploy, functional/visual verification, then production generated URL |
+| Public Cloudflare deployment | In progress | Cloudflare Pages project `sendarc` is provisioned | Upload the built site, then run functional/visual verification on the generated URL |
 | Custom `SendArc.app` domain | Deferred | Owner explicitly deferred purchase/connection; [DECISIONS.md](../DECISIONS.md) | No purchase or payment; generated Cloudflare URL is acceptable |
 | Operator/support identity | Verified decision | 장형진 / `maxtop9843@gmail.com` in policies and decisions | Recheck all public pages/Google consent metadata |
 | GitHub issue forms | Implemented; verification pending | Bug, compatibility, and feature forms under `.github/ISSUE_TEMPLATE` | Push and open template chooser; confirm labels/forms render |
@@ -82,7 +82,7 @@ Status meanings:
 | Dependency/secret/security audit | In progress | Attachment/header/error hardening and policies exist | Resolve/document npm audit findings; Go/vendored/website dependency review; secret scan; update-integrity and installer command-injection review |
 | `v0.1.0-beta` tag/release | Missing | No SendArc release returned by GitHub on 2026-08-27 | Green candidate, immutable tag, versioned installer, checksums, source, complete notes |
 | Website download path | Missing | Release asset and production website do not yet exist | Verify real browser download of the exact checksummed installer |
-| Real Google OAuth + Gmail Sent | Missing | Unit/local mock evidence only | Dedicated SendArc client/consent, controlled account, explicit send visible in Gmail Sent |
+| Real Google OAuth + Gmail Sent | In progress | Dedicated Google Cloud project `sendarc` exists and Gmail API is enabled; unit/local mock evidence passes | Complete SendArc consent/client configuration, inject protected credentials, then prove an explicit send in Gmail Sent |
 | Complete 19-step acceptance flow | Missing | No single end-to-end evidence set | Verify discovery → download → install → registration → OAuth → MAPI → preview → Send → Gmail Sent → uninstall/restore |
 
 ## Owner constraints applied

@@ -26,6 +26,10 @@ export function GetQueue() {
   return window['go']['main']['App']['GetQueue']();
 }
 
+export function OpenDiagnosticLogs() {
+  return window['go']['main']['App']['OpenDiagnosticLogs']();
+}
+
 export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }

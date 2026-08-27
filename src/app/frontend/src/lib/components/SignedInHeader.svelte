@@ -1,8 +1,9 @@
 <script lang="ts">
-  let { email, name, onSignOut }: {
+  let { email, name, onSignOut, onOpenLogs }: {
     email: string;
     name: string;
     onSignOut: () => void;
+    onOpenLogs: () => void;
   } = $props();
 
   const displayName = $derived(email || name || 'your Google account');
@@ -13,7 +14,10 @@
     <span class="brand">SendArc</span>
     <span class="who">Sending with <strong>{displayName}</strong></span>
   </div>
-  <button type="button" class="signout" onclick={onSignOut}>Sign out</button>
+  <div class="actions">
+    <button type="button" class="secondary" onclick={onOpenLogs}>Open logs</button>
+    <button type="button" class="secondary" onclick={onSignOut}>Sign out</button>
+  </div>
 </header>
 
 <style>
@@ -47,7 +51,13 @@
     white-space: nowrap;
   }
 
-  .signout {
+  .actions {
+    display: flex;
+    gap: var(--space-sm);
+    flex: 0 0 auto;
+  }
+
+  .secondary {
     background: transparent;
     border: 1px solid var(--c-border);
     border-radius: 6px;
@@ -59,11 +69,11 @@
     font-family: inherit;
   }
 
-  .signout:hover {
+  .secondary:hover {
     background: var(--c-surface-alt);
   }
 
-  .signout:focus-visible {
+  .secondary:focus-visible {
     outline: 2px solid var(--c-accent);
     outline-offset: -2px;
   }

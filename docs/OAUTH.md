@@ -16,6 +16,8 @@ The user-facing transport calls Gmail `users.messages.send` only after a local p
 
 Use a dedicated Google Cloud project and credentials for SendArc. Do not reuse go-mapi or another product's OAuth client.
 
+Current console state (2026-08-28): the dedicated project exists with project ID `sendarc`, and `gmail.googleapis.com` is enabled. OAuth branding, audience, exact scope, desktop client creation, credential injection, and real-account verification remain release gates.
+
 1. Create/select a Google Cloud project named SendArc.
 2. Enable the Gmail API.
 3. Configure OAuth branding as **SendArc**.

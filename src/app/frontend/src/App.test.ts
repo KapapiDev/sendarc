@@ -9,6 +9,7 @@ vi.mock('../wailsjs/go/main/App', () => ({
   SignOut: vi.fn(),
   SendMessageForID: vi.fn().mockResolvedValue(undefined),
   DismissEmail: vi.fn().mockResolvedValue(undefined),
+  OpenDiagnosticLogs: vi.fn().mockResolvedValue(undefined),
   GetUpdateState: vi.fn().mockResolvedValue({
     currentVersion: '3.0.0',
     latestVersion: '',

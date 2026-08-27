@@ -16,6 +16,8 @@ export function GetPausedState():Promise<boolean>;
 
 export function GetQueue():Promise<Array<mapi.EmailWithId>>;
 
+export function OpenDiagnosticLogs():Promise<void>;
+
 export function GetSettings():Promise<main.AppSettings>;
 
 export function GetUpdateState():Promise<main.UpdateState>;

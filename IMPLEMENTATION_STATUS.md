@@ -19,14 +19,16 @@ Last updated: 2026-08-28
 - Website lint, typecheck, build, link checks, 5 unit tests, and 12 desktop/tablet/mobile Playwright tests (including axe accessibility) pass locally.
 - Go tests and vet pass; frontend check, 60 tests, build, and dependency audit pass with zero known npm vulnerabilities.
 - Gitleaks current-history scan and GitHub Actions syntax validation pass locally.
+- Dedicated Google Cloud project `sendarc` created and Gmail API enabled without billing.
+- Cloudflare D1 database `sendarc-leads` provisioned, bound, and migrated; Cloudflare Pages project `sendarc` provisioned.
 
 ## In progress
 
 - Verify the application/installer/registry/AUMID/path rebrand on clean Windows runners.
 - Run the repaired Windows x64/x86 CI, interceptor harness, and installer smoke tests.
 - Capture and compare the website full-page reference screenshot.
-- Provision D1 and deploy Cloudflare Pages on a generated URL; custom domain remains deferred.
-- Configure a dedicated Google OAuth desktop client and consent screen without committing credentials.
+- Deploy the already-provisioned Cloudflare Pages project on its generated URL; custom domain remains deferred.
+- Complete the dedicated Google OAuth consent screen and desktop client without committing credentials.
 
 ## Not yet complete
 

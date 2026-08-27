@@ -76,7 +76,7 @@ var sessionEndSignal func()
 func registerSessionEndHandler(onQueryEnd func()) (cancel func(), err error) {
 	sessionEndSignal = onQueryEnd
 
-	className, _ := syscall.UTF16PtrFromString("GoMapiSessionEndWnd")
+	className, _ := syscall.UTF16PtrFromString("SendArcSessionEndWnd")
 	hInstance, _, _ := procGetModuleHandle.Call(0)
 
 	wc := wndclassex{

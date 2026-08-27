@@ -16,7 +16,7 @@ The user-facing transport calls Gmail `users.messages.send` only after a local p
 
 Use a dedicated Google Cloud project and credentials for SendArc. Do not reuse go-mapi or another product's OAuth client.
 
-Current console state (2026-08-28): the dedicated project exists with project ID `sendarc`, and `gmail.googleapis.com` is enabled. OAuth branding, audience, exact scope, desktop client creation, credential injection, and real-account verification remain release gates.
+Current console state (2026-08-28): the dedicated project exists with project ID `sendarc`, and `gmail.googleapis.com` is enabled. The Google Authentication Platform is configured as **SendArc** with external Testing audience, test user and developer/support contact `maxtop9843@gmail.com`, deployed SendArc homepage/privacy/terms URLs, authorized domain `sendarc.pages.dev`, and exactly the `gmail.send` scope. A Desktop-app client named **SendArc Windows Desktop** is enabled. Its values are stored only in the gitignored local environment file and protected GitHub Actions secrets. Real-account runtime verification remains a release gate.
 
 1. Create/select a Google Cloud project named SendArc.
 2. Enable the Gmail API.
@@ -38,6 +38,8 @@ SENDARC_OAUTH_CLIENT_SECRET=...
 ```
 
 Release automation receives the same names through protected secrets and injects them at link time. Never commit values, echo them, upload them as debug artifacts, or include them in screenshots.
+
+As of 2026-08-28, both protected GitHub Actions secret names are present and the local gitignored file contains non-empty values. This statement records presence only; the values themselves must never appear in documentation, commits, CI output, or evidence captures.
 
 Google Desktop-app client secrets cannot be treated as confidential once embedded in a distributed binary. Security depends on PKCE, exact redirect/state validation, Google client controls, and least privilege—not on hiding the desktop client secret from an installed user.
 

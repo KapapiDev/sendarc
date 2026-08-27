@@ -25,16 +25,13 @@ Last updated: 2026-08-28
 - Local production website captured and compared with the supplied reference; no desktop-width overflow or missing primary imagery was observed.
 - Cloudflare Pages production deployment is live at `https://sendarc.pages.dev`; all 20 deployed desktop/tablet/mobile/landscape Playwright and axe scenarios pass.
 - Production Pages Functions and D1 were verified end to end: Business Beta returned 201 and persisted its declared fields, the allowlisted event endpoint returned 204, invalid events returned 400, and all synthetic verification rows were deleted afterward.
-
-## In progress
-
-- Verify the application/installer/registry/AUMID/path rebrand on clean Windows runners.
-- Run the repaired Windows x64/x86 CI, interceptor harness, and installer smoke tests.
-- Complete the dedicated Google OAuth consent screen and desktop client without committing credentials.
+- Clean GitHub Actions at commit `2be8d82` passed the Wails app, x64/x86 Debug/Release interceptors, installer Pester round-trip, website, and security/policy jobs.
+- Google Authentication Platform is configured for SendArc with external Testing audience, the controlled test account, deployed policy URLs, authorized `sendarc.pages.dev` domain, and exactly the `gmail.send` scope.
+- The enabled `SendArc Windows Desktop` OAuth client is injected only through the gitignored local environment file and protected GitHub Actions secrets; no credential values were committed.
 
 ## Not yet complete
 
-- Clean SendArc installer and uninstall/previous-handler restoration verification.
+- Real interactive clean-Windows install, application launch, and uninstall/previous-handler restoration verification beyond the passing automated installer round-trip.
 - Real Gmail test-account send verified in Gmail Sent.
 - Signed binaries. The no-payment beta is expected to be explicitly unsigned unless a legitimate free signing route becomes available.
 - GitHub `v0.1.0-beta` tag/release, installer asset, and SHA256 checksums.

@@ -31,7 +31,7 @@ Status meanings:
 | Requirement | Status | Evidence | Gap / release gate |
 |---|---|---|---|
 | Gmail `users.messages.send` transport | Implemented; verification pending | `internal/mapi/gmail.go` uses `/messages/send`; request/error tests in `gmail_test.go` | Current clean Windows CI and a real Gmail Sent result |
-| Exact `gmail.send` scope; no mailbox/profile scope | Implemented; verification pending | `src/app/auth.go`, [OAUTH.md](OAUTH.md) | Inspect actual consent URL/screen and Google Cloud configuration |
+| Exact `gmail.send` scope; no mailbox/profile scope | Implemented; verification pending | `src/app/auth.go`, [OAUTH.md](OAUTH.md); Google Cloud data-access configuration contains only `https://www.googleapis.com/auth/gmail.send` | Inspect the actual runtime authorization URL and consent screen |
 | Windows Credential Manager token storage | Implemented; verification pending | Keyring service `SendArc`, account `oauth-tokens` in `src/app/auth.go` | Real Windows save/load/refresh/disconnect/reconnect evidence |
 | Local preview before transmission | Implemented; verification pending | `QueueRow.svelte` and `App.svelte`; 64 frontend tests passed locally on 2026-08-28 | Wails/Windows runtime and real MAPI foreground/preview flow |
 | Explicit Send and Cancel/Discard; no auto-send/draft | Implemented; verification pending | `App.SendMessageForID`, manual-only settings, removed auto-mode controls; [ARCHITECTURE.md](ARCHITECTURE.md) | Current Go suite/Windows build plus runtime proof that notifications cannot send |
@@ -42,20 +42,20 @@ Status meanings:
 | Single-account connect/disconnect/re-auth | Implemented; verification pending | Auth manager/bindings/UI and tests in `src/app` | Real account flow; account identity is intentionally generic without profile scopes |
 | Polished Status/Account/Settings/About functions | In progress | Existing Wails/Svelte UI provides auth, queue, pause/update surfaces | Audit requested status/MAPI repair/test-connection/diagnostics/About functions; remove any control without a real action |
 | Complete active rebrand | In progress | SendArc names/paths/AUMID/package/installer work exists in the worktree | Run classified search; distinguish lawful upstream module/license references from stale active product identifiers |
-| Clean checkout desktop build | Missing for SendArc changes | Baseline run only | Push current branch and obtain green clean `windows-2025` build |
+| Clean checkout desktop build | Verified | GitHub Actions [run 33122480690](https://github.com/maxtop9843-byte/sendarc/actions/runs/33122480690) passed the Wails app and all interceptor matrices at `2be8d82` on `windows-2025` | Repeat at the immutable release candidate/tag |
 
 ## Installer, updates, and Windows validation
 
 | Requirement | Status | Evidence | Gap / release gate |
 |---|---|---|---|
-| x64 and x86 interceptor builds | In progress | Rebranded CMake/build/harness files in worktree | Green builds/tests on `windows-2025` |
-| NSIS installer with SendArc paths/registry/uninstall entry | In progress | `src/installer/SendArc.nsi` and smoke tests in worktree | Clean compile and Pester round-trip |
-| Preserve/restore previous mail handler | In progress | Installer logic/tests are being rebranded | Verify clean install, upgrade, uninstall, and safe restore on Windows |
+| x64 and x86 interceptor builds | Verified | GitHub Actions [run 33122480690](https://github.com/maxtop9843-byte/sendarc/actions/runs/33122480690) passed x64/x86 Debug/Release builds and harness tests | Repeat at the immutable release candidate/tag |
+| NSIS installer with SendArc paths/registry/uninstall entry | Verified by automated round-trip | `src/installer/SendArc.nsi`; GitHub Actions [run 33122480705](https://github.com/maxtop9843-byte/sendarc/actions/runs/33122480705) passed installer build and Pester install/uninstall round-trip | Perform the final interactive clean-Windows acceptance flow |
+| Preserve/restore previous mail handler | Verified by automated round-trip | Installer smoke run 33122480705 exercises registration, uninstall, and prior-handler restoration | Confirm once more in the final interactive acceptance flow |
 | Coexistence; never remove unrelated mail apps | In progress | Installer requirements/tests under development | Test existing go-mapi, Affixa marker, and alternate default; verify no unrelated deletion |
 | Notify-only update path | In progress | Product decision and update code/workflow changes; [DECISIONS.md](../DECISIONS.md) | Go tests and runtime click-through to official SendArc release page; prove no silent task/path remains active |
 | Unsigned-beta disclosure | Implemented in documentation | [CODE_SIGNING.md](CODE_SIGNING.md), README, IT notes, release template | Repeat disclosure on actual website/release/installer; verify artifact signature state |
 | Authenticode signing | Missing but allowed fallback | No eligible no-payment credential confirmed | Unsigned beta is authorized; do not claim publisher trust or spend money |
-| Windows install/MAPI/uninstall smoke | Missing for current SendArc build | Baseline CI is insufficient | Required clean Windows evidence, including x86/x64 and previous-handler restore |
+| Windows install/MAPI/uninstall smoke | Implemented; verification pending | Current x64/x86 interceptor CI and installer Pester round-trip are green at `2be8d82` | Real legacy-application MAPI send, app launch, Gmail Sent, and interactive uninstall/restore remain |
 
 ## Website, legal, and market probe
 
@@ -76,13 +76,13 @@ Status meanings:
 
 | Requirement | Status | Evidence | Gap / release gate |
 |---|---|---|---|
-| Current app/frontend tests | Partial | On 2026-08-28, frontend: 64 tests passed, Svelte check 0 errors/warnings, production build passed; `internal/mapi` Go tests passed | App Go package and all adjacent suites must pass after active rebrand merges |
-| C++/installer CI | In progress | Workflows and harness/smoke repairs in worktree | Push and obtain unmasked green x86/x64/installer results |
-| Website CI/QA | Verified locally; clean CI pending | Lint/typecheck/build/link scan pass; 5 unit and 20 Playwright desktop/tablet/mobile/landscape tests pass with axe; full-page visual artifact recorded | Push and obtain green GitHub Actions |
+| Current app/frontend tests | Verified at current head | GitHub Actions [run 33122480690](https://github.com/maxtop9843-byte/sendarc/actions/runs/33122480690) passed the Wails app at `2be8d82`; locally, 64 frontend tests, Svelte check, production build, and Go tests pass | Repeat at the immutable release candidate/tag |
+| C++/installer CI | Verified at current head | x64/x86 Debug/Release jobs passed in run 33122480690; installer Pester round-trip passed in [run 33122480705](https://github.com/maxtop9843-byte/sendarc/actions/runs/33122480705) | Repeat at the immutable release candidate/tag |
+| Website CI/QA | Verified | [Website run 33122480669](https://github.com/maxtop9843-byte/sendarc/actions/runs/33122480669) passed; 20 live cross-viewport Playwright/axe scenarios also pass on the deployed site | Repeat after the release asset changes download state |
 | Dependency/secret/security audit | In progress | Attachment/header/error hardening and policies exist | Resolve/document npm audit findings; Go/vendored/website dependency review; secret scan; update-integrity and installer command-injection review |
 | `v0.1.0-beta` tag/release | Missing | No SendArc release returned by GitHub on 2026-08-27 | Green candidate, immutable tag, versioned installer, checksums, source, complete notes |
 | Website download path | Missing | Release asset and production website do not yet exist | Verify real browser download of the exact checksummed installer |
-| Real Google OAuth + Gmail Sent | In progress | Dedicated Google Cloud project `sendarc` exists and Gmail API is enabled; unit/local mock evidence passes | Complete SendArc consent/client configuration, inject protected credentials, then prove an explicit send in Gmail Sent |
+| Real Google OAuth + Gmail Sent | In progress | Project/API, SendArc branding and policy URLs, external Testing audience, controlled test user, exact `gmail.send` scope, enabled Desktop client, and protected credential injection are complete; unit/local mock evidence passes | Prove fresh runtime consent, token storage/refresh/disconnect, explicit send, and Gmail Sent result |
 | Complete 19-step acceptance flow | Missing | No single end-to-end evidence set | Verify discovery → download → install → registration → OAuth → MAPI → preview → Send → Gmail Sent → uninstall/restore |
 
 ## Owner constraints applied

@@ -21,12 +21,12 @@ Last updated: 2026-08-28
 - Gitleaks current-history scan and GitHub Actions syntax validation pass locally.
 - Dedicated Google Cloud project `sendarc` created and Gmail API enabled without billing.
 - Cloudflare D1 database `sendarc-leads` provisioned, bound, and migrated; Cloudflare Pages project `sendarc` provisioned.
+- Local production website captured and compared with the supplied reference; no desktop-width overflow or missing primary imagery was observed.
 
 ## In progress
 
 - Verify the application/installer/registry/AUMID/path rebrand on clean Windows runners.
 - Run the repaired Windows x64/x86 CI, interceptor harness, and installer smoke tests.
-- Capture and compare the website full-page reference screenshot.
 - Deploy the already-provisioned Cloudflare Pages project on its generated URL; custom domain remains deferred.
 - Complete the dedicated Google OAuth consent screen and desktop client without committing credentials.
 

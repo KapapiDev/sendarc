@@ -61,7 +61,7 @@ Status meanings:
 
 | Requirement | Status | Evidence | Gap / release gate |
 |---|---|---|---|
-| Reference-matched scrolling website | Implemented; deployment verification pending | Astro/Cloudflare site and generated design references under `website/`; desktop/tablet/mobile Playwright and axe checks pass | Capture 1440x900 full-page screenshot, compare visually, and repeat on deployed URL |
+| Reference-matched scrolling website | Verified locally; deployment verification pending | Astro/Cloudflare site; desktop/tablet/mobile Playwright and axe checks; full-page production-build capture and comparison in [WEBSITE_VISUAL_QA.md](WEBSITE_VISUAL_QA.md) | Repeat the visual check on the deployed Cloudflare URL |
 | Truthful Gmail-only claims/no dead buttons | Verified locally | Nine static routes build; broken-link scan passes; Playwright exercises navigation, FAQ and beta form | Repeat against deployed production URL and real release asset |
 | Affixa-alternative route and independence wording | Implemented; deployment verification pending | `/affixa-alternative/`, official retirement link, canonical metadata, and independence wording | Verify live external link and deployed metadata |
 | Privacy/terms/licenses/security/support routes | Verified locally | All routes build and pass link/accessibility/browser checks | Repeat on deployed URLs |

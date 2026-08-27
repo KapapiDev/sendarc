@@ -184,7 +184,16 @@ Describe "SendArc installer round-trip" {
                 Should -Be (Join-Path $script:InstallDir 'SendArc.dll')
 
             $powershell32 = "$env:WINDIR\SysWOW64\WindowsPowerShell\v1.0\powershell.exe"
-            $expanded32 = & $powershell32 -NoProfile -Command '[Environment]::ExpandEnvironmentVariables($args[0])' $raw
+            # Pass the raw REG_EXPAND_SZ through the inherited environment.
+            # Appending `%PROGRAMFILES%\...` as an unquoted native-command
+            # argument makes Windows PowerShell parse `%` as an operator.
+            $priorRawPath = $env:SENDARC_TEST_DLLPATH
+            try {
+                $env:SENDARC_TEST_DLLPATH = $raw
+                $expanded32 = & $powershell32 -NoProfile -Command '[Environment]::ExpandEnvironmentVariables($env:SENDARC_TEST_DLLPATH)'
+            } finally {
+                $env:SENDARC_TEST_DLLPATH = $priorRawPath
+            }
             $expanded32 | Should -Be (Join-Path $script:InstallDir32 'SendArc.dll')
         }
 

@@ -5,7 +5,7 @@
   - Opened from UpdateBanner "View update" action in the root shell.
   - Exposes BOTH required links (D-02):
     1. GitHub release page (human-readable release notes)
-    2. Stable installer URL (direct download of go-mapi-setup.exe)
+    2. Stable installer URL (direct download of the SendArc installer)
     Both route through Wails' BrowserOpenURL — we must NOT use plain
     <a href> because WebView2 would open the URL inside the app window
     rather than the user's system browser.
@@ -80,7 +80,7 @@
         {#if update.updateAvailable}
           Update available
         {:else}
-          go-mapi is up to date
+          SendArc is up to date
         {/if}
       </h2>
       <button type="button" class="close" aria-label="Close" onclick={onClose}>×</button>
@@ -90,11 +90,11 @@
       {#if update.updateAvailable}
         <p class="lede">
           A newer release is available:
-          <strong>go-mapi {update.latestVersion}</strong>.
+          <strong>SendArc {update.latestVersion}</strong>.
         </p>
         <p>
-          Download and run the installer manually to update — go-mapi does not
-          install updates automatically in v3.0.
+          Download and run the installer manually to update. SendArc never
+          installs updates in the background.
         </p>
         <div class="actions">
           <button
@@ -102,7 +102,7 @@
             class="primary link"
             onclick={openInstaller}
           >
-            Download installer (go-mapi-setup.exe)
+            Download SendArc installer
           </button>
           <button
             type="button"

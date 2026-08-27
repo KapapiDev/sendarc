@@ -12,8 +12,8 @@ import (
 
 // GOTEST-02: Golden-file tests for buildFullMIME.
 //
-// The multipart boundary in buildFullMIME is "go_mapi_<pid>", which is
-// non-deterministic across runs. normalizeMIMEBoundary rewrites it to a
+// The multipart boundary is cryptographically random. normalizeMIMEBoundary
+// rewrites it to a
 // fixed placeholder before comparison so goldens are stable. Run
 //
 //	go test -run TestBuildFullMIME_Golden ./... -update
@@ -22,12 +22,12 @@ import (
 
 var updateGoldens = flag.Bool("update", false, "regenerate MIME golden files under testdata/mime")
 
-var mimeBoundaryRE = regexp.MustCompile(`go_mapi_\d+`)
+var mimeBoundaryRE = regexp.MustCompile(`sendarc_[0-9a-f]{36}`)
 
-// normalizeMIMEBoundary replaces go_mapi_<pid> with go_mapi_PID so tests
+// normalizeMIMEBoundary replaces the random boundary with a stable token so tests
 // can compare byte-for-byte against a committed fixture.
 func normalizeMIMEBoundary(b []byte) []byte {
-	return mimeBoundaryRE.ReplaceAll(b, []byte("go_mapi_PID"))
+	return mimeBoundaryRE.ReplaceAll(b, []byte("sendarc_BOUNDARY"))
 }
 
 // writeAttachment persists an in-memory blob to a temporary file and
@@ -53,10 +53,10 @@ func TestBuildFullMIME_Golden(t *testing.T) {
 	// 76-char base64 line wrapping path multiple times.
 	longBody := strings.Repeat("The quick brown fox jumps over the lazy dog. ", 300)
 
-	// Body containing the literal substring "go_mapi_" — regression guard
+	// Body containing a boundary-like substring — regression guard
 	// against removing base64 encoding (which would expose the boundary
 	// marker inside the body).
-	collisionBody := "Watch for --go_mapi_PID markers in this body — they must be base64-wrapped."
+	collisionBody := "Watch for --sendarc_BOUNDARY markers in this body — they must be base64-wrapped."
 
 	cases := []struct {
 		name string

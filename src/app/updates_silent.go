@@ -1,4 +1,4 @@
-//go:build windows && !bindings
+//go:build windows && silent_update_experimental && !bindings
 
 package main
 

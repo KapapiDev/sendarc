@@ -15,10 +15,10 @@ import "errors"
 // returning an error instead of exiting directly makes this testable.
 func checkOAuthCredentials() error {
 	if oauthClientID == "" {
-		return errors.New("OAuth client_id missing — build was not wired correctly (expected -ldflags -X main.oauthClientID, or GOMAPI_OAUTH_CLIENT_ID env var for wails dev)")
+		return errors.New("OAuth client_id missing — build was not wired correctly (expected -ldflags -X main.oauthClientID, or SENDARC_OAUTH_CLIENT_ID env var for wails dev)")
 	}
 	if oauthClientSecret == "" {
-		return errors.New("OAuth client_secret missing — build was not wired correctly (expected -ldflags -X main.oauthClientSecret, or GOMAPI_OAUTH_CLIENT_SECRET env var for wails dev)")
+		return errors.New("OAuth client_secret missing — build was not wired correctly (expected -ldflags -X main.oauthClientSecret, or SENDARC_OAUTH_CLIENT_SECRET env var for wails dev)")
 	}
 	return nil
 }

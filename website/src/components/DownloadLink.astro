@@ -1,0 +1,24 @@
+---
+import { DOWNLOAD_ROUTE } from "../lib/site";
+
+interface Props {
+  variant?: "primary" | "secondary" | "header";
+  label?: string;
+  class?: string;
+}
+
+const {
+  variant = "primary",
+  label = "Download for Windows",
+  class: className = "",
+} = Astro.props;
+---
+
+<a
+  class:list={["button", `button--${variant}`, className]}
+  href={DOWNLOAD_ROUTE}
+  data-track="download_cta"
+>
+  <span>{label}</span>
+  <span aria-hidden="true" class="button-arrow">↗</span>
+</a>

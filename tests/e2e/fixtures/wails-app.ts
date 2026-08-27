@@ -18,8 +18,8 @@ import { WatchDirHelper } from './email';
 //   1. Start fake-gmail + fake-oauth servers on ephemeral ports.
 //   2. Pick a free CDP port (try 9223..9233).
 //   3. Build a one-hour-from-now OAuth token blob and stash it in env.
-//   4. Spawn build/bin/go-mapi.exe with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
-//      pointed at our chosen CDP port and the four GOMAPI_E2E_* overrides.
+//   4. Spawn build/bin/SendArc.exe with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
+//      pointed at our chosen CDP port and the four SENDARC_E2E_* overrides.
 //   5. Poll http://127.0.0.1:$PORT/json/version until CDP responds (≤ 20s).
 //   6. chromium.connectOverCDP → grab the first non-empty page.
 //
@@ -41,7 +41,7 @@ export interface WailsAppFixture {
 }
 
 const REPO_ROOT = resolve(__dirname, '..', '..', '..');
-const APP_BINARY = join(REPO_ROOT, 'src', 'app', 'build', 'bin', 'go-mapi.exe');
+const APP_BINARY = join(REPO_ROOT, 'src', 'app', 'build', 'bin', 'SendArc.exe');
 
 function isPortFree(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -129,17 +129,17 @@ export const test = base.extend<{ app: WailsAppFixture }>({
 
     const env: NodeJS.ProcessEnv = {
       ...process.env,
-      // GOMAPI_DEBUG_BROWSER_ARGS is honored by our vendored go-webview2 fork
+      // Legacy GOMAPI_DEBUG_BROWSER_ARGS is honored by the vendored go-webview2 fork.
       // (src/app/vendor/go-webview2-e2e/). The upstream wipes WebView2's own
       // WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS at package init so that route
       // does not work. See 11-06-SUMMARY.md for the full audit trail.
       GOMAPI_DEBUG_BROWSER_ARGS: `--remote-debugging-port=${cdpPort} --no-first-run`,
-      GOMAPI_E2E_FAKE_TOKEN_JSON: tokenBlob,
-      GOMAPI_E2E_GMAIL_BASE_URL: gmail.url,
-      GOMAPI_E2E_TOKEN_ENDPOINT: oauth.tokenURL,
-      GOMAPI_E2E_REVOKE_ENDPOINT: oauth.revokeURL,
-      GOMAPI_WATCH_DIR: watchDir,
-      GOMAPI_APPDATA_DIR: appDataDir,
+      SENDARC_E2E_FAKE_TOKEN_JSON: tokenBlob,
+      SENDARC_E2E_GMAIL_BASE_URL: gmail.url,
+      SENDARC_E2E_TOKEN_ENDPOINT: oauth.tokenURL,
+      SENDARC_E2E_REVOKE_ENDPOINT: oauth.revokeURL,
+      SENDARC_WATCH_DIR: watchDir,
+      SENDARC_APPDATA_DIR: appDataDir,
     };
 
     const child: ChildProcess = spawn(APP_BINARY, [], {

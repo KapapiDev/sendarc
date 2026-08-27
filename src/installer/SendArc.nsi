@@ -1,25 +1,25 @@
-; go-mapi.nsi — NSIS installer for go-mapi (v3.0)
+; SendArc.nsi — NSIS installer for SendArc
 ;
 ; Plan 10-01 scaffold: ModernUI2 layout, admin-elevation, machine-wide install,
 ; MAPI handler registration, previous-mail-client backup, Add/Remove Programs
 ; metadata, and stub Call sites for plans 10-02 / 10-03 / 10-04.
 ;
 ; Compile with:
-;     makensis /DGOMAPI_VERSION=0.0.0-dev src\installer\go-mapi.nsi
+;     makensis /DSENDARC_VERSION=0.0.0-dev src\installer\SendArc.nsi
 ;
-; Requires: pre-built src\app\build\bin\go-mapi.exe and
-;           src\interceptor\build\bin\go-mapi.dll (staged by CI in plan 10-05 /
+; Requires: pre-built src\app\build\bin\SendArc.exe and
+;           src\interceptor\build\bin\SendArc.dll (staged by CI in plan 10-05 /
 ;           release pipeline in plan 10-06).
 ;
 ; References:
 ;   D-01, D-02, D-03, D-04 — NSIS + admin + machine-wide + output filename
-;   D-09 — HKLM\SOFTWARE\Clients\Mail\go-mapi registration layout
+;   D-09 — HKLM\SOFTWARE\Clients\Mail\SendArc registration layout
 ;   D-10 — BackupPreviousMailClient BEFORE overwriting HKLM Mail (Default)
-;   D-12 — %ProgramData%\go-mapi\uninst\ directory for backup JSON
+;   D-12 — %ProgramData%\SendArc\uninst\ directory for backup JSON
 ;   T-10-01-01 — ordering invariant enforced below (Call BackupPreviousMailClient
-;                precedes WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" "go-mapi")
-;   QUICK-260423-msq — DLL queue relocated from %TEMP%\go-mapi\ to
-;                %LOCALAPPDATA%\go-mapi\queue\ (DLL creates it at DllMain; installer does not
+;                precedes WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" "SendArc")
+;   QUICK-260423-msq — DLL queue relocated from %TEMP%\SendArc\ to
+;                %LOCALAPPDATA%\SendArc\queue\ (DLL creates it at DllMain; installer does not
 ;                pre-create it — no install-time action required for the path itself).
 
 Unicode True
@@ -28,15 +28,15 @@ Unicode True
 ; Product defines (consumed by plans 10-02 / 10-03 / 10-04)
 ;------------------------------------------------------------------------------
 
-!ifndef GOMAPI_VERSION
-  !define GOMAPI_VERSION "0.0.0-dev"
+!ifndef SENDARC_VERSION
+  !define SENDARC_VERSION "0.0.0-dev"
 !endif
 
-!define PRODUCT_NAME      "go-mapi"
-!define PRODUCT_VERSION   "${GOMAPI_VERSION}"
-!define PRODUCT_PUBLISHER "Marc Fargas"
-!define PRODUCT_WEB_SITE  "https://github.com/marcfargas/go-mapi"
-!define AUMID             "com.marcfargas.gomapi"
+!define PRODUCT_NAME      "SendArc"
+!define PRODUCT_VERSION   "${SENDARC_VERSION}"
+!define PRODUCT_PUBLISHER "장형진"
+!define PRODUCT_WEB_SITE  "https://github.com/maxtop9843-byte/sendarc"
+!define AUMID             "app.sendarc.desktop"
 
 ;------------------------------------------------------------------------------
 ; Compiler / installer-wide settings
@@ -44,8 +44,8 @@ Unicode True
 
 SetCompressor /SOLID lzma
 RequestExecutionLevel admin
-InstallDir   "$PROGRAMFILES64\go-mapi"
-OutFile      "go-mapi-setup.exe"
+InstallDir   "$PROGRAMFILES64\SendArc"
+OutFile      "SendArc-Setup.exe"
 Name         "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 BrandingText "${PRODUCT_NAME} ${PRODUCT_VERSION} — LGPL-3.0"
 
@@ -61,28 +61,12 @@ BrandingText "${PRODUCT_NAME} ${PRODUCT_VERSION} — LGPL-3.0"
 ;------------------------------------------------------------------------------
 
 !include "MUI2.nsh"
-; Phase 11.1 Plan 05 — D-07 / D-08 silent auto-update wiring.
-;   FileFunc.nsh : ${GetParameters} + ${GetOptions} for /AUTOUPDATE=N parsing.
-;   nsDialogs.nsh: nsDialogs::Create + ${NSD_*} for the AutoUpdate page checkbox.
-;   LogicLib.nsh : ${If}/${Else}/${EndIf} + ${DoUntil}/${LoopUntil}/${Errors}
-;                  used by AutoUpdatePageLeave and un.ScrubOldOrphans.
-!include "FileFunc.nsh"
-!include "nsDialogs.nsh"
 !include "LogicLib.nsh"
-
-; Phase 11.1 D-07: parsed in .onInit, propagated through the AutoUpdate page,
-; consumed by RegisterScheduledTask. Strict bool — only the literal "1" enables.
-Var AutoUpdateFlag
-Var AutoUpdateCheckboxState   ; nsDialogs handle for the FinishPage-adjacent checkbox.
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "${__FILEDIR__}\..\..\LICENSE"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-; Phase 11.1 D-07: AutoUpdate opt-in checkbox page. Default OFF. /AUTOUPDATE=1
-; on the command line forces enable for silent installs (the page is skipped
-; in /S mode and when the flag is already set).
-Page custom AutoUpdatePage AutoUpdatePageLeave
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -91,66 +75,11 @@ Page custom AutoUpdatePage AutoUpdatePageLeave
 !insertmacro MUI_LANGUAGE "English"
 
 ;------------------------------------------------------------------------------
-; .onInit — parse /AUTOUPDATE=N (Phase 11.1 D-07).
-;
-; Default OFF: empty string after GetOptions = parameter not specified.
-; Strict bool comparison downstream (StrCmp $AutoUpdateFlag "1") so any value
-; other than the literal "1" — including "0", "true", "yes", or anything else —
-; resolves to OFF. RESEARCH §T-11.1.05-03: the parsed value never flows into
-; ExecWait argument construction; only the fixed schtasks command line uses it.
-;------------------------------------------------------------------------------
-Function .onInit
-  ${GetParameters} $R0
-  ${GetOptions} $R0 "/AUTOUPDATE=" $AutoUpdateFlag
-FunctionEnd
-
-;------------------------------------------------------------------------------
-; AutoUpdatePage — interactive UI checkbox (Phase 11.1 D-07).
-;
-; Skipped if /S (silent install) — silent installs use /AUTOUPDATE=N only.
-; Skipped if /AUTOUPDATE=1 was already set on the command line — no need to
-; ask again. Default state is UNCHECKED per D-07.
-;------------------------------------------------------------------------------
-Function AutoUpdatePage
-  ; Skip if /S (silent install) — silent installs use /AUTOUPDATE only.
-  IfSilent 0 +2
-    Abort
-  ; Skip if /AUTOUPDATE=1 was already set on the command line.
-  StrCmp $AutoUpdateFlag "1" 0 +3
-    DetailPrint "Auto-update pre-set via /AUTOUPDATE=1 — skipping checkbox page"
-    Abort
-
-  !insertmacro MUI_HEADER_TEXT "Automatic updates" "Enable unattended updates for this machine"
-  nsDialogs::Create 1018
-  Pop $0
-
-  ${NSD_CreateLabel} 0 0 100% 40u "go-mapi can keep itself up-to-date automatically using a Windows Scheduled Task that runs as SYSTEM. The task downloads, verifies SHA-256 integrity, and applies updates without prompting users. Recommended for managed/RDS environments."
-  Pop $0
-
-  ${NSD_CreateCheckbox} 0 50u 100% 12u "Enable automatic updates (creates a Scheduled Task)"
-  Pop $1
-  ${NSD_SetState} $1 ${BST_UNCHECKED}    ; D-07 default OFF
-  StrCpy $AutoUpdateCheckboxState $1
-
-  nsDialogs::Show
-FunctionEnd
-
-Function AutoUpdatePageLeave
-  ${NSD_GetState} $AutoUpdateCheckboxState $0
-  ${If} $0 == ${BST_CHECKED}
-    StrCpy $AutoUpdateFlag "1"
-  ${Else}
-    StrCpy $AutoUpdateFlag "0"
-  ${EndIf}
-  DetailPrint "AutoUpdateFlag chosen: $AutoUpdateFlag"
-FunctionEnd
-
-;------------------------------------------------------------------------------
 ; Install section
 ;------------------------------------------------------------------------------
 
 Section "Install" SecInstall
-  ; QUICK-260423-ntu T2 — if a previous install's go-mapi.exe is running in
+  ; QUICK-260423-ntu T2 — if a previous install's SendArc.exe is running in
   ; $INSTDIR, give it a chance to close cleanly (WM_CLOSE via taskkill
   ; without /F triggers the intentionalQuit path in src/app/main.go) before
   ; we overwrite the binary. Silent mode auto-retries; interactive mode
@@ -161,11 +90,11 @@ Section "Install" SecInstall
 
   ; Staged binary paths — produced by:
   ;   npm run build:interceptor         (clang + CMake → build-x64/ + build-x86/)
-  ;   wails build -platform windows/amd64 (→ go-mapi.exe with go:embed frontend)
+  ;   wails build -platform windows/amd64 (→ SendArc.exe with go:embed frontend)
   ;
   ; QUICK-260423-ntu T3c — dual-bitness layout: x64 DLL lands in $INSTDIR
-  ; (= $PROGRAMFILES64\go-mapi) for native MAPI callers; x86 DLL lands in
-  ; $PROGRAMFILES32\go-mapi for legacy 32-bit MAPI callers. Registry
+  ; (= $PROGRAMFILES64\SendArc) for native MAPI callers; x86 DLL lands in
+  ; $PROGRAMFILES32\SendArc for legacy 32-bit MAPI callers. Registry
   ; DLLPath writes below route each view to the matching-bitness DLL.
   ; PHASE 11.1 T4 (D-04): explicit Delete + SetOverwrite try collapses transient
   ; AV/filter holds into a no-op rather than aborting the installer. RESEARCH
@@ -173,20 +102,20 @@ Section "Install" SecInstall
   ; reinstall fail hard on any transient lock; `try` skips silently if write
   ; fails (the explicit Delete clears the prior version first so it does not).
   ClearErrors
-  Delete "$INSTDIR\go-mapi.exe"
-  Delete "$INSTDIR\go-mapi.dll"
+  Delete "$INSTDIR\SendArc.exe"
+  Delete "$INSTDIR\SendArc.dll"
   SetOverwrite try
-  File "${__FILEDIR__}\..\app\build\bin\go-mapi.exe"
-  File "${__FILEDIR__}\..\interceptor\build-x64\bin\go-mapi.dll"
+  File "${__FILEDIR__}\..\app\build\bin\SendArc.exe"
+  File "${__FILEDIR__}\..\interceptor\build-x64\bin\SendArc.dll"
   SetOverwrite on
 
   ; x86 DLL — same T4 treatment in $PROGRAMFILES32 view.
-  CreateDirectory "$PROGRAMFILES32\go-mapi"
-  SetOutPath "$PROGRAMFILES32\go-mapi"
+  CreateDirectory "$PROGRAMFILES32\SendArc"
+  SetOutPath "$PROGRAMFILES32\SendArc"
   ClearErrors
-  Delete "$PROGRAMFILES32\go-mapi\go-mapi.dll"
+  Delete "$PROGRAMFILES32\SendArc\SendArc.dll"
   SetOverwrite try
-  File "${__FILEDIR__}\..\interceptor\build-x86\bin\go-mapi.dll"
+  File "${__FILEDIR__}\..\interceptor\build-x86\bin\SendArc.dll"
   SetOverwrite on
 
   ; Reset $OUTDIR for the rest of the install section
@@ -208,18 +137,18 @@ Section "Install" SecInstall
   ; D-09 — MAPI handler registration (machine-wide).
   ; Subkey + DLLPath are set first; the HKLM\SOFTWARE\Clients\Mail\(Default)
   ; overwrite happens AFTER the backup call above.
-  WriteRegStr HKLM "SOFTWARE\Clients\Mail\go-mapi" "" "go-mapi"
-  WriteRegStr HKLM "SOFTWARE\Clients\Mail\go-mapi" "DLLPath" "$INSTDIR\go-mapi.dll"
-  WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" "go-mapi"
+  WriteRegStr HKLM "SOFTWARE\Clients\Mail\SendArc" "" "SendArc"
+  WriteRegStr HKLM "SOFTWARE\Clients\Mail\SendArc" "DLLPath" "$INSTDIR\SendArc.dll"
+  WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" "SendArc"
 
   ; QUICK-260423-ntu T3c — 32-bit registry view. SetRegView 32 redirects
   ; HKLM reads/writes into the WOW6432Node subtree, matching the existing
   ; pattern used by DetectWebView2 (lines 269/282/292/300). This routes
-  ; 32-bit MAPI callers to the i686 DLL at $PROGRAMFILES32\go-mapi.
+  ; 32-bit MAPI callers to the i686 DLL at $PROGRAMFILES32\SendArc.
   SetRegView 32
-  WriteRegStr HKLM "SOFTWARE\Clients\Mail\go-mapi" "" "go-mapi"
-  WriteRegStr HKLM "SOFTWARE\Clients\Mail\go-mapi" "DLLPath" "$PROGRAMFILES32\go-mapi\go-mapi.dll"
-  WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" "go-mapi"
+  WriteRegStr HKLM "SOFTWARE\Clients\Mail\SendArc" "" "SendArc"
+  WriteRegStr HKLM "SOFTWARE\Clients\Mail\SendArc" "DLLPath" "$PROGRAMFILES32\SendArc\SendArc.dll"
+  WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" "SendArc"
   SetRegView default
 
   ; Uninstaller binary
@@ -236,7 +165,7 @@ Section "Install" SecInstall
 
   ; D-03: best-effort cleanup of stale per-user shortcut from pre-11.1 builds.
   SetShellVarContext current
-  Delete "$SMPROGRAMS\go-mapi.lnk"
+  Delete "$SMPROGRAMS\SendArc.lnk"
   ; (next call to CreateShortcutAndAUMID below already wrapped to all-users)
 
   ; Stub calls — bodies are filled in by later plans. Each stub emits a
@@ -244,17 +173,16 @@ Section "Install" SecInstall
   Call InstallWebView2           ; plan 10-02
   Call CreateShortcutAndAUMID    ; plan 10-03 (D-03)
   Call AddFirewallRule           ; plan 10-03
-  Call RegisterScheduledTask     ; Phase 11.1 D-08 (gated on $AutoUpdateFlag)
 SectionEnd
 
 ;------------------------------------------------------------------------------
 ; BackupPreviousMailClient — D-10 / T-10-01-01
 ;
-; Writes %ProgramData%\go-mapi\uninst\previous-mail-client.json with the shape
+; Writes %ProgramData%\SendArc\uninst\previous-mail-client.json with the shape
 ;     {"previousClient": "<name>"|null, "backedUpAt": "<ISO-8601>"}
 ; so the uninstaller (plan 10-04) can restore the pre-install Mail client.
 ;
-; Upgrade case (current (Default) is already "go-mapi") intentionally preserves
+; Upgrade case (current (Default) is already "SendArc") intentionally preserves
 ; the existing backup — overwriting would lose the original previous-client
 ; name across reinstalls.
 ;
@@ -267,7 +195,7 @@ SectionEnd
 Function BackupPreviousMailClient
   ; `$APPDATA\..\..\ProgramData` resolves to `%ProgramData%` at install time
   ; (admin context). Same primitive used by the uninstaller section stub.
-  CreateDirectory "$APPDATA\..\..\ProgramData\go-mapi\uninst"
+  CreateDirectory "$APPDATA\..\..\ProgramData\SendArc\uninst"
 
   ReadRegStr $0 HKLM "SOFTWARE\Clients\Mail" ""
 
@@ -278,7 +206,7 @@ Function BackupPreviousMailClient
   SetRegView default
 
   ; Upgrade case: existing install. Preserve original backup, skip write.
-  StrCmp $0 "go-mapi" AlreadyUs
+  StrCmp $0 "SendArc" AlreadyUs
   ; Clean install with no prior default Mail client.
   StrCmp $0 "" BackupNull
 
@@ -301,7 +229,7 @@ Function BackupPreviousMailClient
   Pop $3   ; stdout (timestamp + trailing CRLF)
   StrCpy $3 $3 -2   ; strip trailing \r\n
 
-  FileOpen  $1 "$APPDATA\..\..\ProgramData\go-mapi\uninst\previous-mail-client.json" w
+  FileOpen  $1 "$APPDATA\..\..\ProgramData\SendArc\uninst\previous-mail-client.json" w
   StrCmp $4 "" BackupWriteNative32
   FileWrite $1 '{"previousClient":"$0","previousClient32":"$4","backedUpAt":"$3"}'
   Goto BackupWriteDone
@@ -324,7 +252,7 @@ BackupNull:
   Call EscapeJsonString
   Pop $4
 
-  FileOpen  $1 "$APPDATA\..\..\ProgramData\go-mapi\uninst\previous-mail-client.json" w
+  FileOpen  $1 "$APPDATA\..\..\ProgramData\SendArc\uninst\previous-mail-client.json" w
   StrCmp $4 "" BackupNullNoWow
   FileWrite $1 '{"previousClient":null,"previousClient32":"$4","backedUpAt":"$3"}'
   Goto BackupNullDone
@@ -343,14 +271,14 @@ FunctionEnd
 ;------------------------------------------------------------------------------
 ; EnsureAppNotRunning — QUICK-260423-ntu T2 (installer scope)
 ;
-; If a go-mapi.exe process is running, offer clean-close-and-retry. Uses
+; If a SendArc.exe process is running, offer clean-close-and-retry. Uses
 ; `tasklist` (core Windows tool, no plugin) for detection and `taskkill`
 ; WITHOUT /F for graceful shutdown — WM_CLOSE maps to the same
 ; intentionalQuit path in src/app/main.go that the tray "Quit" menu item
 ; triggers. Polls every 500ms up to 20 iterations (10s budget) for the
 ; process to exit; aborts on timeout.
 ;
-; Image-name match only (no WMIC path-narrowing) — go-mapi.exe is unique
+; Image-name match only (no WMIC path-narrowing) — SendArc.exe is unique
 ; enough in practice that a duplicate unrelated process is an acceptable
 ; v3.0 risk, and WMIC has been removed on recent Windows 11 builds.
 ;
@@ -365,47 +293,47 @@ Function EnsureAppNotRunning
   Push $0
   Push $1
 
-  ; Quick probe — is any go-mapi.exe running at all?
-  nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq go-mapi.exe" /NH /FO CSV'
+  ; Quick probe — is any SendArc.exe running at all?
+  nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq SendArc.exe" /NH /FO CSV'
   Pop $0   ; exit code
   Pop $1   ; stdout
 
   Push $1
-  Push "go-mapi.exe"
+  Push "SendArc.exe"
   Call StrContains
   Pop $0   ; "1" = found, "0" = not found
   StrCmp $0 "1" EANR_Found EANR_NotFound
 
 EANR_Found:
-  DetailPrint "go-mapi.exe is running — attempting graceful close"
+  DetailPrint "SendArc.exe is running — attempting graceful close"
   IfSilent EANR_SilentRetry EANR_AskUser
 
 EANR_AskUser:
-  MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION "go-mapi is currently running. Click OK to close it and continue, or Cancel to abort the installer." IDOK EANR_SilentRetry IDCANCEL EANR_Cancel
+  MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION "SendArc is currently running. Click OK to close it and continue, or Cancel to abort the installer." IDOK EANR_SilentRetry IDCANCEL EANR_Cancel
 
 EANR_Cancel:
   DetailPrint "User cancelled — aborting installer"
   Pop $1
   Pop $0
-  Abort "Installer aborted by user (go-mapi was running)."
+  Abort "Installer aborted by user (SendArc was running)."
 
 EANR_SilentRetry:
-  ; Send WM_CLOSE to every go-mapi.exe instance (no /F — honours
+  ; Send WM_CLOSE to every SendArc.exe instance (no /F — honours
   ; intentionalQuit path). /IM matches by image name; /T includes children.
-  nsExec::ExecToStack 'taskkill /IM go-mapi.exe'
+  nsExec::ExecToStack 'taskkill /IM SendArc.exe'
   Pop $0
   Pop $1
-  DetailPrint "taskkill /IM go-mapi.exe rc=$0"
+  DetailPrint "taskkill /IM SendArc.exe rc=$0"
 
   ; Poll loop — 20 iterations * 500ms = 10s budget
   StrCpy $0 0
 EANR_PollLoop:
   Sleep 500
-  nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq go-mapi.exe" /NH /FO CSV'
+  nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq SendArc.exe" /NH /FO CSV'
   Pop $1   ; exit code (discard)
   Pop $1   ; stdout
   Push $1
-  Push "go-mapi.exe"
+  Push "SendArc.exe"
   Call StrContains
   Pop $1
   StrCmp $1 "0" EANR_Exited
@@ -414,16 +342,16 @@ EANR_PollLoop:
   Goto EANR_PollLoop
 
 EANR_Timeout:
-  DetailPrint "ERROR: go-mapi.exe did not exit within 10s"
+  DetailPrint "ERROR: SendArc.exe did not exit within 10s"
   Pop $1
   Pop $0
   IfSilent EANR_SilentAbort
-  MessageBox MB_OK|MB_ICONSTOP "go-mapi did not close within 10 seconds. Please close it manually and re-run the installer."
+  MessageBox MB_OK|MB_ICONSTOP "SendArc did not close within 10 seconds. Please close it manually and re-run the installer."
 EANR_SilentAbort:
-  Abort "go-mapi.exe still running after 10s close poll."
+  Abort "SendArc.exe still running after 10s close poll."
 
 EANR_Exited:
-  DetailPrint "go-mapi.exe exited after $0 poll iterations"
+  DetailPrint "SendArc.exe exited after $0 poll iterations"
   Pop $1
   Pop $0
   Return
@@ -651,11 +579,11 @@ FunctionEnd
 ;------------------------------------------------------------------------------
 ; CreateShortcutAndAUMID — D-13 / D-14 / D-15 / INST-01
 ;
-; Creates the all-users Start Menu shortcut at $SMPROGRAMS\go-mapi.lnk and
+; Creates the all-users Start Menu shortcut at $SMPROGRAMS\SendArc.lnk and
 ; stamps PKEY_AppUserModel_ID on it via the ApplicationID NSIS plugin. The
 ; stamped AUMID is what makes Phase 9's toast notifications persist in Action
 ; Center — the shortcut AUMID MUST match the Wails app's runtime AUMID
-; (com.marcfargas.gomapi per D-15), which the plan 10-06 release pipeline
+; (app.sendarc.desktop per D-15), which the plan 10-06 release pipeline
 ; injects into the .exe via ldflags.
 ;
 ; Plugin ABI (from NSIS ApplicationID v1.1):
@@ -670,18 +598,18 @@ Function CreateShortcutAndAUMID
   ; $DESKTOP — keep the wrap tight so the existing %ProgramData% walk at
   ; lines 666-676 stays in default `current` context.
   SetShellVarContext all
-  CreateShortcut "$SMPROGRAMS\go-mapi.lnk" \
-      "$INSTDIR\go-mapi.exe" \
+  CreateShortcut "$SMPROGRAMS\SendArc.lnk" \
+      "$INSTDIR\SendArc.exe" \
       "" \
-      "$INSTDIR\go-mapi.exe" 0 \
+      "$INSTDIR\SendArc.exe" 0 \
       SW_SHOWNORMAL "" \
-      "go-mapi — MAPI-to-Gmail bridge"
+      "SendArc — MAPI-to-Gmail bridge"
 
   ; D-14: stamp PKEY_AppUserModel_ID via ApplicationID plugin. Plugin loaded
   ; from src/installer/plugins/x86-unicode/ApplicationID.dll (vendored in plan 10-01).
   ; ApplicationID::Set pushes "0" on success, "-1" on error.
-  ; D-15: production AUMID is com.marcfargas.gomapi (matches the ${AUMID} define).
-  ApplicationID::Set "$SMPROGRAMS\go-mapi.lnk" "${AUMID}"
+  ; D-15: production AUMID is app.sendarc.desktop (matches the ${AUMID} define).
+  ApplicationID::Set "$SMPROGRAMS\SendArc.lnk" "${AUMID}"
   Pop $0
   SetShellVarContext current
   StrCmp $0 "0" AumidOk
@@ -696,9 +624,9 @@ FunctionEnd
 ;------------------------------------------------------------------------------
 ; AddFirewallRule — D-16 / INST-06
 ;
-; Creates an inbound Windows Firewall rule named "go-mapi OAuth loopback" bound
-; to program=$INSTDIR\go-mapi.exe. Pre-creating the rule at install time avoids
-; the first-bind firewall prompt that Windows otherwise raises when go-mapi
+; Creates an inbound Windows Firewall rule named "SendArc OAuth loopback" bound
+; to program=$INSTDIR\SendArc.exe. Pre-creating the rule at install time avoids
+; the first-bind firewall prompt that Windows otherwise raises when SendArc
 ; binds its OAuth loopback listener — on RDS that prompt appears on the server
 ; console, invisible to the user in the RDP session (RESEARCH §Pitfall 4).
 ;
@@ -708,125 +636,20 @@ FunctionEnd
 ;   - shorter NSIS script (RESEARCH §Pitfall 4 recommendation)
 ;
 ; Why program= (not localport=):
-;   - go-mapi binds 127.0.0.1:0 (ephemeral port) for the OAuth loopback server
+;   - SendArc binds 127.0.0.1:0 (ephemeral port) for the OAuth loopback server
 ;   - a program-scoped rule is both narrower (only this .exe) and port-stable
 ;   - broad port exposure is avoided; tampering with $INSTDIR requires admin
 ;
-; Rule name "go-mapi OAuth loopback" MUST match byte-for-byte the uninstall
+; Rule name "SendArc OAuth loopback" MUST match byte-for-byte the uninstall
 ; counterpart in plan 10-04 — a typo here breaks uninstall.
 ;------------------------------------------------------------------------------
 
 Function AddFirewallRule
-  ExecWait 'netsh advfirewall firewall add rule name="go-mapi OAuth loopback" dir=in program="$INSTDIR\go-mapi.exe" action=allow profile=any' $0
+  ExecWait 'netsh advfirewall firewall add rule name="SendArc OAuth loopback" dir=in program="$INSTDIR\SendArc.exe" action=allow profile=any' $0
   DetailPrint "firewall add rule rc=$0"
   ; Do NOT halt on non-zero rc — group policy may block netsh writes, in which
   ; case OAuth on RDS will still hang but desktop Windows works (Windows
   ; auto-classifies loopback without the prompt on non-RDS sessions).
-FunctionEnd
-
-;------------------------------------------------------------------------------
-; RegisterScheduledTask — Phase 11.1 D-08 / D-09 / D-14
-;
-; Gated on $AutoUpdateFlag == "1" (D-07: default OFF, only the literal "1"
-; enables — the .onInit GetOptions parser keeps strict-bool semantics).
-;
-; Steps:
-;   1. Stage tasks/go-mapi-auto-update.xml into $INSTDIR.
-;   2. Substitute INSTDIR_PLACEHOLDER -> $INSTDIR via PowerShell 5.1.
-;      [regex]::Escape on the replacement value protects against any
-;      regex meta in $INSTDIR (RESEARCH §T-11.1.05-04). -Encoding Unicode
-;      preserves the UTF-16 LE BOM that schtasks /XML requires.
-;   3. schtasks /create /XML <path> /TN "go-mapi Auto Update" /F /RU SYSTEM
-;      /RL HIGHEST. /F suppresses "task already exists" → idempotent
-;      re-install (RESEARCH §Pitfall 3). /RU + /RL are defensive overrides
-;      of the XML <Principals> block (typo guard).
-;   4. Delete the staged XML — the definition lives in Task Scheduler now.
-;------------------------------------------------------------------------------
-
-Function RegisterScheduledTask
-  StrCmp $AutoUpdateFlag "1" 0 SkipTask
-  DetailPrint "Auto-update opt-in: registering Scheduled Task 'go-mapi Auto Update'"
-
-  ; Generate the Task Scheduler XML programmatically with $INSTDIR baked in.
-  ; The earlier "stage tasks/go-mapi-auto-update.xml + nsExec PowerShell
-  ; substitution" pattern shipped in Plan 11.1-05 e9b2693 proved unreliable —
-  ; the XML retained INSTDIR_PLACEHOLDER literal because the nested-quote
-  ; escaping in the nsExec command line prevented PowerShell from running the
-  ; substitution at all. Programmatic generation eliminates the entire
-  ; substitution step.
-  ;
-  ; FileWriteUTF16LE (with /BOM on the first call) writes proper UTF-16 LE
-  ; bytes preceded by the 0xFF 0xFE BOM — the encoding schtasks /XML requires
-  ; on Win 10/11. NOTE: NSIS Unicode-build's plain `FileWrite` writes ANSI/
-  ; UTF-8 bytes (single-byte per char), NOT UTF-16 LE, despite what some
-  ; older NSIS docs imply — verified empirically in Plan 11.1-05 sandbox UAT
-  ; (the staged file had a 0xFF 0xFE BOM followed by single-byte ASCII for
-  ; "<?xml...", which schtasks decoded as garbage Chinese characters and
-  ; rejected as malformed XML). FileWriteUTF16LE is the correct primitive.
-  ;
-  ; The committed src/installer/tasks/go-mapi-auto-update.xml file remains as
-  ; the canonical reference for the task shape — it is no longer staged at
-  ; install time, but downstream docs and future maintainers can read it.
-  FileOpen $0 "$INSTDIR\go-mapi-auto-update.xml" w
-  FileWriteUTF16LE /BOM $0 '<?xml version="1.0" encoding="UTF-16"?>$\r$\n'
-  FileWriteUTF16LE $0 '<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">$\r$\n'
-  FileWriteUTF16LE $0 '  <RegistrationInfo>$\r$\n'
-  FileWriteUTF16LE $0 '    <Description>go-mapi silent auto-update — fetches and applies updates without elevating the interactive user.</Description>$\r$\n'
-  FileWriteUTF16LE $0 '    <URI>\go-mapi Auto Update</URI>$\r$\n'
-  FileWriteUTF16LE $0 '  </RegistrationInfo>$\r$\n'
-  FileWriteUTF16LE $0 '  <Triggers>$\r$\n'
-  FileWriteUTF16LE $0 '    <CalendarTrigger>$\r$\n'
-  FileWriteUTF16LE $0 '      <StartBoundary>2026-01-01T03:00:00</StartBoundary>$\r$\n'
-  FileWriteUTF16LE $0 '      <Enabled>true</Enabled>$\r$\n'
-  FileWriteUTF16LE $0 '      <RandomDelay>PT30M</RandomDelay>$\r$\n'
-  FileWriteUTF16LE $0 '      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>$\r$\n'
-  FileWriteUTF16LE $0 '    </CalendarTrigger>$\r$\n'
-  FileWriteUTF16LE $0 '    <BootTrigger>$\r$\n'
-  FileWriteUTF16LE $0 '      <Enabled>true</Enabled>$\r$\n'
-  FileWriteUTF16LE $0 '      <Delay>PT5M</Delay>$\r$\n'
-  FileWriteUTF16LE $0 '    </BootTrigger>$\r$\n'
-  FileWriteUTF16LE $0 '  </Triggers>$\r$\n'
-  FileWriteUTF16LE $0 '  <Principals>$\r$\n'
-  FileWriteUTF16LE $0 '    <Principal id="Author">$\r$\n'
-  FileWriteUTF16LE $0 '      <UserId>S-1-5-18</UserId>$\r$\n'
-  FileWriteUTF16LE $0 '      <RunLevel>HighestAvailable</RunLevel>$\r$\n'
-  FileWriteUTF16LE $0 '    </Principal>$\r$\n'
-  FileWriteUTF16LE $0 '  </Principals>$\r$\n'
-  FileWriteUTF16LE $0 '  <Settings>$\r$\n'
-  FileWriteUTF16LE $0 '    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>$\r$\n'
-  FileWriteUTF16LE $0 '    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>$\r$\n'
-  FileWriteUTF16LE $0 '    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>$\r$\n'
-  FileWriteUTF16LE $0 '    <AllowHardTerminate>true</AllowHardTerminate>$\r$\n'
-  FileWriteUTF16LE $0 '    <StartWhenAvailable>true</StartWhenAvailable>$\r$\n'
-  FileWriteUTF16LE $0 '    <RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable>$\r$\n'
-  FileWriteUTF16LE $0 '    <Enabled>true</Enabled>$\r$\n'
-  FileWriteUTF16LE $0 '    <ExecutionTimeLimit>PT12H</ExecutionTimeLimit>$\r$\n'
-  FileWriteUTF16LE $0 '  </Settings>$\r$\n'
-  FileWriteUTF16LE $0 '  <Actions Context="Author">$\r$\n'
-  FileWriteUTF16LE $0 '    <Exec>$\r$\n'
-  FileWriteUTF16LE $0 '      <Command>"$INSTDIR\go-mapi.exe"</Command>$\r$\n'
-  FileWriteUTF16LE $0 '      <Arguments>--update-check-silent</Arguments>$\r$\n'
-  FileWriteUTF16LE $0 '    </Exec>$\r$\n'
-  FileWriteUTF16LE $0 '  </Actions>$\r$\n'
-  FileWriteUTF16LE $0 '</Task>$\r$\n'
-  FileClose $0
-
-  ; /F idempotent re-install. /RU SYSTEM is defensive (XML already pins
-  ; <UserId>S-1-5-18</UserId>). NOTE: /RL is INCOMPATIBLE with /XML — schtasks
-  ; rejects with "la opción /XML solo puede usarse con /S /U /P /RU /RP /F /IT
-  ; /TN" if both are passed. RunLevel comes from <RunLevel>HighestAvailable</RunLevel>
-  ; in the XML instead.
-  ExecWait 'schtasks /create /XML "$INSTDIR\go-mapi-auto-update.xml" /TN "go-mapi Auto Update" /F /RU SYSTEM' $0
-  DetailPrint "schtasks /create rc=$0"
-
-  ; One-shot stage file — definition now lives in Task Scheduler database.
-  Delete "$INSTDIR\go-mapi-auto-update.xml"
-  Goto Done
-
-SkipTask:
-  DetailPrint "Auto-update opt-in not set (/AUTOUPDATE=0 or absent) — skipping Scheduled Task"
-
-Done:
 FunctionEnd
 
 ;------------------------------------------------------------------------------
@@ -837,14 +660,7 @@ FunctionEnd
 ;------------------------------------------------------------------------------
 
 Section "Uninstall"
-  ; Phase 11.1 D-16: remove the Scheduled Task FIRST so it cannot fire
-  ; mid-uninstall (the task launches go-mapi.exe --update-check-silent which
-  ; would write to $INSTDIR while we are scrubbing it). schtasks /delete /f
-  ; is idempotent — rc=0 (removed) and rc=1 (not found) are both swallowed
-  ; by un.RemoveScheduledTask, so /AUTOUPDATE=0 installs uninstall cleanly too.
-  Call un.RemoveScheduledTask
-
-  ; QUICK-260423-ntu T2 — runs SECOND now (was first): if go-mapi.exe is
+  ; QUICK-260423-ntu T2: if SendArc.exe is
   ; still running when the uninstaller starts, WM_CLOSE it and wait up to
   ; 10s for the intentionalQuit path to fire before any Delete runs.
   Call un.EnsureAppNotRunning
@@ -854,74 +670,70 @@ Section "Uninstall"
   ; when some steps fail (e.g. firewall rule GPO-locked, AV-locked file).
 
   ; 1. Firewall rule — name MUST match plan 10-03 AddFirewallRule byte-for-byte
-  ExecWait 'netsh advfirewall firewall delete rule name="go-mapi OAuth loopback"' $0
+  ExecWait 'netsh advfirewall firewall delete rule name="SendArc OAuth loopback"' $0
   DetailPrint "firewall delete rule rc=$0"
 
   ; 2. Start Menu shortcut (plan 10-03 stamped the AUMID on this .lnk)
   SetShellVarContext all
-  Delete "$SMPROGRAMS\go-mapi.lnk"
+  Delete "$SMPROGRAMS\SendArc.lnk"
   SetShellVarContext current
 
   ; 3. MAPI handler key (native view)
-  DeleteRegKey HKLM "SOFTWARE\Clients\Mail\go-mapi"
+  DeleteRegKey HKLM "SOFTWARE\Clients\Mail\SendArc"
 
   ; 3b. QUICK-260423-ntu T3c — WOW6432 MAPI handler key (32-bit view)
   SetRegView 32
-  DeleteRegKey HKLM "SOFTWARE\Clients\Mail\go-mapi"
+  DeleteRegKey HKLM "SOFTWARE\Clients\Mail\SendArc"
   SetRegView default
 
   ; 4. Restore (Default) Mail client from backup (D-11)
   Call un.RestorePreviousMailClient
 
-  ; Phase 11.1 D-18 case 6: scrub silent-update staging dir (Plan 11.1-04 writes
-  ; here under SYSTEM context; Plan 11.1-05 owns the cleanup).
+  ; Scrub any legacy update-staging directory under SYSTEM context.
   ; Use ReadEnvStr to read %PROGRAMDATA% directly. The `$APPDATA\..\..\ProgramData`
   ; pattern used elsewhere in this file (BackupPreviousMailClient, RestorePreviousMailClient)
   ; resolves to `<userprofile>\ProgramData` under default `current` context — a
   ; non-existent path. Verified by Plan 11.1-05 sandbox UAT (Test B updates_dir_after=true
-  ; while planted file remained at C:\ProgramData\go-mapi\updates). ReadEnvStr is
+  ; while planted file remained at C:\ProgramData\SendArc\updates). ReadEnvStr is
   ; reliable across user/SYSTEM contexts.
   ReadEnvStr $0 PROGRAMDATA
-  RMDir /r "$0\go-mapi\updates"
+  RMDir /r "$0\SendArc\updates"
 
-  ; Phase 11.1 W7: belt-and-braces cleanup of *.old.<pid> orphans left by
-  ; silent-updater swaps (Plan 11.1-04 swapInPlace renames the old binary
-  ; aside via MoveFileEx before placing the new one). Plan 11.1-04 also
-  ; cleans these proactively at silent-update start; this catches any orphans
-  ; that survive past the last cycle. Runs before the binary scrub at step 9.
+  ; Belt-and-braces cleanup of *.old.<pid> orphans left by interrupted
+  ; upgrades. Runs before the binary scrub at step 9.
   Push "$INSTDIR"
   Call un.ScrubOldOrphans
-  Push "$PROGRAMFILES32\go-mapi"
+  Push "$PROGRAMFILES32\SendArc"
   Call un.ScrubOldOrphans
 
-  ; 5. %ProgramData%\go-mapi\uninst\ — remove AFTER the restore (step 4) since
+  ; 5. %ProgramData%\SendArc\uninst\ — remove AFTER the restore (step 4) since
   ; the restore reads from this directory
-  RMDir /r "$APPDATA\..\..\ProgramData\go-mapi\uninst"
-  RMDir    "$APPDATA\..\..\ProgramData\go-mapi"   ; only if empty (non-recursive)
+  RMDir /r "$APPDATA\..\..\ProgramData\SendArc\uninst"
+  RMDir    "$APPDATA\..\..\ProgramData\SendArc"   ; only if empty (non-recursive)
 
-  ; 6. %TEMP%\go-mapi\ — best-effort. Under elevated uninstall this is the
+  ; 6. %TEMP%\SendArc\ — best-effort. Under elevated uninstall this is the
   ; SYSTEM user's TEMP, not the real user's. Real users' temp already
   ; auto-cleans via the delete-on-process privacy model in src/app/watcher_bridge.go.
-  RMDir /r "$TEMP\go-mapi"
+  RMDir /r "$TEMP\SendArc"
 
-  ; 7. %APPDATA%\go-mapi\ — uninstalling user only (D-19 multi-user caveat:
+  ; 7. %APPDATA%\SendArc\ — uninstalling user only (D-19 multi-user caveat:
   ; other users on the machine retain their own copies; documented in README)
-  RMDir /r "$APPDATA\go-mapi"
+  RMDir /r "$APPDATA\SendArc"
 
   ; 8. Windows Credential Manager — target is "<service>:<username>" per
   ; zalando/go-keyring Windows backend (PATTERNS.md §Shared Pattern 3).
   ; CONTEXT specifics line 199 wrote the slash-separated form — WRONG.
-  ; Verified target: "go-mapi:oauth-tokens" (colon). This is the byte-for-byte
+  ; Verified target: "SendArc:oauth-tokens" (colon). This is the byte-for-byte
   ; value returned by zalando/go-keyring's credName() method for
-  ; service="go-mapi" + username="oauth-tokens" (see src/app/auth.go:27-28).
-  ExecWait 'cmdkey /delete:go-mapi:oauth-tokens' $0
-  DetailPrint "cmdkey /delete:go-mapi:oauth-tokens rc=$0"
+  ; service="SendArc" + username="oauth-tokens" (see src/app/auth.go:27-28).
+  ExecWait 'cmdkey /delete:SendArc:oauth-tokens' $0
+  DetailPrint "cmdkey /delete:SendArc:oauth-tokens rc=$0"
 
   ; 9. Binaries (x64 side) — the un.EnsureAppNotRunning call at the start
-  ; of this section has already closed any running go-mapi.exe so these
+  ; of this section has already closed any running SendArc.exe so these
   ; Deletes succeed.
-  Delete "$INSTDIR\go-mapi.exe"
-  Delete "$INSTDIR\go-mapi.dll"
+  Delete "$INSTDIR\SendArc.exe"
+  Delete "$INSTDIR\SendArc.dll"
   Delete "$INSTDIR\uninstall.exe"
   Delete "$INSTDIR\install.log"
 
@@ -931,8 +743,8 @@ Section "Uninstall"
   RMDir  "$INSTDIR\diagnostics"
 
   ; 9c. QUICK-260423-ntu T3c — x86 DLL + its parallel install dir
-  Delete "$PROGRAMFILES32\go-mapi\go-mapi.dll"
-  RMDir  "$PROGRAMFILES32\go-mapi"
+  Delete "$PROGRAMFILES32\SendArc\SendArc.dll"
+  RMDir  "$PROGRAMFILES32\SendArc"
 
   ; 10. Install dir (RMDir non-recursive — only removes if empty)
   RMDir "$INSTDIR"
@@ -946,14 +758,14 @@ SectionEnd
 ; D-11: on uninstall, restore HKLM\SOFTWARE\Clients\Mail\(Default) from the backup JSON.
 ; Only restores if:
 ;   1. backup JSON exists AND
-;   2. current (Default) still points at "go-mapi" (don't clobber another installer) AND
+;   2. current (Default) still points at "SendArc" (don't clobber another installer) AND
 ;   3. the restoration target's subkey still exists under HKLM\SOFTWARE\Clients\Mail\
 ; Otherwise: try fallbacks (Microsoft Outlook -> Outlook -> Windows Mail) or clear to "".
 Function un.RestorePreviousMailClient
   ; Guard 1: only restore if current (Default) is still our claim
   ReadRegStr $0 HKLM "SOFTWARE\Clients\Mail" ""
-  StrCmp $0 "go-mapi" 0 DoneRestore
-  DetailPrint "Mail (Default) is still 'go-mapi' — proceeding with restore"
+  StrCmp $0 "SendArc" 0 DoneRestore
+  DetailPrint "Mail (Default) is still 'SendArc' — proceeding with restore"
 
   ; IN-05: parse the backup JSON via PowerShell's ConvertFrom-Json instead of a
   ; naive substring search. The previous substring-based detection of
@@ -971,8 +783,8 @@ Function un.RestorePreviousMailClient
   ;   - previousClient=null:        exit 0, stdout = "" (just trailing CRLF)
   ;   - previousClient="<name>":    exit 0, stdout = "<name>" + trailing CRLF
   StrCpy $1 ""  ; candidate name
-  IfFileExists "$APPDATA\..\..\ProgramData\go-mapi\uninst\previous-mail-client.json" 0 NoBackup
-  nsExec::ExecToStack 'powershell.exe -NoProfile -Command "try { $$j = Get-Content -LiteralPath ''$APPDATA\..\..\ProgramData\go-mapi\uninst\previous-mail-client.json'' -Raw | ConvertFrom-Json; if ($$null -ne $$j.previousClient) { Write-Output $$j.previousClient } exit 0 } catch { exit 1 }"'
+  IfFileExists "$APPDATA\..\..\ProgramData\SendArc\uninst\previous-mail-client.json" 0 NoBackup
+  nsExec::ExecToStack 'powershell.exe -NoProfile -Command "try { $$j = Get-Content -LiteralPath ''$APPDATA\..\..\ProgramData\SendArc\uninst\previous-mail-client.json'' -Raw | ConvertFrom-Json; if ($$null -ne $$j.previousClient) { Write-Output $$j.previousClient } exit 0 } catch { exit 1 }"'
   Pop $4    ; exit code
   Pop $1    ; stdout (empty if null or parse error)
   StrCmp $4 "0" 0 TryFallbacks
@@ -988,7 +800,7 @@ SkipTrim:
   Goto VerifyAndRestore
 
 NoBackup:
-  DetailPrint "No backup JSON at %ProgramData%\go-mapi\uninst\previous-mail-client.json — trying fallbacks"
+  DetailPrint "No backup JSON at %ProgramData%\SendArc\uninst\previous-mail-client.json — trying fallbacks"
   Goto TryFallbacks
 
 VerifyAndRestore:
@@ -1027,8 +839,8 @@ DoneRestore:
   ; is present and contains a non-null previousClient32 value, write it
   ; back to the 32-bit view's (Default). Parse via PowerShell's
   ; ConvertFrom-Json — same pattern as the native-view restore above.
-  IfFileExists "$APPDATA\..\..\ProgramData\go-mapi\uninst\previous-mail-client.json" 0 NoWow6432
-  nsExec::ExecToStack 'powershell.exe -NoProfile -Command "try { $$j = Get-Content -LiteralPath ''$APPDATA\..\..\ProgramData\go-mapi\uninst\previous-mail-client.json'' -Raw | ConvertFrom-Json; if ($$null -ne $$j.previousClient32) { Write-Output $$j.previousClient32 } exit 0 } catch { exit 1 }"'
+  IfFileExists "$APPDATA\..\..\ProgramData\SendArc\uninst\previous-mail-client.json" 0 NoWow6432
+  nsExec::ExecToStack 'powershell.exe -NoProfile -Command "try { $$j = Get-Content -LiteralPath ''$APPDATA\..\..\ProgramData\SendArc\uninst\previous-mail-client.json'' -Raw | ConvertFrom-Json; if ($$null -ne $$j.previousClient32) { Write-Output $$j.previousClient32 } exit 0 } catch { exit 1 }"'
   Pop $4    ; exit code
   Pop $1    ; stdout
   StrCmp $4 "0" 0 NoWow6432
@@ -1156,43 +968,43 @@ Function un.EnsureAppNotRunning
   Push $0
   Push $1
 
-  nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq go-mapi.exe" /NH /FO CSV'
+  nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq SendArc.exe" /NH /FO CSV'
   Pop $0
   Pop $1
 
   Push $1
-  Push "go-mapi.exe"
+  Push "SendArc.exe"
   Call un.StrContains
   Pop $0
   StrCmp $0 "1" unEANR_Found unEANR_NotFound
 
 unEANR_Found:
-  DetailPrint "go-mapi.exe is running — attempting graceful close"
+  DetailPrint "SendArc.exe is running — attempting graceful close"
   IfSilent unEANR_SilentRetry unEANR_AskUser
 
 unEANR_AskUser:
-  MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION "go-mapi is currently running. Click OK to close it and continue, or Cancel to abort the uninstaller." IDOK unEANR_SilentRetry IDCANCEL unEANR_Cancel
+  MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION "SendArc is currently running. Click OK to close it and continue, or Cancel to abort the uninstaller." IDOK unEANR_SilentRetry IDCANCEL unEANR_Cancel
 
 unEANR_Cancel:
   DetailPrint "User cancelled — aborting uninstaller"
   Pop $1
   Pop $0
-  Abort "Uninstaller aborted by user (go-mapi was running)."
+  Abort "Uninstaller aborted by user (SendArc was running)."
 
 unEANR_SilentRetry:
-  nsExec::ExecToStack 'taskkill /IM go-mapi.exe'
+  nsExec::ExecToStack 'taskkill /IM SendArc.exe'
   Pop $0
   Pop $1
-  DetailPrint "taskkill /IM go-mapi.exe rc=$0"
+  DetailPrint "taskkill /IM SendArc.exe rc=$0"
 
   StrCpy $0 0
 unEANR_PollLoop:
   Sleep 500
-  nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq go-mapi.exe" /NH /FO CSV'
+  nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq SendArc.exe" /NH /FO CSV'
   Pop $1
   Pop $1
   Push $1
-  Push "go-mapi.exe"
+  Push "SendArc.exe"
   Call un.StrContains
   Pop $1
   StrCmp $1 "0" unEANR_Exited
@@ -1201,16 +1013,16 @@ unEANR_PollLoop:
   Goto unEANR_PollLoop
 
 unEANR_Timeout:
-  DetailPrint "ERROR: go-mapi.exe did not exit within 10s"
+  DetailPrint "ERROR: SendArc.exe did not exit within 10s"
   Pop $1
   Pop $0
   IfSilent unEANR_SilentAbort
-  MessageBox MB_OK|MB_ICONSTOP "go-mapi did not close within 10 seconds. Please close it manually and re-run the uninstaller."
+  MessageBox MB_OK|MB_ICONSTOP "SendArc did not close within 10 seconds. Please close it manually and re-run the uninstaller."
 unEANR_SilentAbort:
-  Abort "go-mapi.exe still running after 10s close poll."
+  Abort "SendArc.exe still running after 10s close poll."
 
 unEANR_Exited:
-  DetailPrint "go-mapi.exe exited after $0 poll iterations"
+  DetailPrint "SendArc.exe exited after $0 poll iterations"
   Pop $1
   Pop $0
   Return
@@ -1221,28 +1033,11 @@ unEANR_NotFound:
 FunctionEnd
 
 ;------------------------------------------------------------------------------
-; un.RemoveScheduledTask — Phase 11.1 D-16
-;
-; Idempotent removal of the silent-update Scheduled Task. Runs unconditionally
-; — installs that did NOT register the task (e.g. /AUTOUPDATE=0) still call
-; this; rc=1 ("task not found") is swallowed. /F suppresses the confirmation
-; prompt. Logged via DetailPrint for installer-log forensic trail.
-;------------------------------------------------------------------------------
-
-Function un.RemoveScheduledTask
-  ExecWait 'schtasks /delete /tn "go-mapi Auto Update" /f' $0
-  DetailPrint "schtasks /delete rc=$0 (0=removed, 1=not found — both ok)"
-FunctionEnd
-
-;------------------------------------------------------------------------------
 ; un.ScrubOldOrphans — Phase 11.1 W7
 ;
-; Belt-and-braces cleanup of *.old.<pid> orphan files left behind by the
-; silent updater's MoveFileEx rename-while-running pattern (Plan 11.1-04
-; swapInPlace). Plan 11.1-04 cleans these proactively at silent-update start;
-; this uninstaller helper catches any orphans that survive past the last
-; update cycle. Pattern matches both go-mapi.exe.old.<pid> and
-; go-mapi.dll.old.<pid> via NSIS FindFirst/FindNext.
+; Belt-and-braces cleanup of *.old.<pid> orphan files left by an interrupted
+; upgrade. Pattern matches both SendArc.exe.old.<pid> and
+; SendArc.dll.old.<pid> via NSIS FindFirst/FindNext.
 ;
 ; Stack contract: caller pushes the directory path (e.g. "$INSTDIR"), function
 ; pops it, scrubs all "*.old.*" matches in that directory, returns nothing.

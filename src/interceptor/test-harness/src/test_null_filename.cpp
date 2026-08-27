@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <filesystem>
+#include <fstream>
 #include "../test_utils.h"
 
 using namespace mapi_test;
@@ -11,9 +12,8 @@ using namespace mapi_test;
 int test_null_filename() {
     std::cout << "\nTest: Null Filename (extract from path)" << std::endl;
 
-    HMODULE hDll = LoadLibraryA("go-mapi.dll");
+    HMODULE hDll = TestUtilities::LoadInterceptorDll();
     if (!hDll) {
-        std::cerr << "Failed to load go-mapi.dll" << std::endl;
         return 1;
     }
 
@@ -27,7 +27,7 @@ int test_null_filename() {
     }
 
     // Clean up first
-    std::string tempDir = TestUtilities::GetGoMapiTempDir();
+    std::string tempDir = TestUtilities::GetSendArcQueueDir();
     TestUtilities::CleanupTestFiles(tempDir);
 
     char subject[] = "Test with null filename";
@@ -35,13 +35,33 @@ int test_null_filename() {
     char toAddress[] = "test@example.com";
     char toName[] = "Test User";
 
-    // Attachment with lpszPathName set but lpszFileName = NULL
-    // This is what Windows "Send to → Mail recipient" does
-    char filePath[] = "C:\\Users\\marc\\Documents\\PyG_BGBL_GLOBAL_SL.xlsx";
+    // Attachment with lpszPathName set but lpszFileName = NULL. Use real
+    // temporary files because the interceptor copies them into its queue.
+    std::filesystem::path sourceDir = std::filesystem::temp_directory_path() /
+        ("SendArc-harness-" + std::to_string(GetCurrentProcessId()));
+    std::error_code filesystemError;
+    std::filesystem::create_directories(sourceDir, filesystemError);
+    if (filesystemError) {
+        std::cerr << "Failed to create temporary attachment directory" << std::endl;
+        FreeLibrary(hDll);
+        return 1;
+    }
+
+    std::filesystem::path sourcePath = sourceDir / "PyG_BGBL_GLOBAL_SL.xlsx";
+    {
+        std::ofstream source(sourcePath, std::ios::binary | std::ios::trunc);
+        source << "ansi attachment";
+        if (!source) {
+            std::filesystem::remove_all(sourceDir, filesystemError);
+            FreeLibrary(hDll);
+            return 1;
+        }
+    }
+    std::string filePath = sourcePath.u8string();
 
     MapiFileDesc attachment = {};
     attachment.nPosition = static_cast<ULONG>(-1);
-    attachment.lpszPathName = filePath;
+    attachment.lpszPathName = filePath.data();
     attachment.lpszFileName = nullptr;  // NULL — the bug case
 
     MapiRecipDesc recipient = {};
@@ -62,6 +82,7 @@ int test_null_filename() {
 
     if (result != 0) {
         std::cerr << "MAPISendMail failed" << std::endl;
+        std::filesystem::remove_all(sourceDir, filesystemError);
         FreeLibrary(hDll);
         return 1;
     }
@@ -103,7 +124,17 @@ int test_null_filename() {
         wchar_t wBody[] = L"Wide attachment test";
         wchar_t wToAddr[] = L"test@example.com";
         wchar_t wToName[] = L"Test User";
-        wchar_t wFilePath[] = L"C:\\Users\\marc\\Documents\\Informe_año_2025.pdf";
+        std::filesystem::path wideSourcePath = sourceDir / L"Informe_año_2025.pdf";
+        {
+            std::ofstream source(wideSourcePath, std::ios::binary | std::ios::trunc);
+            source << "wide attachment";
+            if (!source) {
+                std::filesystem::remove_all(sourceDir, filesystemError);
+                FreeLibrary(hDll);
+                return 1;
+            }
+        }
+        std::wstring wFilePath = wideSourcePath.wstring();
 
         MapiRecipDescW recipW = {};
         recipW.ulRecipClass = MAPI_TO;
@@ -112,7 +143,7 @@ int test_null_filename() {
 
         MapiFileDescW fileW = {};
         fileW.nPosition = static_cast<ULONG>(-1);
-        fileW.lpszPathName = wFilePath;
+        fileW.lpszPathName = wFilePath.data();
         fileW.lpszFileName = nullptr;  // NULL
 
         MapiMessageW msgW = {};
@@ -139,6 +170,7 @@ int test_null_filename() {
     }
 
     TestUtilities::CleanupTestFiles(tempDir);
+    std::filesystem::remove_all(sourceDir, filesystemError);
     FreeLibrary(hDll);
     return (hasFilename && hasFilenameW) ? 0 : 1;
 }

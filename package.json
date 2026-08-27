@@ -1,6 +1,7 @@
 {
-  "name": "go-mapi",
-  "description": "MAPI to Gmail bridge for Windows — a Wails (Go + WebView2) desktop app that routes legacy 'Send to Mail recipient' calls to Gmail as drafts",
+  "name": "sendarc",
+  "version": "0.1.0-beta",
+  "description": "Send email from legacy Windows MAPI applications through Gmail with an explicit local preview and send confirmation.",
   "private": true,
   "workspaces": [
     "src/app",
@@ -13,18 +14,18 @@
     "build:interceptor:x64": "powershell -ExecutionPolicy Bypass -File src/interceptor/build.ps1 -Arch x64 -Config Release",
     "build:interceptor:x86": "powershell -ExecutionPolicy Bypass -File src/interceptor/build.ps1 -Arch x86 -Config Release",
     "build:interceptor:debug": "powershell -ExecutionPolicy Bypass -File src/interceptor/build.ps1 -Arch x64 -Config Debug -Tests",
-    "build:installer": "cd src/installer && makensis -DGOMAPI_VERSION=3.0.0-dev go-mapi.nsi",
-    "test": "npm run -w @marcfargas/go-mapi-app-frontend build && go test ./internal/mapi/... ./src/app/... && npm run -w @marcfargas/go-mapi-app-frontend test:run",
-    "test:interceptor": "powershell -ExecutionPolicy Bypass -Command \"src/interceptor/build-x64/bin/go-mapi-test-harness.exe src/interceptor/build-x64/bin/go-mapi.dll\"",
+    "build:installer": "cd src/installer && makensis -DSENDARC_VERSION=0.1.0-beta SendArc.nsi",
+    "test": "npm run -w @sendarc/frontend build && go test ./internal/mapi/... ./src/app/... && npm run -w @sendarc/frontend test:run",
+    "test:interceptor": "powershell -ExecutionPolicy Bypass -Command \"src/interceptor/build-x64/bin/SendArc-test-harness.exe src/interceptor/build-x64/bin/SendArc.dll\"",
     "test:dll:sandbox": "powershell -ExecutionPolicy Bypass -File tests/sandbox/run-sandbox-test.ps1",
-    "e2e": "npm run -w @marcfargas/go-mapi-e2e test",
-    "check": "npm run -w @marcfargas/go-mapi-app-frontend build && go vet ./internal/mapi/... ./src/app/... && npm run -w @marcfargas/go-mapi-app-frontend check",
+    "e2e": "npm run -w @sendarc/e2e test",
+    "check": "npm run -w @sendarc/frontend build && go vet ./internal/mapi/... ./src/app/... && npm run -w @sendarc/frontend check",
     "clean": "npm run clean:interceptor",
     "clean:interceptor": "powershell -ExecutionPolicy Bypass -Command \"Remove-Item -Recurse -Force src/interceptor/build-x64, src/interceptor/build-x86 -ErrorAction SilentlyContinue\""
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/marcfargas/go-mapi.git"
+    "url": "https://github.com/maxtop9843-byte/sendarc.git"
   },
   "keywords": [
     "mapi",
@@ -35,10 +36,10 @@
     "wails",
     "desktop"
   ],
-  "author": "Marc Fargas <https://github.com/marcfargas>",
+  "author": "장형진 <maxtop9843@gmail.com>",
   "license": "LGPL-3.0-or-later",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.19.0"
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0"

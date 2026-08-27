@@ -1,0 +1,34 @@
+import { describe, expect, it } from "vitest";
+import { buildCanonical, DOWNLOAD_ROUTE, SUPPORT_EMAIL } from "../../src/lib/site";
+import { json, text, visitorHash } from "../../functions/api/_shared";
+import { onRequestPost as submitBeta } from "../../functions/api/business-beta";
+
+describe("site configuration", () => {
+  it("builds stable canonical URLs", () => {
+    expect(buildCanonical(new URL("https://example.com/base/"), "/privacy/")).toBe("https://example.com/privacy/");
+    expect(DOWNLOAD_ROUTE).toBe("/download/");
+    expect(SUPPORT_EMAIL).toBe("maxtop9843@gmail.com");
+  });
+
+  it("bounds submitted text", () => expect(text("  abcdef  ", 4)).toBe("abcd"));
+
+  it("returns no-store JSON", async () => {
+    const response = json({ ok: true }, 201);
+    expect(response.status).toBe(201);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({ ok: true });
+  });
+
+  it("hashes an address without retaining the raw value", async () => {
+    const request = new Request("https://example.com", { headers: { "CF-Connecting-IP": "203.0.113.9" } });
+    const hash = await visitorHash(request, "test-salt");
+    expect(hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(hash).not.toContain("203.0.113.9");
+  });
+
+  it("fails closed when beta storage is unavailable", async () => {
+    const request = new Request("https://example.com/api/business-beta", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const response = await submitBeta({ request, env: {} });
+    expect(response.status).toBe(503);
+  });
+});

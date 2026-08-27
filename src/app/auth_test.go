@@ -204,11 +204,9 @@ func TestAuthCodeURLHasPKCE(t *testing.T) {
 	if q.Get("access_type") != "offline" {
 		t.Fatalf("expected access_type=offline, got %q", q.Get("access_type"))
 	}
-	scope := q.Get("scope")
-	for _, want := range []string{"gmail.compose", "gmail.send", "userinfo.email", "userinfo.profile"} {
-		if !strings.Contains(scope, want) {
-			t.Fatalf("scope missing %q: %q", want, scope)
-		}
+	scope := strings.Fields(q.Get("scope"))
+	if len(scope) != 1 || scope[0] != scopeGmailSend {
+		t.Fatalf("expected only gmail.send scope, got %q", q.Get("scope"))
 	}
 	if q.Get("state") != "state-xyz" {
 		t.Fatalf("expected state=state-xyz, got %q", q.Get("state"))
@@ -339,6 +337,26 @@ func TestRefreshIfNeededNoTokens(t *testing.T) {
 	am := NewAuthManagerWithStore(newFakeKeyringStore())
 	if err := am.refreshIfNeededLocked(context.Background()); !errors.Is(err, ErrNotAuthenticated) {
 		t.Fatalf("expected ErrNotAuthenticated, got %v", err)
+	}
+}
+
+func TestRefreshMissingRefreshTokenClearsState(t *testing.T) {
+	store := newFakeKeyringStore()
+	am := NewAuthManagerWithStore(store)
+	am.tokens = &OAuthTokens{AccessToken: "stale", Expiry: time.Now().Add(-time.Minute)}
+	if err := am.saveToKeyringLocked(); err != nil {
+		t.Fatalf("seed keyring: %v", err)
+	}
+
+	err := am.refreshIfNeededLocked(context.Background())
+	if !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("expected ErrInvalidGrant, got %v", err)
+	}
+	if am.tokens != nil {
+		t.Fatal("expected stale in-memory tokens to be cleared")
+	}
+	if _, err := store.Get(keyringService, keyringUser); !errors.Is(err, keyring.ErrNotFound) {
+		t.Fatalf("expected stale keyring entry to be cleared, got %v", err)
 	}
 }
 
@@ -800,10 +818,10 @@ func TestMakeAuthenticatedGmailCall_NonUnauthorizedErrorBubbles(t *testing.T) {
 	app := NewApp()
 	app.auth = NewAuthManagerWithStore(newFakeKeyringStore())
 	app.auth.tokens = &OAuthTokens{
-		AccessToken: "fresh-at",
+		AccessToken:  "fresh-at",
 		RefreshToken: "rt",
-		TokenType: "Bearer",
-		Expiry:   time.Now().Add(30 * time.Minute),
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(30 * time.Minute),
 	}
 
 	sentinel := errors.New("gmail 500: boom")

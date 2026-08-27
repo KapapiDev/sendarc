@@ -2,31 +2,31 @@ package main
 
 // AUMIDs — pinned per RESEARCH §2 + CONTEXT.md §Specifics.
 const (
-	aumidDev  = "com.marcfargas.gomapi.dev"
-	aumidProd = "com.marcfargas.gomapi" // Phase 10 installer uses this; kept here for source truth.
+	aumidDev  = "app.sendarc.desktop.dev"
+	aumidProd = "app.sendarc.desktop"
 )
 
-// toastActivatorGUID is the go-mapi-owned COM CLSID for toast activation.
+// toastActivatorGUID is the SendArc-owned COM CLSID for toast activation.
 // Generated fresh for Phase 9 (RESEARCH §9 landmines 2 + 8 — NEVER use the
 // jackmordaunt default {0F82E845-...} default GUID). MUST be identical across
 // dev + prod builds so a user upgrading from dev to prod does not end up with
 // two competing HKCU registrations.
 //
-// Generated: 2026-04-19 via PowerShell [guid]::NewGuid(); pinned here.
-const toastActivatorGUID = "{6352C677-78F0-444F-AAA9-724EB43DBCB0}"
+// Generated for the SendArc fork on 2026-08-27; pinned here and in the installer.
+const toastActivatorGUID = "{AC20AAF7-A958-4A96-A8CB-2A58BAD64F10}"
 
 // toastGroup is the shared group string for all Phase 9 toasts. Enables
-// Windows to auto-collapse multiple pending toasts under a single go-mapi
+// Windows to auto-collapse multiple pending toasts under a single SendArc
 // banner in Action Center (D-08).
-const toastGroup = "go-mapi-queue"
+const toastGroup = "sendarc-queue"
 
 // Toast copy constants — matches UI-SPEC §Copywriting Contract exactly.
 // Kept here as a single source of truth so copy changes are localized.
 const (
-	toastCopyDraftFailedSignedOut = "Draft failed — Sign-in expired"
-	toastCopyDraftFailedNetwork   = "Draft failed — Network error"
-	toastCopyDraftFailedGmail     = "Draft failed — Gmail error"
-	toastCopySummaryInvalidGrant  = "Sign-in expired — emails queued for manual review"
+	toastCopyDraftFailedSignedOut = "Send failed — Sign-in expired"
+	toastCopyDraftFailedNetwork   = "Send failed — Network error"
+	toastCopyDraftFailedGmail     = "Send failed — Gmail error"
+	toastCopySummaryInvalidGrant  = "Sign-in expired — messages remain queued for review"
 )
 
 // toastErrorCopy maps a Plan 03 errorCategory to user-facing error text.
@@ -45,7 +45,7 @@ func toastErrorCopy(category string) string {
 
 // aumidOverride is injected at build time via:
 //
-//	-ldflags "-X 'main.aumidOverride=com.marcfargas.gomapi'"
+//	-ldflags "-X 'main.aumidOverride=app.sendarc.desktop'"
 //
 // `var` (not const) is REQUIRED — -X only overwrites string vars. Mirrors the
 // pattern used for oauthClientID / oauthClientSecret in auth_credentials.go.

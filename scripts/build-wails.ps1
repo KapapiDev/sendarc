@@ -2,7 +2,7 @@
 #
 # QUICK-260423-olq.
 #
-# Reads GOMAPI_OAUTH_CLIENT_ID and GOMAPI_OAUTH_CLIENT_SECRET from the repo-root
+# Reads SENDARC_OAUTH_CLIENT_ID and SENDARC_OAUTH_CLIENT_SECRET from the repo-root
 # `.env.local` file (gitignored) and passes them to `wails build` via
 # -ldflags "-X main.oauthClientID=... -X main.oauthClientSecret=...". Without
 # this injection, the Wails binary's startup guard in src/app/credentials_check.go
@@ -42,11 +42,11 @@ if ([string]::IsNullOrEmpty($EnvFile)) {
 # 1) Locate and parse .env.local (repo root by default)
 $EnvFile = [System.IO.Path]::GetFullPath($EnvFile)
 if (-not (Test-Path -LiteralPath $EnvFile)) {
-    Write-Error "Missing env file: $EnvFile. Create it with GOMAPI_OAUTH_CLIENT_ID=... and GOMAPI_OAUTH_CLIENT_SECRET=... (gitignored)."
+    Write-Error "Missing env file: $EnvFile. Create it with SENDARC_OAUTH_CLIENT_ID=... and SENDARC_OAUTH_CLIENT_SECRET=... (gitignored)."
     exit 1
 }
 
-$required = @('GOMAPI_OAUTH_CLIENT_ID', 'GOMAPI_OAUTH_CLIENT_SECRET')
+$required = @('SENDARC_OAUTH_CLIENT_ID', 'SENDARC_OAUTH_CLIENT_SECRET')
 $values   = @{}
 
 foreach ($line in [System.IO.File]::ReadAllLines($EnvFile)) {
@@ -73,8 +73,8 @@ if ($missing) {
 # 2) Build ldflags string. Values are passed to wails via the arg array so
 # cmd.exe never re-parses them. We never echo the values.
 $ldflags = @(
-    "-X `"main.oauthClientID=$($values['GOMAPI_OAUTH_CLIENT_ID'])`"",
-    "-X `"main.oauthClientSecret=$($values['GOMAPI_OAUTH_CLIENT_SECRET'])`""
+    "-X `"main.oauthClientID=$($values['SENDARC_OAUTH_CLIENT_ID'])`"",
+    "-X `"main.oauthClientSecret=$($values['SENDARC_OAUTH_CLIENT_SECRET'])`""
 ) -join ' '
 
 # 3) CC / CXX override for ARM64 hosts. If the triple-prefixed binaries are on

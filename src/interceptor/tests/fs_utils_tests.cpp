@@ -12,7 +12,7 @@
 //   - WriteErrorForStem: writes errors\<stem>.error with a reason.
 //
 // These tests write real files into a temp scratch dir under CMAKE_BINARY_DIR
-// so they do not pollute the user's %LOCALAPPDATA%\go-mapi\queue\. They never
+// so they do not pollute the user's %LOCALAPPDATA%\SendArc\queue\. They never
 // mutate real queue state.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -37,7 +37,7 @@ static std::wstring makeScratchDir(const wchar_t* leaf) {
     REQUIRE(n > 0);
     std::wstring dir(tempBase);
     if (!dir.empty() && dir.back() != L'\\') dir += L'\\';
-    dir += L"go-mapi-tk6-tests\\";
+    dir += L"SendArc-tk6-tests\\";
     dir += leaf;
     SHCreateDirectoryExW(nullptr, dir.c_str(), nullptr);
     return dir;
@@ -157,6 +157,74 @@ TEST_CASE("CopyFileToDir returns false when source is missing") {
     // Sanity: out params should not falsely report a successful copy.
     // (We don't mandate clearing them — just that no file was created.)
     CHECK(!fileExists(destDir + L"\\whatever.bin"));
+    RemoveDirectoryW(destDir.c_str());
+}
+
+TEST_CASE("CopyFileToDir rejects traversal absolute paths and separators") {
+    std::wstring scratch = makeScratchDir(L"copyunsafe");
+    std::wstring srcPath = scratch + L"\\source.bin";
+    std::wstring destDir = scratch + L"\\dest";
+    std::wstring nestedDir = destDir + L"\\nested";
+    FsUtils::EnsureDirExists(nestedDir);
+    DeleteFileW((scratch + L"\\escaped.bin").c_str());
+    DeleteFileW((nestedDir + L"\\escaped.bin").c_str());
+
+    const char payload[] = "safe-source";
+    writeBytes(srcPath, payload, sizeof(payload) - 1);
+
+    const char* invalidNames[] = {
+        "..\\escaped.bin",
+        "../escaped.bin",
+        "C:\\escaped.bin",
+        "/escaped.bin",
+        "nested\\escaped.bin",
+        "nested/escaped.bin",
+        ".",
+        "..",
+        "safe.bin:stream"
+    };
+
+    for (const char* invalidName : invalidNames) {
+        std::wstring outNewPath = L"sentinel";
+        uint32_t outSize = 999;
+        CHECK(FsUtils::CopyFileToDir(toUtf8(srcPath), destDir, invalidName,
+                                     outNewPath, outSize) == false);
+        CHECK(outNewPath == L"sentinel");
+        CHECK(outSize == 999);
+    }
+
+    CHECK(!fileExists(scratch + L"\\escaped.bin"));
+    CHECK(!fileExists(nestedDir + L"\\escaped.bin"));
+
+    DeleteFileW(srcPath.c_str());
+    RemoveDirectoryW(nestedDir.c_str());
+    RemoveDirectoryW(destDir.c_str());
+}
+
+TEST_CASE("CopyFileToDir preserves a Unicode destination basename") {
+    std::wstring scratch = makeScratchDir(L"copyunicode");
+    std::wstring srcPath = scratch + L"\\source.bin";
+    std::wstring destDir = scratch + L"\\dest";
+    FsUtils::EnsureDirExists(destDir);
+    DeleteFileW((destDir + L"\\\uBCF4\uACE0\uC11C.txt").c_str());
+
+    const char payload[] = "unicode-name";
+    writeBytes(srcPath, payload, sizeof(payload) - 1);
+
+    std::wstring outNewPath;
+    uint32_t outSize = 0;
+    bool ok = FsUtils::CopyFileToDir(
+        toUtf8(srcPath), destDir,
+        "\xEB\xB3\xB4\xEA\xB3\xA0\xEC\x84\x9C.txt", // 보고서.txt
+        outNewPath, outSize);
+
+    CHECK(ok == true);
+    CHECK(outNewPath == destDir + L"\\\uBCF4\uACE0\uC11C.txt");
+    CHECK(outSize == sizeof(payload) - 1);
+    CHECK(fileExists(outNewPath));
+
+    DeleteFileW(outNewPath.c_str());
+    DeleteFileW(srcPath.c_str());
     RemoveDirectoryW(destDir.c_str());
 }
 

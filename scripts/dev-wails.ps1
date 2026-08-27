@@ -21,8 +21,8 @@ Get-Content $envFile | ForEach-Object {
     }
 }
 
-if (-not $env:GOMAPI_OAUTH_CLIENT_ID -or -not $env:GOMAPI_OAUTH_CLIENT_SECRET) {
-    Write-Error "GOMAPI_OAUTH_CLIENT_ID and GOMAPI_OAUTH_CLIENT_SECRET must both be set in $envFile"
+if (-not $env:SENDARC_OAUTH_CLIENT_ID -or -not $env:SENDARC_OAUTH_CLIENT_SECRET) {
+    Write-Error "SENDARC_OAUTH_CLIENT_ID and SENDARC_OAUTH_CLIENT_SECRET must both be set in $envFile"
 }
 
 Push-Location (Join-Path $repoRoot 'src' 'app')
@@ -32,16 +32,16 @@ try {
     # `-gcflags "all=-N -l"`. Build production with devtools instead — same
     # env-var credential fallback (auth_credentials.go init()) drives both paths.
     # Trade-off: no hot reload; rerun this script after editing Go/Svelte code.
-    Write-Host 'Building go-mapi (production + devtools)...'
+    Write-Host 'Building SendArc (production + devtools)...'
     wails build -devtools
     if ($LASTEXITCODE -ne 0) { throw 'wails build failed' }
 
-    $binary = Join-Path (Get-Location) 'build' 'bin' 'go-mapi.exe'
+    $binary = Join-Path (Get-Location) 'build' 'bin' 'SendArc.exe'
     if (-not (Test-Path $binary)) { throw "Binary not produced at $binary" }
 
     Write-Host "Launching $binary..."
     & $binary
-    if ($LASTEXITCODE -ne 0) { throw "go-mapi exited with code $LASTEXITCODE" }
+    if ($LASTEXITCODE -ne 0) { throw "SendArc exited with code $LASTEXITCODE" }
 } finally {
     Pop-Location
 }

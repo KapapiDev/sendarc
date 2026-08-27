@@ -1,13 +1,26 @@
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { GetQueue } from '../../wailsjs/go/main/App';
 
-export interface MailMessageFrom { address: string; name?: string }
+export interface MailAddress { address: string; name?: string }
+export interface MailRecipients {
+  to?: MailAddress[];
+  cc?: MailAddress[];
+  bcc?: MailAddress[];
+}
+export interface MailAttachment {
+  filename: string;
+  size: number;
+}
 export interface MailMessage {
   version: number;
   timestamp: string;
   bodyFormat: string;
   subject?: string;
-  from?: MailMessageFrom;
+  body?: string;
+  from?: MailAddress;
+  recipients?: MailRecipients;
+  attachments?: MailAttachment[];
+  originApp?: string;
 }
 export interface EmailWithId { id: string; message?: MailMessage }
 
@@ -26,7 +39,7 @@ export function subscribeQueue(
         // Without this, a transient IPC/Wails error silently freezes the UI
         // at the last-known snapshot. Log at minimum so it shows up in devtools,
         // and surface to the caller if a handler was provided.
-        console.error('[go-mapi] queue fetch failed:', e);
+        console.error('[SendArc] queue fetch failed:', e);
         onError?.(e);
       });
   });

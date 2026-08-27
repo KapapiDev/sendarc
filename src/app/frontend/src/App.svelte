@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { EventsOn } from '../wailsjs/runtime/runtime';
-  import { CreateDraftForID, DismissEmail } from '../wailsjs/go/main/App';
+  import { SendMessageForID, DismissEmail } from '../wailsjs/go/main/App';
   import { subscribeQueue, fetchQueue, type EmailWithId } from './lib/queue';
   import {
     fetchAuthStatus,
@@ -13,16 +13,11 @@
     type AuthStatus,
   } from './lib/auth';
   import {
-    fetchSettings,
-    setMode as persistMode,
-    getPausedState,
-    subscribeAutoDraftResult,
-    subscribePauseChanged,
+    subscribeSendResult,
     fetchUpdateState,
     subscribeUpdateState,
-    type Mode,
     type ErrorCategory,
-    type AutoDraftResult,
+    type SendResult,
     type UpdateState,
   } from './lib/settings';
   import SignInScreen from './lib/components/SignInScreen.svelte';
@@ -34,7 +29,6 @@
   import UpdatePanel from './lib/components/UpdatePanel.svelte';
   import './lib/styles.css';
 
-  // Existing state
   let queue = $state<EmailWithId[]>([]);
   let errorMsg = $state<string | null>(null);
   let auth = $state<AuthStatus>({ authenticated: false });
@@ -42,183 +36,136 @@
   let showReAuthBanner = $state(false);
   let wasAuthenticated = false;
 
-  // Phase 9 state
-  let mode = $state<Mode>('manual');
-  let paused = $state(false);
-  let autoDraftErrors = $state(new Map<string, ErrorCategory>());
-  // QUICK-260423-tk6: parallel map of raw Go error text per failed emailId.
-  // Populated on auto-draft-result failure, cleared on success or queue prune.
-  // Passed through to QueueRow → AutoDraftErrorBadge so the badge tooltip /
-  // subtitle can show *why* the draft failed (not just the opaque category).
-  let autoDraftReasons = $state(new Map<string, string>());
+  let sendErrors = $state(new Map<string, ErrorCategory>());
+  let sendReasons = $state(new Map<string, string>());
   let flashingIds = $state(new Set<string>());
   let inflightIds = $state(new Set<string>());
 
-  // Phase 11-03 state — notify-only update UX (D-01/D-02/D-07/D-08).
   let updateState = $state<UpdateState | null>(null);
   let showUpdatePanel = $state(false);
-  let bannerDismissedForVersion = $state<string | null>(null);
 
-  // Collect all unsub functions for cleanup
   const unsubs: Array<() => void> = [];
 
   onMount(async () => {
-    // Fetch initial state in parallel.
-    const [initialAuth, initialQueue, initialSettings, initialPaused, initialUpdate] =
-      await Promise.all([
-        fetchAuthStatus(),
-        fetchQueue().catch((e) => { errorMsg = (e as Error).message; return []; }),
-        fetchSettings().catch(() => ({ mode: 'manual' as Mode })),
-        getPausedState().catch(() => false),
-        // D-04 silent-failure: never block startup on update hydration.
-        fetchUpdateState().catch(() => null),
-      ]);
+    const [initialAuth, initialQueue, initialUpdate] = await Promise.all([
+      fetchAuthStatus(),
+      fetchQueue().catch((error) => {
+        errorMsg = error instanceof Error ? error.message : 'Queue fetch failed';
+        return [];
+      }),
+      fetchUpdateState().catch(() => null),
+    ]);
 
     auth = initialAuth as AuthStatus;
     wasAuthenticated = auth.authenticated;
     queue = initialQueue as EmailWithId[];
-    mode = ((initialSettings as { mode: string }).mode === 'auto-draft' ? 'auto-draft' : 'manual');
-    paused = initialPaused as boolean;
     updateState = initialUpdate as UpdateState | null;
 
-    // Subscribe to queue updates — prune stale state entries on each update.
     unsubs.push(subscribeQueue(
       (next) => {
         queue = next;
-        // Reassign Maps/Sets to guarantee Svelte 5 detects the change when pruning.
-        const ids = new Set(next.map((e) => e.id));
-        const nextErrors = new Map(autoDraftErrors);
-        let errChanged = false;
-        for (const id of nextErrors.keys()) {
-          if (!ids.has(id)) { nextErrors.delete(id); errChanged = true; }
-        }
-        if (errChanged) autoDraftErrors = nextErrors;
-
-        // Prune the tk6 reasons map in lockstep with autoDraftErrors.
-        const nextReasons = new Map(autoDraftReasons);
-        let reasonChanged = false;
-        for (const id of nextReasons.keys()) {
-          if (!ids.has(id)) { nextReasons.delete(id); reasonChanged = true; }
-        }
-        if (reasonChanged) autoDraftReasons = nextReasons;
-
-        const nextFlashing = new Set(flashingIds);
-        let flashChanged = false;
-        for (const id of nextFlashing) {
-          if (!ids.has(id)) { nextFlashing.delete(id); flashChanged = true; }
-        }
-        if (flashChanged) flashingIds = nextFlashing;
-
-        const nextInflight = new Set(inflightIds);
-        let inflightChanged = false;
-        for (const id of nextInflight) {
-          if (!ids.has(id)) { nextInflight.delete(id); inflightChanged = true; }
-        }
-        if (inflightChanged) inflightIds = nextInflight;
+        pruneRowState(new Set(next.map((email) => email.id)));
       },
-      (e) => { errorMsg = (e as Error)?.message ?? 'queue fetch failed'; },
+      (error) => {
+        errorMsg = error instanceof Error ? error.message : 'Queue fetch failed';
+      },
     ));
 
-    // Queue error events from Go
-    unsubs.push(EventsOn('queue-error', (msg: string) => { errorMsg = msg; }));
+    unsubs.push(EventsOn('queue-error', (message: string) => { errorMsg = message; }));
 
-    // Auth state changes — trigger re-auth banner on sign-out.
-    unsubs.push(subscribeAuth((s) => {
-      const becameSignedOut = wasAuthenticated && !s.authenticated;
-      auth = s;
+    unsubs.push(subscribeAuth((status) => {
+      const becameSignedOut = wasAuthenticated && !status.authenticated;
+      auth = status;
       if (becameSignedOut) {
         showReAuthBanner = true;
-      } else if (s.authenticated) {
+      } else if (status.authenticated) {
         showReAuthBanner = false;
       }
-      wasAuthenticated = s.authenticated;
+      wasAuthenticated = status.authenticated;
     }));
 
-    // Auto-draft result (fires for both manual CreateDraftForID and automode).
-    unsubs.push(subscribeAutoDraftResult((r: AutoDraftResult) => {
-      // Reassign to guarantee Svelte 5 fine-grained reactivity detects the change.
-      inflightIds = new Set([...inflightIds].filter((id) => id !== r.emailId));
-      if (r.success) {
-        const next = new Map(autoDraftErrors);
-        next.delete(r.emailId);
-        autoDraftErrors = next;
-        // Clear tk6 reason tracking on success too — the row will flash green
-        // (if visible) then leave the queue on the next queue-update.
-        const nextReasons = new Map(autoDraftReasons);
-        if (nextReasons.delete(r.emailId)) autoDraftReasons = nextReasons;
-        // D-04: only flash in-window when visible + focused; Go fires toast when hidden.
-        if (isWindowVisibleAndFocused()) {
-          flashingIds = new Set([...flashingIds, r.emailId]);
-          setTimeout(() => {
-            flashingIds = new Set([...flashingIds].filter((id) => id !== r.emailId));
-          }, 1600);
-        }
-      } else if (r.errorCategory) {
-        const next = new Map(autoDraftErrors);
-        next.set(r.emailId, r.errorCategory);
-        autoDraftErrors = next;
-        // QUICK-260423-tk6: stash raw reason so AutoDraftErrorBadge can show
-        // it. Gracefully tolerate missing reason (older Go builds).
-        if (r.reason) {
-          const nextReasons = new Map(autoDraftReasons);
-          nextReasons.set(r.emailId, r.reason);
-          autoDraftReasons = nextReasons;
-        }
+    unsubs.push(subscribeSendResult((result: SendResult) => {
+      inflightIds = without(inflightIds, result.emailId);
+
+      if (result.success) {
+        sendErrors = withoutKey(sendErrors, result.emailId);
+        sendReasons = withoutKey(sendReasons, result.emailId);
+        flashingIds = new Set([...flashingIds, result.emailId]);
+        setTimeout(() => { flashingIds = without(flashingIds, result.emailId); }, 1600);
+        return;
       }
+
+      const nextErrors = new Map(sendErrors);
+      nextErrors.set(result.emailId, result.errorCategory ?? 'gmail');
+      sendErrors = nextErrors;
+
+      const nextReasons = new Map(sendReasons);
+      if (result.reason) nextReasons.set(result.emailId, result.reason);
+      else nextReasons.delete(result.emailId);
+      sendReasons = nextReasons;
     }));
 
-    // Pause state changes from Go (tray menu or PauseWatching/ResumeWatching calls).
-    unsubs.push(subscribePauseChanged((p: boolean) => { paused = p; }));
-
-    // Update state changes from Go (startup check, 24h scheduler, manual check).
-    // Plan 11-01 guarantees one event per material state change.
-    unsubs.push(subscribeUpdateState((s: UpdateState) => { updateState = s; }));
+    unsubs.push(subscribeUpdateState((state: UpdateState) => { updateState = state; }));
   });
 
   onDestroy(() => {
-    for (const u of unsubs) u();
+    for (const unsubscribe of unsubs) unsubscribe();
   });
 
-  /** D-04: visible + focused proxy using web platform APIs supported by WebView2. */
-  function isWindowVisibleAndFocused(): boolean {
-    return document.visibilityState === 'visible' && document.hasFocus();
+  function without(values: Set<string>, id: string): Set<string> {
+    return new Set([...values].filter((value) => value !== id));
   }
 
-  /** Compute per-row UI state from the three tracking sets/maps. */
-  function rowStateFor(id: string): 'idle' | 'in-flight' | 'drafted-flash' | 'error' {
-    if (flashingIds.has(id)) return 'drafted-flash';
+  function withoutKey<T>(values: Map<string, T>, id: string): Map<string, T> {
+    const next = new Map(values);
+    next.delete(id);
+    return next;
+  }
+
+  function pruneRowState(ids: Set<string>) {
+    sendErrors = new Map([...sendErrors].filter(([id]) => ids.has(id)));
+    sendReasons = new Map([...sendReasons].filter(([id]) => ids.has(id)));
+    flashingIds = new Set([...flashingIds].filter((id) => ids.has(id)));
+    inflightIds = new Set([...inflightIds].filter((id) => ids.has(id)));
+  }
+
+  function rowStateFor(id: string): 'idle' | 'in-flight' | 'sent-flash' | 'error' {
+    if (flashingIds.has(id)) return 'sent-flash';
     if (inflightIds.has(id)) return 'in-flight';
-    if (autoDraftErrors.has(id)) return 'error';
+    if (sendErrors.has(id)) return 'error';
     return 'idle';
   }
 
-  /** Manual draft: put row in-flight, call binding; auto-draft-result event resolves state. */
-  async function handleCreateDraft(id: string) {
+  async function handleSend(id: string) {
+    sendErrors = withoutKey(sendErrors, id);
+    sendReasons = withoutKey(sendReasons, id);
     inflightIds = new Set([...inflightIds, id]);
+
     try {
-      await CreateDraftForID(id);
-      // auto-draft-result event will handle success/failure state update.
+      await SendMessageForID(id);
     } catch {
-      // Binding threw (network/IPC error) — clear in-flight, show generic gmail error.
-      inflightIds = new Set([...inflightIds].filter((x) => x !== id));
-      const next = new Map(autoDraftErrors);
-      next.set(id, 'gmail');
-      autoDraftErrors = next;
+      inflightIds = without(inflightIds, id);
+      // The backend also emits send-result. Preserve its more precise category
+      // if that event arrived before the rejected binding promise settled.
+      if (!sendErrors.has(id)) {
+        const nextErrors = new Map(sendErrors);
+        nextErrors.set(id, 'gmail');
+        sendErrors = nextErrors;
+        const nextReasons = new Map(sendReasons);
+        nextReasons.set(id, 'Gmail could not send this message. Please retry.');
+        sendReasons = nextReasons;
+      }
     }
   }
 
-  /** Dismiss: call binding; queue-update handles row removal. */
   async function handleDismiss(id: string) {
-    try { await DismissEmail(id); } catch { /* ignore dismiss errors */ }
+    try {
+      await DismissEmail(id);
+    } catch {
+      // The queue watcher remains the source of truth; leave the row in place.
+    }
   }
 
-  /** Mode toggle: persist then update local state. */
-  async function handleModeChange(next: Mode) {
-    await persistMode(next);
-    mode = next;
-  }
-
-  // Auth flow handlers — unchanged from Phase 8.
   async function handleSignInClick() {
     if (!hasSeenPreAuthExplainer()) {
       showPreAuthModal = true;
@@ -245,30 +192,10 @@
   async function handleSignOutClick() {
     await signOut();
   }
-
-  /** Phase 11-03: open the update panel from the banner (D-01 → D-02). */
-  function handleOpenUpdatePanel() {
-    showUpdatePanel = true;
-  }
-
-  /** Phase 11-03: close the panel without dismissing the banner — the
-   *  banner stays until a newer version actually ships. bannerDismissedForVersion
-   *  is reserved for an optional future "hide until next release" dismissal
-   *  flow; we keep it inert this phase to avoid suppressing legitimate
-   *  upgrade prompts. */
-  function handleCloseUpdatePanel() {
-    showUpdatePanel = false;
-    // bannerDismissedForVersion intentionally not updated here (D-01: banner
-    // remains persistent across panel open/close cycles).
-    void bannerDismissedForVersion; // silence "assigned but never read" without removing the state field
-  }
 </script>
 
-{#if updateState && updateState.updateAvailable}
-  <UpdateBanner
-    latestVersion={updateState.latestVersion}
-    onViewUpdate={handleOpenUpdatePanel}
-  />
+{#if updateState?.updateAvailable}
+  <UpdateBanner latestVersion={updateState.latestVersion} onViewUpdate={() => { showUpdatePanel = true; }} />
 {/if}
 
 {#if showReAuthBanner}
@@ -280,8 +207,6 @@
     email={auth.email ?? ''}
     name={auth.name ?? ''}
     onSignOut={handleSignOutClick}
-    {mode}
-    onModeChange={handleModeChange}
   />
 {/if}
 
@@ -289,29 +214,38 @@
   {#if !auth.authenticated}
     <SignInScreen onSignIn={handleSignInClick} />
   {:else if errorMsg}
-    <section class="state state--error">
-      <h2>Watcher stopped</h2>
-      <p>go-mapi can't watch %LOCALAPPDATA%\go-mapi\queue\. Restart the app, or check app.log for details.</p>
+    <section class="state state--error" role="alert">
+      <h2>SendArc needs attention</h2>
+      <p>SendArc cannot read the local email queue. Restart the app, or check app.log for details.</p>
     </section>
   {:else if queue.length === 0}
     <section class="state state--empty">
       <h2>No emails waiting</h2>
-      <p>When a Windows app sends to mail, it will appear here.</p>
+      <p>When a Windows app sends to email, SendArc will show a local preview here.</p>
     </section>
   {:else}
-    <ul class="queue" aria-live="polite">
-      {#each queue as item (item.id)}
-        <QueueRow
-          {item}
-          state={rowStateFor(item.id)}
-          authenticated={auth.authenticated}
-          errorCategory={autoDraftErrors.get(item.id)}
-          errorReason={autoDraftReasons.get(item.id)}
-          onCreateDraft={handleCreateDraft}
-          onDismiss={handleDismiss}
-        />
-      {/each}
-    </ul>
+    <section class="queue-shell" aria-labelledby="queue-title">
+      <div class="queue-heading">
+        <div>
+          <p class="eyebrow">Ready for review</p>
+          <h1 id="queue-title">Email queue</h1>
+        </div>
+        <p>{queue.length} {queue.length === 1 ? 'message' : 'messages'} waiting</p>
+      </div>
+      <ul class="queue">
+        {#each queue as item (item.id)}
+          <QueueRow
+            {item}
+            status={rowStateFor(item.id)}
+            authenticated={auth.authenticated}
+            errorCategory={sendErrors.get(item.id)}
+            errorReason={sendReasons.get(item.id)}
+            onSend={handleSend}
+            onDismiss={handleDismiss}
+          />
+        {/each}
+      </ul>
+    </section>
   {/if}
 </main>
 
@@ -320,5 +254,5 @@
 {/if}
 
 {#if showUpdatePanel && updateState}
-  <UpdatePanel update={updateState} onClose={handleCloseUpdatePanel} />
+  <UpdatePanel update={updateState} onClose={() => { showUpdatePanel = false; }} />
 {/if}

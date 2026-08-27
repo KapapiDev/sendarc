@@ -6,18 +6,17 @@
   <div class="modal">
     <h2 id="preauth-title">One thing before we continue</h2>
     <p>
-      Google will show a warning that <strong>go-mapi isn't verified</strong>.
-      This is expected — verification takes several weeks for small open-source apps
-      and is in progress.
+      During the beta, Google may show a warning that <strong>SendArc isn't verified</strong>.
+      Only continue if the app name shown by Google is SendArc.
     </p>
     <p>To continue, click:</p>
     <ol class="steps">
       <li><strong>Advanced</strong></li>
-      <li><strong>Go to go-mapi (unsafe)</strong></li>
+      <li><strong>Go to SendArc (unsafe)</strong></li>
     </ol>
     <p class="note">
-      go-mapi only requests permission to create Gmail drafts on your behalf.
-      You can revoke this access at any time from your Google account settings.
+      SendArc requests permission to send mail with Gmail after you review it
+      locally and click Send. You can revoke access from your Google account settings.
     </p>
     <div class="actions">
       <button type="button" class="secondary" onclick={onCancel}>Cancel</button>
@@ -49,4 +48,5 @@
   }
   .primary { background: #1a73e8; color: white; }
   .secondary { background: #eee; color: #222; }
+  .actions button:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
 </style>

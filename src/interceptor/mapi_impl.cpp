@@ -40,9 +40,11 @@ static bool CopyAttachmentsForStem(MailMessage& msg, const std::wstring& stem) {
             // will skip empty-path attachments). Still counts as success.
             continue;
         }
-        // Basename fallback: prefer explicit filename, else message_converter
-        // already derived it from the path via FilenameFromPath.
-        std::string basename = !att.filename.empty() ? att.filename : att.path;
+        // Basename fallback: message_converter normally derives this already;
+        // repeat it here so no full source path can become a destination name.
+        std::string basename = !att.filename.empty()
+            ? att.filename
+            : message_converter::FilenameFromPath(att.path);
 
         std::wstring newPath;
         uint32_t newSize = 0;
@@ -155,7 +157,7 @@ ULONG MapiImpl::MAPISendMailW(
         msg.originApp = GetOriginApplicationName();
 
         // QUICK-260423-tk6: same lifetime fix as the ANSI path — copy
-        // attachments into %LOCALAPPDATA%\go-mapi\queue\<stem>\ before the
+        // attachments into %LOCALAPPDATA%\SendArc\queue\<stem>\ before the
         // caller's TEMP dir disappears on return.
         std::wstring stem = FsUtils::GenerateUniqueStem();
         if (!CopyAttachmentsForStem(msg, stem)) {

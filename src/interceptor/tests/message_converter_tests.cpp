@@ -86,11 +86,10 @@ TEST_CASE("FilenameFromPath no separator returns input") {
     CHECK(FilenameFromPath("file.txt") == "file.txt");
 }
 
-TEST_CASE("FilenameFromPath trailing separator returns input unchanged") {
-    // Current behavior: a trailing separator causes the substring bound
-    // check `pos + 1 < path.size()` to fail, so the full path is returned.
-    // Lock this behavior to catch unintended refactors.
-    CHECK(FilenameFromPath("a/b/") == "a/b/");
+TEST_CASE("FilenameFromPath rejects a trailing separator and dot segments") {
+    CHECK(FilenameFromPath("a/b/") == "");
+    CHECK(FilenameFromPath(".") == "");
+    CHECK(FilenameFromPath("..") == "");
 }
 
 // ---------- ConvertAnsiMessage ----------
@@ -324,6 +323,35 @@ TEST_CASE("ConvertAnsiMessage attachment filename fallback from path") {
     CHECK(result.attachments[0].filename == "report.pdf");
 }
 
+TEST_CASE("ConvertAnsiMessage ignores path-like explicit attachment filenames") {
+    char paths[3][32] = {
+        "C:\\tmp\\first.txt",
+        "C:\\tmp\\second.txt",
+        "C:\\tmp\\third.txt"
+    };
+    char traversalName[] = "..\\outside.txt";
+    char absoluteName[] = "C:\\Windows\\outside.txt";
+    char separatorName[] = "nested/outside.txt";
+
+    MapiFileDesc files[3]{};
+    for (int i = 0; i < 3; ++i) {
+        files[i].lpszPathName = paths[i];
+    }
+    files[0].lpszFileName = traversalName;
+    files[1].lpszFileName = absoluteName;
+    files[2].lpszFileName = separatorName;
+
+    MapiMessage msg{};
+    msg.nFileCount = 3;
+    msg.lpFiles = files;
+
+    MailMessage result = ConvertAnsiMessage(msg);
+    REQUIRE(result.attachments.size() == 3);
+    CHECK(result.attachments[0].filename == "first.txt");
+    CHECK(result.attachments[1].filename == "second.txt");
+    CHECK(result.attachments[2].filename == "third.txt");
+}
+
 // ---------- ConvertWideMessage ----------
 
 TEST_CASE("ConvertWideMessage handles null fields") {
@@ -406,6 +434,40 @@ TEST_CASE("ConvertWideMessage attachment filename fallback from path") {
     REQUIRE(result.attachments.size() == 1);
     CHECK(result.attachments[0].path == "C:\\tmp\\resume.pdf");
     CHECK(result.attachments[0].filename == "resume.pdf");
+}
+
+TEST_CASE("ConvertWideMessage preserves a Unicode attachment basename") {
+    wchar_t filePath[] = L"C:\\tmp\\source.txt";
+    wchar_t fileName[] = L"\uBCF4\uACE0\uC11C.txt"; // 보고서.txt
+
+    MapiFileDescW file{};
+    file.lpszPathName = filePath;
+    file.lpszFileName = fileName;
+
+    MapiMessageW msg{};
+    msg.nFileCount = 1;
+    msg.lpFiles = &file;
+
+    MailMessage result = ConvertWideMessage(msg);
+    REQUIRE(result.attachments.size() == 1);
+    CHECK(result.attachments[0].filename == "\xEB\xB3\xB4\xEA\xB3\xA0\xEC\x84\x9C.txt");
+}
+
+TEST_CASE("ConvertWideMessage ignores a Unicode path-like explicit filename") {
+    wchar_t filePath[] = L"C:\\tmp\\\uC6D0\uBCF8.txt"; // 원본.txt
+    wchar_t fileName[] = L"..\\\uC720\uCD9C.txt";       // ..\유출.txt
+
+    MapiFileDescW file{};
+    file.lpszPathName = filePath;
+    file.lpszFileName = fileName;
+
+    MapiMessageW msg{};
+    msg.nFileCount = 1;
+    msg.lpFiles = &file;
+
+    MailMessage result = ConvertWideMessage(msg);
+    REQUIRE(result.attachments.size() == 1);
+    CHECK(result.attachments[0].filename == "\xEC\x9B\x90\xEB\xB3\xB8.txt");
 }
 
 TEST_CASE("ConvertWideMessage unknown recipient class routes to TO") {

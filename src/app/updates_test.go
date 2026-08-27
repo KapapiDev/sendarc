@@ -46,7 +46,7 @@ func (s *stubReleaseFetcher) FetchLatestRelease(ctx context.Context) (*latestRel
 // an empty last-checked value. Confirms D-08 default-enabled semantics.
 func TestSettingsUpdateDefaultsEnabled(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GOMAPI_APPDATA_DIR", dir)
+	t.Setenv("SENDARC_APPDATA_DIR", dir)
 
 	got := loadSettings()
 	if !got.UpdateChecksEnabled {
@@ -61,7 +61,7 @@ func TestSettingsUpdateDefaultsEnabled(t *testing.T) {
 // with UpdateChecksEnabled=true (flat-fields back-compat for D-05).
 func TestSettingsUpdateBackCompatPartialJSON(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GOMAPI_APPDATA_DIR", dir)
+	t.Setenv("SENDARC_APPDATA_DIR", dir)
 
 	// Write a settings file that pre-dates the update fields (Phase 9 shape).
 	if err := saveSettingsRaw(dir, `{"mode":"manual"}`); err != nil {
@@ -81,7 +81,7 @@ func TestSettingsUpdateBackCompatPartialJSON(t *testing.T) {
 // UpdateChecksEnabled=true) without surfacing an error.
 func TestSettingsUpdateCorruptFallsBackToDefaults(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GOMAPI_APPDATA_DIR", dir)
+	t.Setenv("SENDARC_APPDATA_DIR", dir)
 
 	if err := saveSettingsRaw(dir, `{ this is not json`); err != nil {
 		t.Fatalf("saveSettingsRaw: %v", err)
@@ -154,7 +154,7 @@ func TestUpdateServiceStaleCheckTriggersFetch(t *testing.T) {
 	stub := &stubReleaseFetcher{
 		release: &latestRelease{
 			Version:    "3.0.0",
-			ReleaseURL: "https://github.com/marcfargas/go-mapi/releases/tag/v3.0.0",
+			ReleaseURL: "https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.0.0",
 		},
 	}
 	svc := newUpdateService("0.0.0-dev", stub, nopLogger)
@@ -185,7 +185,7 @@ func TestUpdateServiceDetectsAvailableUpdate(t *testing.T) {
 	stub := &stubReleaseFetcher{
 		release: &latestRelease{
 			Version:    "3.0.0",
-			ReleaseURL: "https://github.com/marcfargas/go-mapi/releases/tag/v3.0.0",
+			ReleaseURL: "https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.0.0",
 		},
 	}
 	svc := newUpdateService("2.1.0", stub, nopLogger)
@@ -200,11 +200,11 @@ func TestUpdateServiceDetectsAvailableUpdate(t *testing.T) {
 	if state.LatestVersion != "3.0.0" {
 		t.Errorf("expected LatestVersion=3.0.0, got %q", state.LatestVersion)
 	}
-	if state.LatestReleaseURL != "https://github.com/marcfargas/go-mapi/releases/tag/v3.0.0" {
+	if state.LatestReleaseURL != "https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.0.0" {
 		t.Errorf("unexpected LatestReleaseURL: %q", state.LatestReleaseURL)
 	}
-	if state.InstallerURL != "https://github.com/marcfargas/go-mapi/releases/latest/download/go-mapi-setup.exe" {
-		t.Errorf("InstallerURL must be the stable installer URL (D-02), got %q", state.InstallerURL)
+	if state.InstallerURL != "https://github.com/maxtop9843-byte/sendarc/releases/latest" {
+		t.Errorf("InstallerURL must be the manual release page URL, got %q", state.InstallerURL)
 	}
 	if state.CurrentVersion != "2.1.0" {
 		t.Errorf("expected CurrentVersion=2.1.0, got %q", state.CurrentVersion)
@@ -223,7 +223,7 @@ func TestUpdateServiceNoUpdateWhenCurrentIsLatest(t *testing.T) {
 	stub := &stubReleaseFetcher{
 		release: &latestRelease{
 			Version:    "3.0.0",
-			ReleaseURL: "https://github.com/marcfargas/go-mapi/releases/tag/v3.0.0",
+			ReleaseURL: "https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.0.0",
 		},
 	}
 	svc := newUpdateService("3.0.0", stub, nopLogger)

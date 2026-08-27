@@ -1,5 +1,11 @@
 node_modules/
 build/
+!src/app/build/
+src/app/build/*
+!src/app/build/appicon.png
+!src/app/build/windows/
+src/app/build/windows/*
+!src/app/build/windows/icon.ico
 # QUICK-260423-ntu T3a: arch-specific CMake build dirs (x86_64 / i686 clang)
 build-x64/
 build-x86/

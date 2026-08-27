@@ -12,9 +12,9 @@ import (
 // Subtests cannot t.Parallel — they mutate process-wide env vars.
 func TestSaveLoadRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GOMAPI_APPDATA_DIR", dir)
+	t.Setenv("SENDARC_APPDATA_DIR", dir)
 
-	want := AppSettings{Mode: "auto-draft"}
+	want := AppSettings{Mode: defaultMode}
 	if err := saveSettings(want); err != nil {
 		t.Fatalf("saveSettings: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 // TestLoadDefaultsOnFirstRun: empty dir → defaults.
 func TestLoadDefaultsOnFirstRun(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GOMAPI_APPDATA_DIR", dir)
+	t.Setenv("SENDARC_APPDATA_DIR", dir)
 
 	got := loadSettings()
 	if got.Mode != "manual" {
@@ -38,9 +38,9 @@ func TestLoadDefaultsOnFirstRun(t *testing.T) {
 // TestLoadDefaultsOnCorruptJSON: garbage file → defaults, no error, no panic.
 func TestLoadDefaultsOnCorruptJSON(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GOMAPI_APPDATA_DIR", dir)
+	t.Setenv("SENDARC_APPDATA_DIR", dir)
 
-	// GOMAPI_APPDATA_DIR = dir, so settingsPath() = dir/settings.json
+	// SENDARC_APPDATA_DIR = dir, so settingsPath() = dir/settings.json
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestLoadDefaultsOnCorruptJSON(t *testing.T) {
 // TestLoadNormalizesUnknownMode: unknown Mode value → default.
 func TestLoadNormalizesUnknownMode(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GOMAPI_APPDATA_DIR", dir)
+	t.Setenv("SENDARC_APPDATA_DIR", dir)
 
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
@@ -74,17 +74,17 @@ func TestLoadNormalizesUnknownMode(t *testing.T) {
 // no tmp files leak after.
 func TestSaveOverwritesAtomically(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GOMAPI_APPDATA_DIR", dir)
+	t.Setenv("SENDARC_APPDATA_DIR", dir)
 
 	if err := saveSettings(AppSettings{Mode: "manual"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := saveSettings(AppSettings{Mode: "auto-draft"}); err != nil {
+	if err := saveSettings(AppSettings{Mode: defaultMode, UpdateChecksEnabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	got := loadSettings()
-	if got.Mode != "auto-draft" {
-		t.Errorf("second save should win: got %q", got.Mode)
+	if got.Mode != defaultMode || !got.UpdateChecksEnabled {
+		t.Errorf("second save should win: got %+v", got)
 	}
 	// No stale tmp files.
 	matches, err := filepath.Glob(filepath.Join(dir, "settings-*.tmp"))
@@ -100,9 +100,9 @@ func TestSaveOverwritesAtomically(t *testing.T) {
 func TestSaveCreatesMissingDir(t *testing.T) {
 	base := t.TempDir()
 	nested := filepath.Join(base, "never-created-yet")
-	t.Setenv("GOMAPI_APPDATA_DIR", nested)
+	t.Setenv("SENDARC_APPDATA_DIR", nested)
 
-	if err := saveSettings(AppSettings{Mode: "auto-draft"}); err != nil {
+	if err := saveSettings(AppSettings{Mode: defaultMode}); err != nil {
 		t.Fatalf("saveSettings with missing dir: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(nested, "settings.json")); err != nil {

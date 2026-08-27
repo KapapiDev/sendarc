@@ -1,0 +1,83 @@
+<form class="beta-form" data-beta-form>
+  <div class="form-grid">
+    <label>
+      <span>Work email</span>
+      <input
+        type="email"
+        name="email"
+        autocomplete="email"
+        inputmode="email"
+        maxlength="254"
+        placeholder="name@company.com"
+        required
+      />
+    </label>
+
+    <label>
+      <span>Company name</span>
+      <input
+        type="text"
+        name="company"
+        autocomplete="organization"
+        minlength="2"
+        maxlength="120"
+        placeholder="Your company"
+        required
+      />
+    </label>
+
+    <label>
+      <span>Approximate seats</span>
+      <select name="seats" required>
+        <option value="">Select a range</option>
+        <option value="1">1</option>
+        <option value="2-5">2–5</option>
+        <option value="6-20">6–20</option>
+        <option value="21-50">21–50</option>
+        <option value="51-200">51–200</option>
+        <option value="201+">201+</option>
+      </select>
+    </label>
+
+    <label>
+      <span>Current workflow</span>
+      <select name="workflow" required>
+        <option value="">Choose the closest match</option>
+        <option value="affixa">Affixa</option>
+        <option value="mapi-bridge">Another MAPI bridge</option>
+        <option value="desktop-client">Desktop mail client</option>
+        <option value="other">Other</option>
+      </select>
+    </label>
+
+    <label class="form-span">
+      <span>Optional note</span>
+      <textarea
+        name="note"
+        rows="4"
+        maxlength="1000"
+        placeholder="Application name or workflow details (do not include email content)"
+      ></textarea>
+    </label>
+
+    <label class="honeypot" aria-hidden="true">
+      <span>Website</span>
+      <input name="website" type="text" tabindex="-1" autocomplete="off" />
+    </label>
+    <input type="hidden" name="startedAt" value="" data-form-started-at />
+  </div>
+
+  <button class="button button--primary beta-submit" type="submit" data-track="business_beta_submit">
+    <span>Join Business Beta</span>
+    <span aria-hidden="true" class="button-arrow">↗</span>
+  </button>
+
+  <p class="form-disclosure">
+    No payment today. This form collects only contact and workflow information.
+    <a href="/privacy/#beta-data">Privacy details</a>
+  </p>
+  <p class="form-status" role="status" aria-live="polite" data-form-status></p>
+  <a class="form-email-fallback" href="mailto:maxtop9843@gmail.com" hidden data-form-fallback>
+    Open a prefilled support email instead
+  </a>
+</form>

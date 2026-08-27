@@ -1,0 +1,39 @@
+---
+interface Props {
+  eyebrow?: string;
+  title: string;
+  description: string;
+  updated?: string;
+}
+
+const {
+  eyebrow = "SENDARC",
+  title,
+  description,
+  updated = "27 August 2026",
+} = Astro.props;
+---
+
+<section class="page-hero page-hero--compact">
+  <div class="shell page-hero-inner">
+    <p class="eyebrow">{eyebrow}</p>
+    <h1>{title}</h1>
+    <p>{description}</p>
+    <span class="updated">Last updated {updated}</span>
+  </div>
+</section>
+
+<section class="legal-wrap">
+  <div class="shell legal-grid">
+    <aside class="legal-aside" aria-label="Trust pages">
+      <a href="/privacy/">Privacy</a>
+      <a href="/terms/">Terms</a>
+      <a href="/licenses/">Licenses</a>
+      <a href="/security/">Security</a>
+      <a href="/support/">Support</a>
+    </aside>
+    <article class="prose">
+      <slot />
+    </article>
+  </div>
+</section>

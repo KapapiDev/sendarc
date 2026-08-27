@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <filesystem>
 #include "../test_utils.h"
 
 // Forward declarations of test functions
@@ -16,23 +17,31 @@ using namespace mapi_test;
 
 int main(int argc, char* argv[]) {
     std::cout << "=================================" << std::endl;
-    std::cout << "  go-mapi MAPI Test Harness" << std::endl;
+    std::cout << "  SendArc MAPI Test Harness" << std::endl;
     std::cout << "=================================" << std::endl;
     std::cout << std::endl;
 
     // Determine DLL path
-    std::string dllPath = "go-mapi.dll";
+    std::string dllPath = "SendArc.dll";
     if (argc > 1) {
         dllPath = argv[1];
     }
 
-    std::cout << "Using DLL: " << dllPath << std::endl;
+    std::filesystem::path absoluteDllPath = std::filesystem::absolute(dllPath);
+    if (!std::filesystem::is_regular_file(absoluteDllPath)) {
+        std::cerr << "DLL not found: " << absoluteDllPath.string() << std::endl;
+        return 1;
+    }
+
+    TestUtilities::SetInterceptorDllPath(absoluteDllPath.wstring());
+
+    std::cout << "Using DLL: " << absoluteDllPath.string() << std::endl;
     std::cout << std::endl;
 
-    // Get the temp directory
-    std::string tempDir = TestUtilities::GetGoMapiTempDir();
+    // Get the interceptor queue directory.
+    std::string tempDir = TestUtilities::GetSendArcQueueDir();
     if (tempDir.empty()) {
-        std::cerr << "Failed to get temp directory" << std::endl;
+        std::cerr << "Failed to get interceptor queue directory" << std::endl;
         return 1;
     }
 
@@ -54,6 +63,7 @@ int main(int argc, char* argv[]) {
     };
 
     for (const auto& test : tests) {
+        TestUtilities::CleanupTestFiles(tempDir);
         int result = test.second();
         if (result == 0) {
             testsPassed++;
@@ -62,6 +72,7 @@ int main(int argc, char* argv[]) {
             testsFailed++;
             TestUtilities::PrintTestResult(test.first, false);
         }
+        TestUtilities::CleanupTestFiles(tempDir);
     }
 
     std::cout << std::endl;

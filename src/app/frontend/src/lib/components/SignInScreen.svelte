@@ -3,17 +3,18 @@
 </script>
 
 <section class="signin">
-  <h1>go-mapi</h1>
-  <p class="tagline">Gmail drafts for Windows "Send to Mail recipient".</p>
+  <h1>SendArc</h1>
+  <p class="tagline">Modern Gmail sending for your Windows apps.</p>
   <p class="copy">
-    Sign in with your Google account. go-mapi will create drafts in your Gmail
-    account; it never sends mail on its own and never stores message bodies.
+    Sign in with Google to review each local email preview, then send it with
+    Gmail. SendArc never sends in the background and does not upload messages
+    to a SendArc server.
   </p>
   <button class="signin-btn" type="button" onclick={onSignIn}>
     Sign in with Google
   </button>
   <p class="footnote">
-    Queued emails stay on your computer until you sign in.
+    Queued emails stay on your computer until you review or dismiss them.
   </p>
 </section>
 
@@ -42,5 +43,6 @@
     cursor: pointer;
   }
   .signin-btn:hover { background: #1662c4; }
+  .signin-btn:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
   .footnote { font-size: 0.85rem; color: var(--c-text-muted, #666); }
 </style>

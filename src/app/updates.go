@@ -32,27 +32,25 @@ import (
 //   - D-08: update checks default enabled. AppSettings handles the default;
 //     the service stays a pure consumer of the (already-defaulted) settings.
 //
-// Why not go-selfupdate's DetectLatest flow? The current release layout
-// publishes `go-mapi-setup.exe` only, and DetectLatest's asset matcher
-// expects `{cmd}_{goos}_{goarch}` or archived variants and reports
-// found=false when no matching asset exists (11-RESEARCH.md Pitfall 1). We
-// therefore use ListReleases as a GitHub client layer, do our own
-// metadata-only version compare, and hand the user the stable installer
-// URL to download manually.
+// We use ListReleases as a GitHub client layer, do our own metadata-only
+// version compare, and hand the user the release page to review and download
+// manually. The app never downloads or applies an update itself.
 
 const (
 	// gitHubOwner / gitHubRepo are hardcoded to the repo slug so no user
 	// input or settings file can redirect update checks to a different
 	// origin (threat T-11-01-01 partial mitigation + Pitfall-4 guard).
-	gitHubOwner = "marcfargas"
-	gitHubRepo  = "go-mapi"
+	gitHubOwner = "maxtop9843-byte"
+	gitHubRepo  = "sendarc"
 
-	// installerDownloadURL is the stable installer URL shown to users
-	// when an update is available (D-02, REL-02). Intentionally hardcoded;
-	// never constructed from release metadata so a tampered release name
-	// cannot redirect downloads (T-11-01-01).
-	installerDownloadURL = "https://github.com/" + gitHubOwner + "/" + gitHubRepo +
-		"/releases/latest/download/go-mapi-setup.exe"
+	// manualReleaseURL is the stable page shown to users when an update is
+	// available. SendArc intentionally uses notify-only updates until its
+	// Windows installer/update path has been independently verified.
+	manualReleaseURL = "https://github.com/" + gitHubOwner + "/" + gitHubRepo +
+		"/releases/latest"
+	// Kept as the existing frontend/test contract name. It deliberately points
+	// to the human-reviewed release page, not an executable download.
+	installerDownloadURL = manualReleaseURL
 
 	// updateCheckWindow is the cadence floor between background checks
 	// (REL-03: "every 24h").
@@ -77,10 +75,8 @@ type UpdateState struct {
 	// LatestVersion. Used for the "Release notes" affordance (D-02).
 	LatestReleaseURL string `json:"latestReleaseUrl"`
 
-	// InstallerURL is the stable download URL shown in the update panel
-	// (D-02). Kept constant because we only ship one Windows installer
-	// asset today; future platforms would extend this type, not mutate
-	// the constant.
+	// InstallerURL is retained for the frontend contract, but points to the
+	// manual GitHub release page rather than a direct-download executable.
 	InstallerURL string `json:"installerUrl"`
 
 	// UpdateAvailable is true iff LatestVersion > CurrentVersion. Pure
@@ -173,7 +169,7 @@ func (s *updateService) MaybeCheck(ctx context.Context, settings updateSettings)
 	// callers have a valid snapshot even on the opt-out path.
 	state := UpdateState{
 		CurrentVersion: s.currentVersion,
-		InstallerURL:   installerDownloadURL,
+		InstallerURL:   manualReleaseURL,
 		Enabled:        settings.Enabled,
 		LastCheckedAt:  settings.LastUpdateCheck,
 	}
@@ -214,7 +210,7 @@ func (s *updateService) CheckNow(ctx context.Context) (UpdateState, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	state := UpdateState{
 		CurrentVersion: s.currentVersion,
-		InstallerURL:   installerDownloadURL,
+		InstallerURL:   manualReleaseURL,
 		LastCheckedAt:  now,
 		Enabled:        true, // caller may overwrite; CheckNow semantically assumes the user asked for a check
 	}

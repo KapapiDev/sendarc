@@ -64,7 +64,7 @@ func buildUpdateNotificationPlan(s UpdateState) *updateNotificationPlan {
 		// that link lives in the in-app panel per D-02.
 		url = "https://github.com/" + gitHubOwner + "/" + gitHubRepo + "/releases"
 	}
-	title := "go-mapi update available"
+	title := "SendArc update available"
 	body := "Version " + s.LatestVersion + " is ready on GitHub."
 	return &updateNotificationPlan{
 		Title: title,
@@ -87,9 +87,9 @@ func buildUpdateNotificationPlan(s UpdateState) *updateNotificationPlan {
 // flip-to-true fires again — supports users who install manually and
 // then continue running the app through a future release.
 type updateNotificationTracker struct {
-	mu           sync.Mutex
-	dispatch     func(*updateNotificationPlan)
-	lastVersion  string
+	mu            sync.Mutex
+	dispatch      func(*updateNotificationPlan)
+	lastVersion   string
 	lastAvailable bool
 }
 

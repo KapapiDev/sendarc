@@ -1,39 +1,53 @@
-## go-mapi v3.0
+## SendArc v0.1.0-beta
 
-A standalone Windows desktop app that routes legacy "Send to Mail recipient" calls to Gmail as drafts. Wails v2 + Svelte 5 + WebView2 + C++17 MAPI DLL.
+**Beta software — Gmail and Google Workspace only.**
 
-### ⚠️ v2.x is retired
-
-> **The v2.x Chrome/Edge extension + Go native-host is retired and receives no further updates.** Its store listings are frozen with deprecation messaging. If you are on v2.x:
->
-> 1. **Uninstall v2.x first** via **Settings → Apps → Installed apps** — this removes both the browser extension and the native-host.
-> 2. **Then install v3.0.** go-mapi does not migrate v2 artifacts, and running both side-by-side is unsupported.
+SendArc connects Simple MAPI email actions in legacy Windows applications to Gmail. It captures the outgoing request locally, shows To/Cc/Bcc, subject, body, and attachments in a local preview, and sends to Gmail only after the user clicks **Send**.
 
 ### Install
 
-1. Download `go-mapi-setup.exe` from the assets below, or use the stable URL:
-   `https://github.com/marcfargas/go-mapi/releases/latest/download/go-mapi-setup.exe`
-2. Run the installer as administrator. Admin elevation is required because the installer registers go-mapi as a machine-wide MAPI handler under `HKLM\SOFTWARE\Clients\Mail`.
-3. First launch: sign in with your Google account — the app opens your default browser for OAuth consent.
+1. Download `SendArc-Setup-0.1.0-beta.exe` and `SHA256SUMS.txt` from the assets below.
+2. Verify the installer's SHA-256 checksum.
+3. Run the installer and approve the elevation request needed for machine-wide MAPI registration.
+4. Start SendArc and connect a Gmail or Google Workspace account.
 
-### Updates are manual
+Supported target: Windows 10 22H2 and Windows 11. Compatibility depends on how each application implements Simple MAPI; report sanitized results with the [compatibility form](https://github.com/maxtop9843-byte/sendarc/issues/new?template=compatibility_report.yml).
 
-go-mapi surfaces an in-app "update available" banner when a newer release is published, but does **not** replace its own binary. Clicking the banner opens this release page in your browser; you download and run the new installer yourself. Manual path is an explicit design decision, not a limitation.
+### Signing and Windows warning
 
-### System requirements
+This no-payment beta is **unsigned** unless the published asset's verified signature and this section explicitly say otherwise. Windows SmartScreen or an organization policy may warn about or block it. Do not disable Defender, SmartScreen, AppLocker, or WDAC; verify the checksum and follow your organization's software-approval process.
 
-- Windows 10 (22H2) or Windows 11
-- Microsoft Edge WebView2 Evergreen Runtime — auto-bootstrapped by the installer if missing
-- Gmail or Google Workspace account
+### Gmail permission and privacy
 
-### Release artifacts
+SendArc requests only `https://www.googleapis.com/auth/gmail.send`. It does not read the inbox, create Gmail drafts, or request `gmail.compose`/`gmail.modify`/contacts/calendar access.
 
-- `go-mapi-setup.exe` — single-file installer (~7 MB, bundles WebView2 bootstrapper + MAPI DLL + Wails binary)
+Pending messages remain on the Windows device. After explicit Send, the desktop app sends directly to Google's Gmail API. There is no SendArc email relay or message-content server, and the desktop beta has no hidden telemetry.
 
-### License
+### Known limitations
 
-LGPL-3.0 — see [LICENSE](https://github.com/marcfargas/go-mapi/blob/main/LICENSE).
+- Gmail/Google Workspace only; no Microsoft 365 transport.
+- One connected Google account.
+- No MSI, fleet dashboard, or guaranteed application compatibility.
+- Updates are manual. The app opens the official GitHub release page and never silently replaces its binaries.
+- Unsigned builds may be unsuitable for managed environments that require a trusted publisher.
 
----
+### Upgrade and uninstall
 
-Full docs: [README](https://github.com/marcfargas/go-mapi#readme). Privacy model, uninstall steps, and the v2.x → v3.0 cutover note live there.
+Run the newer verified installer to upgrade. Uninstall through **Settings → Apps → Installed apps**. The uninstaller is designed to restore the previous default mail handler when safe and must not remove Affixa, go-mapi, Outlook, Thunderbird, or another mail client.
+
+### Assets
+
+- `SendArc-Setup-0.1.0-beta.exe` — versioned Windows installer
+- `SHA256SUMS.txt` — SHA-256 manifest for published binary assets
+- source archives generated from this exact tag
+
+### Source, license, and independence
+
+Source for this release is the `v0.1.0-beta` tag in [maxtop9843-byte/sendarc](https://github.com/maxtop9843-byte/sendarc/tree/v0.1.0-beta).
+
+SendArc incorporates and modifies [go-mapi](https://github.com/marcfargas/go-mapi) by Marc Fargas, starting from upstream commit `b90fcb08754f910fc318cbc922cbf24702582463`. Covered source is provided under LGPL-3.0-or-later; see [LICENSE](https://github.com/maxtop9843-byte/sendarc/blob/v0.1.0-beta/LICENSE) and [THIRD_PARTY_NOTICES.md](https://github.com/maxtop9843-byte/sendarc/blob/v0.1.0-beta/THIRD_PARTY_NOTICES.md).
+
+SendArc is independent and is not affiliated with Google, Affixa, Notably Good Ltd., or the original go-mapi author.
+
+Security reports: [private advisory](https://github.com/maxtop9843-byte/sendarc/security/advisories/new)
+General/compatibility reports: [GitHub Issues](https://github.com/maxtop9843-byte/sendarc/issues)

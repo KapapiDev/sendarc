@@ -6,10 +6,6 @@ export function CheckForUpdatesNow(arg1) {
   return window['go']['main']['App']['CheckForUpdatesNow'](arg1);
 }
 
-export function CreateDraftForID(arg1) {
-  return window['go']['main']['App']['CreateDraftForID'](arg1);
-}
-
 export function DismissEmail(arg1) {
   return window['go']['main']['App']['DismissEmail'](arg1);
 }
@@ -52,6 +48,10 @@ export function ResumeWatching() {
 
 export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
+}
+
+export function SendMessageForID(arg1) {
+  return window['go']['main']['App']['SendMessageForID'](arg1);
 }
 
 export function SetMode(arg1) {

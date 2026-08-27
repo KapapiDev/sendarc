@@ -1,21 +1,18 @@
 <script lang="ts">
-  import type { Mode } from '../settings';
-  import ModeToggle from './ModeToggle.svelte';
-
-  let { email, name, onSignOut, mode, onModeChange }: {
+  let { email, name, onSignOut }: {
     email: string;
     name: string;
     onSignOut: () => void;
-    mode: Mode;
-    onModeChange: (m: Mode) => void;
   } = $props();
 
   const displayName = $derived(email || name || 'your Google account');
 </script>
 
 <header class="hdr">
-  <span class="who">Signed in as <strong>{displayName}</strong></span>
-  <ModeToggle {mode} {onModeChange} />
+  <div>
+    <span class="brand">SendArc</span>
+    <span class="who">Sending with <strong>{displayName}</strong></span>
+  </div>
   <button type="button" class="signout" onclick={onSignOut}>Sign out</button>
 </header>
 
@@ -29,16 +26,33 @@
     gap: var(--space-md);
   }
 
+  .hdr > div {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-md);
+    min-width: 0;
+  }
+
+  .brand {
+    color: var(--c-text);
+    font-size: 18px;
+    font-weight: 750;
+  }
+
   .who {
     color: var(--c-text-muted);
     font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .signout {
     background: transparent;
     border: 1px solid var(--c-border);
-    border-radius: 4px;
-    padding: 4px var(--space-btn-x);
+    border-radius: 6px;
+    min-height: 36px;
+    padding: 6px var(--space-btn-x);
     cursor: pointer;
     color: var(--c-text);
     font-size: 14px;
@@ -52,5 +66,9 @@
   .signout:focus-visible {
     outline: 2px solid var(--c-accent);
     outline-offset: -2px;
+  }
+
+  @media (max-width: 620px) {
+    .hdr > div { align-items: flex-start; flex-direction: column; gap: 0; }
   }
 </style>

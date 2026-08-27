@@ -160,7 +160,6 @@ func TestValidateMailMessage_MultipleRecipients(t *testing.T) {
 }
 
 func TestValidateMailMessage_NoRecipients(t *testing.T) {
-	// Email with no recipients is valid (recipients are optional per the code)
 	mail := &MailMessage{
 		Version:    1,
 		Timestamp:  "2024-01-01T00:00:00Z",
@@ -168,8 +167,30 @@ func TestValidateMailMessage_NoRecipients(t *testing.T) {
 		Recipients: Recipients{},
 	}
 
-	if err := ValidateMailMessage(mail); err != nil {
-		t.Errorf("ValidateMailMessage() error = %v, want nil", err)
+	if err := ValidateMailMessage(mail); err == nil {
+		t.Error("ValidateMailMessage() expected error for missing recipient")
+	}
+}
+
+func TestValidateMailMessage_RejectsHeaderInjection(t *testing.T) {
+	mail := &MailMessage{
+		Version: 1, Timestamp: "2024-01-01T00:00:00Z", BodyFormat: "plain",
+		Subject:    "hello\r\nBcc: attacker@example.com",
+		Recipients: Recipients{To: []Recipient{{Address: "safe@example.com"}}},
+	}
+	if err := ValidateMailMessage(mail); err == nil {
+		t.Error("expected CRLF subject to be rejected")
+	}
+}
+
+func TestValidateMailMessage_RejectsUnsafeAttachmentFilename(t *testing.T) {
+	mail := &MailMessage{
+		Version: 1, Timestamp: "2024-01-01T00:00:00Z", BodyFormat: "plain",
+		Recipients:  Recipients{To: []Recipient{{Address: "safe@example.com"}}},
+		Attachments: []Attachment{{Filename: "..\\secret.txt", Path: `C:\temp\secret.txt`}},
+	}
+	if err := ValidateMailMessage(mail); err == nil {
+		t.Error("expected traversal filename to be rejected")
 	}
 }
 

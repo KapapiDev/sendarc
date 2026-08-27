@@ -1,0 +1,44 @@
+{
+  "name": "@sendarc/website",
+  "version": "0.1.0-beta",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "preview:test": "vite preview --host 127.0.0.1 --port 4321",
+    "lint": "eslint .",
+    "typecheck": "astro check",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test:links": "node scripts/check-links.mjs",
+    "qa": "npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run test:links && npm run test:e2e",
+    "pages:dev": "npm run build && wrangler pages dev dist --d1 SENDARC_DB --persist-to=.wrangler/state",
+    "pages:deploy": "npm run build && wrangler pages deploy",
+    "db:migrate:local": "wrangler d1 migrations apply SENDARC_DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply SENDARC_DB --remote"
+  },
+  "dependencies": {
+    "astro": "7.2.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@astrojs/check": "0.9.10",
+    "@axe-core/playwright": "4.13.0",
+    "@cloudflare/workers-types": "5.20260827.1",
+    "@playwright/test": "1.62.1",
+    "@types/node": "26.4.0",
+    "eslint": "10.9.1",
+    "eslint-plugin-astro": "3.1.0",
+    "globals": "17.11.0",
+    "typescript": "6.0.2",
+    "typescript-eslint": "8.68.0",
+    "vitest": "4.1.11",
+    "wrangler": "4.127.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

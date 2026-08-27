@@ -177,7 +177,7 @@ func shimClearToast(aumid, tag, group string) error {
 	var historyPtr *iToastNotificationHistory
 	hr, _, _ := syscall.SyscallN(
 		statics2.VTable().GetHistory,
-		uintptr(unsafe.Pointer(statics2)),   // this
+		uintptr(unsafe.Pointer(statics2)),    // this
 		uintptr(unsafe.Pointer(&historyPtr)), // out IToastNotificationHistory
 	)
 	if hr != 0 {
@@ -355,7 +355,7 @@ func createToastNotificationFromDoc(doc *ole.IUnknown) (*toastNotification, erro
 
 // setTagGroup calls QueryInterface for IToastNotification2 and invokes
 // put_Tag + put_Group on the notification object. Tag enables per-notification
-// removal from Action Center; Group enables go-mapi notification collapse.
+// removal from Action Center; Group enables SendArc notification collapse.
 func setTagGroup(n *toastNotification, tag, group string) error {
 	itf, err := n.ptr.QueryInterface(ole.NewGUID(guidIToastNotification2))
 	if err != nil {

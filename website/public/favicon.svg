@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">SendArc</title>
+  <rect width="64" height="64" rx="15" fill="#075cf6"/>
+  <g fill="none" stroke="#fff" stroke-linecap="round">
+    <path d="M10 45C14 20 24 11 32 11s18 9 22 34" stroke-width="6"/>
+    <path d="M13 45c5-15 11-22 19-22s14 7 19 22" stroke-width="5" opacity=".68"/>
+  </g>
+  <circle cx="10" cy="45" r="4" fill="#fff"/>
+  <circle cx="54" cy="45" r="4" fill="#fff"/>
+</svg>

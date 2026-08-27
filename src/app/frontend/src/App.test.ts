@@ -1,5 +1,4 @@
-// Tests for App.svelte — smoke + Phase 9 state wiring.
-// Scope: mount, queue rendering, auto-draft-result events, pause-changed, mode toggle.
+// Tests for App.svelte — explicit local preview + Gmail send wiring.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock wailsjs bindings BEFORE importing App — vi.mock is hoisted.
@@ -8,16 +7,13 @@ vi.mock('../wailsjs/go/main/App', () => ({
   GetQueue: vi.fn().mockResolvedValue([]),
   SignIn: vi.fn(),
   SignOut: vi.fn(),
-  CreateDraftForID: vi.fn().mockResolvedValue(undefined),
+  SendMessageForID: vi.fn().mockResolvedValue(undefined),
   DismissEmail: vi.fn().mockResolvedValue(undefined),
-  GetSettings: vi.fn().mockResolvedValue({ mode: 'manual', update_checks_enabled: true }),
-  SetMode: vi.fn().mockResolvedValue(undefined),
-  GetPausedState: vi.fn().mockResolvedValue(false),
   GetUpdateState: vi.fn().mockResolvedValue({
     currentVersion: '3.0.0',
     latestVersion: '',
     latestReleaseUrl: '',
-    installerUrl: 'https://github.com/marcfargas/go-mapi/releases/latest/download/go-mapi-setup.exe',
+    installerUrl: 'https://github.com/maxtop9843-byte/sendarc/releases/latest/download/SendArc-Setup.exe',
     updateAvailable: false,
     lastCheckedAt: '',
     enabled: true,
@@ -47,17 +43,9 @@ vi.mock('../wailsjs/runtime/runtime', () => ({
 
 // Mock settings module
 vi.mock('./lib/settings', () => ({
-  fetchSettings: vi.fn().mockResolvedValue({ mode: 'manual' }),
-  setMode: vi.fn().mockResolvedValue(undefined),
-  getPausedState: vi.fn().mockResolvedValue(false),
-  subscribeAutoDraftResult: vi.fn((cb: (r: unknown) => void) => {
-    if (!eventHandlers['auto-draft-result']) eventHandlers['auto-draft-result'] = [];
-    eventHandlers['auto-draft-result'].push(cb as (...args: unknown[]) => void);
-    return () => {};
-  }),
-  subscribePauseChanged: vi.fn((cb: (p: unknown) => void) => {
-    if (!eventHandlers['pause-changed']) eventHandlers['pause-changed'] = [];
-    eventHandlers['pause-changed'].push(cb as (...args: unknown[]) => void);
+  subscribeSendResult: vi.fn((cb: (r: unknown) => void) => {
+    if (!eventHandlers['send-result']) eventHandlers['send-result'] = [];
+    eventHandlers['send-result'].push(cb as (...args: unknown[]) => void);
     return () => {};
   }),
   // Phase 11-03 — notify-only update wrappers.
@@ -65,7 +53,7 @@ vi.mock('./lib/settings', () => ({
     currentVersion: '3.0.0',
     latestVersion: '',
     latestReleaseUrl: '',
-    installerUrl: 'https://github.com/marcfargas/go-mapi/releases/latest/download/go-mapi-setup.exe',
+    installerUrl: 'https://github.com/maxtop9843-byte/sendarc/releases/latest/download/SendArc-Setup.exe',
     updateAvailable: false,
     lastCheckedAt: '',
     enabled: true,
@@ -96,9 +84,9 @@ vi.mock('./lib/auth', () => ({
 
 import { render, fireEvent } from '@testing-library/svelte';
 import App from './App.svelte';
-import { fetchSettings, setMode } from './lib/settings';
 import { fetchQueue, subscribeQueue } from './lib/queue';
 import { fetchAuthStatus } from './lib/auth';
+import { SendMessageForID } from '../wailsjs/go/main/App';
 
 beforeEach(() => {
   // Reset all event handler maps between tests to prevent cross-test bleed.
@@ -111,24 +99,17 @@ afterEach(() => {
 
 describe('App.svelte — smoke', () => {
   it('mounts without throwing and renders the sign-in screen when unauthenticated', async () => {
-    const { findByText } = render(App);
-    expect(await findByText(/Sign in with Google/i)).toBeInTheDocument();
+    const { findByRole } = render(App);
+    expect(await findByRole('button', { name: /sign in with google/i })).toBeInTheDocument();
   });
 });
 
-describe('App.svelte — Phase 9 wiring', () => {
-  it('calls fetchSettings on mount', async () => {
-    render(App);
-    // Allow promises to settle
-    await new Promise((r) => setTimeout(r, 0));
-    expect(fetchSettings).toHaveBeenCalled();
-  });
-
-  it('registers subscribeAutoDraftResult on mount', async () => {
-    const { subscribeAutoDraftResult } = await import('./lib/settings');
+describe('App.svelte — explicit send wiring', () => {
+  it('registers subscribeSendResult on mount', async () => {
+    const { subscribeSendResult } = await import('./lib/settings');
     render(App);
     await new Promise((r) => setTimeout(r, 0));
-    expect(subscribeAutoDraftResult).toHaveBeenCalled();
+    expect(subscribeSendResult).toHaveBeenCalled();
   });
 
   it('registers subscribeQueue on mount', async () => {
@@ -160,35 +141,36 @@ describe('App.svelte — Phase 9 wiring', () => {
     expect(await findByText('Test Subject')).toBeInTheDocument();
   });
 
-  it('auto-draft-result success event: clears error, adds to flashingIds (✓ Drafted visible)', async () => {
-    vi.useFakeTimers();
+  it('opens Preview without a Gmail call, then sends only from the separate Send button', async () => {
     vi.mocked(fetchAuthStatus).mockResolvedValueOnce({ authenticated: true, email: 'a@b.com' });
     vi.mocked(fetchQueue).mockResolvedValueOnce([
       {
-        id: 'flash-1',
+        id: 'send-1',
         message: {
           version: 1,
           timestamp: '2026-04-19T12:00:00Z',
           bodyFormat: 'plain',
-          subject: 'Flash me',
+          subject: 'Review first',
+          body: 'This remains local until Send is clicked.',
+          recipients: { to: [{ name: 'Alice', address: 'alice@example.com' }] },
+          attachments: [],
         } as unknown as import('./lib/queue').EmailWithId['message'],
       },
     ]);
 
-    const { findByText, queryByText } = render(App);
-    await findByText('Flash me'); // wait for mount
+    const { findByRole, findByText } = render(App);
+    await findByText('Review first');
+    expect(SendMessageForID).not.toHaveBeenCalled();
 
-    // Fire auto-draft-result success
-    const handlers = eventHandlers['auto-draft-result'] ?? [];
-    handlers.forEach((h) => h({ emailId: 'flash-1', success: true }));
+    await fireEvent.click(await findByRole('button', { name: 'Preview' }));
+    expect(await findByRole('region', { name: /email preview/i })).toBeInTheDocument();
+    expect(SendMessageForID).not.toHaveBeenCalled();
 
-    // Expect flash — but note document.hasFocus() in jsdom returns false by default,
-    // so the flash path may not fire. We test that the handler runs without error.
-    expect(queryByText('Flash me') ?? null).toBeDefined(); // either subject or flash label is present
-    vi.useRealTimers();
+    await fireEvent.click(await findByRole('button', { name: /send with gmail/i }));
+    expect(SendMessageForID).toHaveBeenCalledWith('send-1');
   });
 
-  it('auto-draft-result failure event: populates autoDraftErrors (error badge shown on row)', async () => {
+  it('renders an announced error when send-result reports failure', async () => {
     vi.mocked(fetchAuthStatus).mockResolvedValueOnce({ authenticated: true, email: 'a@b.com' });
     vi.mocked(fetchQueue).mockResolvedValueOnce([
       {
@@ -205,38 +187,30 @@ describe('App.svelte — Phase 9 wiring', () => {
     const { findByText, findByRole } = render(App);
     await findByText('Error email');
 
-    // Fire auto-draft-result failure with errorCategory
-    const handlers = eventHandlers['auto-draft-result'] ?? [];
-    handlers.forEach((h) => h({ emailId: 'err-1', success: false, errorCategory: 'network' }));
+    const handlers = eventHandlers['send-result'] ?? [];
+    handlers.forEach((handler) => handler({
+      emailId: 'err-1',
+      success: false,
+      errorCategory: 'network',
+      reason: 'connection reset',
+    }));
 
-    // Error badge (role=status) should appear
-    const badge = await findByRole('status', { name: /network error/i });
-    expect(badge).toBeTruthy();
+    const alert = await findByRole('alert');
+    expect(alert).toHaveTextContent('Send failed');
+    expect(alert).toHaveTextContent('connection reset');
   });
 
-  it('pause-changed event flips paused state (no throw)', async () => {
-    render(App);
-    await new Promise((r) => setTimeout(r, 0));
-
-    // Fire pause-changed — just verify it does not throw
-    expect(() => {
-      const handlers = eventHandlers['pause-changed'] ?? [];
-      handlers.forEach((h) => h(true));
-    }).not.toThrow();
-  });
-
-  it('mode toggle calls setMode when auto-draft segment clicked', async () => {
+  it('does not expose an automatic-send mode', async () => {
     vi.mocked(fetchAuthStatus).mockResolvedValueOnce({
       authenticated: true,
       email: 'a@b.com',
       name: 'Alice',
     });
 
-    const { findByRole } = render(App);
-    // Wait for SignedInHeader to render (auth=true)
-    const autoDraftBtn = await findByRole('button', { name: /auto-draft/i });
-    await fireEvent.click(autoDraftBtn);
-    expect(setMode).toHaveBeenCalledWith('auto-draft');
+    const { findByText, queryByText, queryByRole } = render(App);
+    await findByText('a@b.com');
+    expect(queryByText(/auto-draft/i)).toBeNull();
+    expect(queryByRole('group', { name: /mode/i })).toBeNull();
   });
 });
 
@@ -248,9 +222,9 @@ describe('App.svelte — update UX (Phase 11-03)', () => {
   const availableState = {
     currentVersion: '3.0.0',
     latestVersion: '3.0.1',
-    latestReleaseUrl: 'https://github.com/marcfargas/go-mapi/releases/tag/v3.0.1',
+    latestReleaseUrl: 'https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.0.1',
     installerUrl:
-      'https://github.com/marcfargas/go-mapi/releases/latest/download/go-mapi-setup.exe',
+      'https://github.com/maxtop9843-byte/sendarc/releases/latest/download/SendArc-Setup.exe',
     updateAvailable: true,
     lastCheckedAt: '2026-04-21T12:00:00Z',
     enabled: true,
@@ -259,9 +233,9 @@ describe('App.svelte — update UX (Phase 11-03)', () => {
   const noUpdateState = {
     currentVersion: '3.0.0',
     latestVersion: '3.0.0',
-    latestReleaseUrl: 'https://github.com/marcfargas/go-mapi/releases/tag/v3.0.0',
+    latestReleaseUrl: 'https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.0.0',
     installerUrl:
-      'https://github.com/marcfargas/go-mapi/releases/latest/download/go-mapi-setup.exe',
+      'https://github.com/maxtop9843-byte/sendarc/releases/latest/download/SendArc-Setup.exe',
     updateAvailable: false,
     lastCheckedAt: '2026-04-21T12:00:00Z',
     enabled: true,
@@ -309,7 +283,7 @@ describe('App.svelte — update UX (Phase 11-03)', () => {
 
     // The panel exposes both URLs (D-02).
     const releaseLink = await findByText(/release notes|release page/i);
-    const installerLink = await findByText(/download installer|download go-mapi-setup/i);
+    const installerLink = await findByText(/download sendarc installer/i);
     expect(releaseLink).toBeInTheDocument();
     expect(installerLink).toBeInTheDocument();
   });
@@ -322,7 +296,7 @@ describe('App.svelte — update UX (Phase 11-03)', () => {
     await fireEvent.click(openPanelBtn);
 
     const releaseLink = await findByText(/release notes|release page/i);
-    const installerLink = await findByText(/download installer|download go-mapi-setup/i);
+    const installerLink = await findByText(/download sendarc installer/i);
     await fireEvent.click(releaseLink);
     await fireEvent.click(installerLink);
 

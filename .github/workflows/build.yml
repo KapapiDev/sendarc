@@ -10,14 +10,16 @@ on:
 
 jobs:
   build-interceptor:
-    name: Build Interceptor (C++)
-    runs-on: windows-latest
+    name: Build Interceptor (${{ matrix.arch }}, ${{ matrix.config }})
+    runs-on: windows-2025
     strategy:
+      fail-fast: false
       matrix:
+        arch: [x64, x86]
         config: [Debug, Release]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install mingw-mstorsjo-llvm-ucrt (triple-prefixed clang + bundled cmake/ninja)
         shell: pwsh
@@ -27,7 +29,7 @@ jobs:
           # driver layout and is unusable for our x64 + x86 dual build. The package also
           # bundles cmake + ninja, so no separate cmake/ninja install is needed here.
           Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
-          # windows-latest pwsh sessions run elevated (as runneradmin); scoop's installer
+          # windows-2025 pwsh sessions run elevated (as runneradmin); scoop's installer
           # aborts under elevation unless SCOOP_INSTALL_AS_ADMIN=1 is set (or -RunAsAdmin
           # is passed). Setting the env var is a no-op when non-elevated and clears the
           # gate when elevated, so it's safe in both modes.
@@ -51,49 +53,48 @@ jobs:
 
       - name: Build Interceptor and Test Harness
         working-directory: src/interceptor
-        run: .\build.ps1 -Config ${{ matrix.config }} -Tests -Clean
+        run: .\build.ps1 -Arch ${{ matrix.arch }} -Config ${{ matrix.config }} -Version 0.0.0-ci -Tests -Clean
 
       - name: Run Test Harness
         working-directory: src/interceptor
-        run: .\build-x64\bin\go-mapi-test-harness.exe .\build-x64\bin\go-mapi.dll
-        continue-on-error: true
+        run: .\build-${{ matrix.arch }}\bin\SendArc-test-harness.exe .\build-${{ matrix.arch }}\bin\SendArc.dll
 
       - name: Run C++ Unit Tests (doctest via ctest)
-        working-directory: src/interceptor/build-x64
+        working-directory: src/interceptor/build-${{ matrix.arch }}
         run: ctest --output-on-failure --build-config ${{ matrix.config }}
 
       - name: Upload DLL Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: go-mapi-dll-${{ matrix.config }}
-          path: src/interceptor/build-x64/bin/go-mapi.dll
-          if-no-files-found: warn
+          name: sendarc-dll-${{ matrix.arch }}-${{ matrix.config }}
+          path: src/interceptor/build-${{ matrix.arch }}/bin/SendArc.dll
+          if-no-files-found: error
 
       - name: Upload Test Harness Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: go-mapi-tests-${{ matrix.config }}
-          path: src/interceptor/build-x64/bin/go-mapi-test-harness.exe
-          if-no-files-found: warn
+          name: sendarc-tests-${{ matrix.arch }}-${{ matrix.config }}
+          path: src/interceptor/build-${{ matrix.arch }}/bin/SendArc-test-harness.exe
+          if-no-files-found: error
 
   build-wails-app:
     name: Build Wails App (Go + Svelte)
-    runs-on: windows-latest
+    runs-on: windows-2025
     env:
       CGO_ENABLED: '1'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.25'
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
 
       # CRITICAL: npm ci + frontend build MUST run before any 'go test' or
       # 'go vet' on ./src/app/... because src/app/main.go has
@@ -103,7 +104,7 @@ jobs:
         run: npm ci
 
       - name: Build frontend (produces src/app/frontend/dist for go:embed)
-        run: npm run -w @marcfargas/go-mapi-app-frontend build
+        run: npm --workspace src/app/frontend run build
 
       - name: go vet
         run: go vet ./internal/mapi/... ./src/app/...
@@ -118,35 +119,35 @@ jobs:
         run: go test -race -coverprofile=coverage-src-app.out -v ./src/app/...
 
       - name: Upload Go coverage (internal/mapi)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-internal-mapi
           path: coverage-internal-mapi.out
-          if-no-files-found: warn
+          if-no-files-found: error
 
       - name: Upload Go coverage (src/app)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-src-app
           path: coverage-src-app.out
-          if-no-files-found: warn
+          if-no-files-found: error
 
       - name: svelte-check (blocking)
-        run: npm run -w @marcfargas/go-mapi-app-frontend check
+        run: npm --workspace src/app/frontend run check
 
       - name: Vitest frontend tests (blocking)
-        run: npm run -w @marcfargas/go-mapi-app-frontend test:run
+        run: npm --workspace src/app/frontend run test:run
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
       - name: wails build (sanity)
         working-directory: src/app
         run: wails build -platform windows/amd64
 
       - name: Upload Wails app artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: go-mapi-wails-app
+          name: sendarc-wails-app
           path: src/app/build/bin/
-          if-no-files-found: warn
+          if-no-files-found: error

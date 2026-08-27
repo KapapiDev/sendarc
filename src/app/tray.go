@@ -34,7 +34,7 @@ var trayUpdateIcon []byte
 // surfaces a distinct icon variant AND appends an "Update available" marker
 // to the tooltip so the transition is concretely testable.
 type trayState struct {
-	Mode            string // "manual" | "auto-draft"
+	Mode            string // retained for settings compatibility; SendArc is preview-first
 	Paused          bool
 	SignedIn        bool
 	ErrorMsg        string // non-empty → error state overrides everything (D-16)
@@ -45,31 +45,31 @@ type trayState struct {
 // computeTrayVisual is a pure function — testable without a live systray.
 //
 // Icon priority (highest first, D-16 + Phase 11):
-//   error > has-queue > update-available > idle
+//
+//	error > has-queue > update-available > idle
 //
 // Tooltip (D-17 + Phase 11):
-//   "go-mapi — {segment} — N pending"
-//   • error path overrides to "go-mapi — <msg>"
-//   • when UpdateAvailable (and no error), " • Update available" is appended
-//     so the tray transition is observable even when the icon variant
-//     cannot be visually distinguished from has-queue.
+//
+//	"SendArc — {segment} — N pending"
+//	• error path overrides to "SendArc — <msg>"
+//	• when UpdateAvailable (and no error), " • Update available" is appended
+//	  so the tray transition is observable even when the icon variant
+//	  cannot be visually distinguished from has-queue.
 //
 // Segment priority (highest first): error > paused > signed-out > mode.
 func computeTrayVisual(s trayState) (icon []byte, tooltip string) {
 	if s.ErrorMsg != "" {
-		return trayErrorIcon, "go-mapi — " + s.ErrorMsg
+		return trayErrorIcon, "SendArc — " + s.ErrorMsg
 	}
 	// D-17 segment selection: paused > signed-out > mode.
-	segment := "Manual"
+	segment := "Ready"
 	switch {
 	case s.Paused:
 		segment = "Paused"
 	case !s.SignedIn:
 		segment = "Signed out"
-	case s.Mode == "auto-draft":
-		segment = "Auto-draft"
 	}
-	tooltip = fmt.Sprintf("go-mapi — %s — %d pending", segment, s.Count)
+	tooltip = fmt.Sprintf("SendArc — %s — %d pending", segment, s.Count)
 	if s.UpdateAvailable {
 		tooltip += " • Update available"
 	}
@@ -122,7 +122,7 @@ func (a *App) onTrayReady() {
 	mShow := systray.AddMenuItem("Show", "Open main window")
 	// Pause watching (D-14): suppresses toasts + halts automode; watcher keeps running.
 	// Session-only (D-15): label resets on restart. Placed between Show and Quit.
-	mPause := systray.AddMenuItem("Pause watching", "Silences toasts and auto-draft; queue still collecting")
+	mPause := systray.AddMenuItem("Pause watching", "Silences notifications; the local queue keeps collecting")
 
 	// Phase 11 — update status rows + actions (D-05, D-06, D-07).
 	// Placement: between Pause and Quit, with a separator above and below to
@@ -152,7 +152,7 @@ func (a *App) onTrayReady() {
 	}
 
 	systray.AddSeparator()
-	mQuit := systray.AddMenuItem("Quit", "Exit go-mapi")
+	mQuit := systray.AddMenuItem("Quit", "Exit SendArc")
 
 	logInfo("tray ready: menu items registered (Show, Pause watching, update status + toggle + check-now, Quit)")
 

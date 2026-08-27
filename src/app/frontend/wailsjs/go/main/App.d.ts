@@ -6,8 +6,6 @@ import {mapi} from '../models';
 
 export function CheckForUpdatesNow(arg1:context.Context):Promise<void>;
 
-export function CreateDraftForID(arg1:string):Promise<void>;
-
 export function DismissEmail(arg1:string):Promise<void>;
 
 export function GetAuthStatus():Promise<main.AuthStatus>;
@@ -29,6 +27,8 @@ export function PauseWatching():Promise<void>;
 export function ResumeWatching():Promise<void>;
 
 export function SaveSettings(arg1:main.AppSettings):Promise<void>;
+
+export function SendMessageForID(arg1:string):Promise<void>;
 
 export function SetMode(arg1:string):Promise<void>;
 

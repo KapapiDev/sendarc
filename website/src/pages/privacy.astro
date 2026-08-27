@@ -1,0 +1,12 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import LegalShell from "../components/LegalShell.astro";
+import { SUPPORT_EMAIL } from "../lib/site";
+---
+<BaseLayout title="Privacy" path="/privacy/"><LegalShell title="Privacy notice" description="What SendArc processes, where it stays, and how to request deletion.">
+  <h2>Desktop application</h2><p>Outgoing message data is written to a local per-user queue and displayed for review. When you confirm Send, the app sends the message directly to the Gmail API. SendArc does not operate a relay and does not request inbox-reading permission.</p>
+  <p>OAuth tokens are stored in Windows Credential Manager. Local logs are designed to exclude message bodies, recipient addresses, attachment contents, and tokens.</p>
+  <h2 id="beta-data">Business Beta data</h2><p>The website form stores work email, company, seat range, current workflow, an optional note, basic campaign labels, and anti-abuse metadata. Do not submit message content, recipients, credentials, or confidential attachments. Data is used only to evaluate and contact beta participants and is retained for no more than 12 months after the last contact.</p>
+  <h2>Minimal website events</h2><p>The site may store an allowlisted event name, page path, coarse campaign labels, and a one-way abuse-prevention hash. It does not use advertising cookies or cross-site identifiers.</p>
+  <h2>Your choices</h2><p>Ask to access or delete a beta record by emailing <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> from the submitted address. The operator is 장형진.</p>
+</LegalShell></BaseLayout>

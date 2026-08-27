@@ -1,7 +1,9 @@
 package mapi
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,7 +11,7 @@ import (
 	"testing"
 )
 
-// GOTEST-01: HTTP-level tests for GmailClient.CreateDraft.
+// HTTP-level tests for GmailClient.SendMessage.
 //
 // Uses httptest.Server via the FOUND-03 NewGmailClientWithBase injection
 // point so the real Gmail endpoint is never touched. Covers happy path,
@@ -31,7 +33,7 @@ func newTestMail() *MailMessage {
 	}
 }
 
-func TestGmailClient_CreateDraft(t *testing.T) {
+func TestGmailClient_SendMessage(t *testing.T) {
 	type stubHandler struct {
 		status int
 		body   string
@@ -46,15 +48,15 @@ func TestGmailClient_CreateDraft(t *testing.T) {
 		expectCalled bool // false only when server is closed before the call
 	}{
 		{
-			name:         "happy path returns draft id",
-			stub:         stubHandler{status: 200, body: `{"id":"draft_abc123"}`},
-			wantID:       "draft_abc123",
+			name:         "happy path returns message id",
+			stub:         stubHandler{status: 200, body: `{"id":"msg_abc123"}`},
+			wantID:       "msg_abc123",
 			expectCalled: true,
 		},
 		{
-			name:         "401 unauthorized surfaces token expired",
+			name:         "401 unauthorized preserves status",
 			stub:         stubHandler{status: 401, body: `{"error":"unauthorized"}`},
-			wantErrSub:   "token expired",
+			wantErrSub:   "Gmail API error (401)",
 			expectCalled: true,
 		},
 		{
@@ -72,7 +74,7 @@ func TestGmailClient_CreateDraft(t *testing.T) {
 		{
 			name:         "network failure when server is closed",
 			closeServer:  true,
-			wantErrSub:   "failed to create draft",
+			wantErrSub:   "failed to send message",
 			expectCalled: false,
 		},
 	}
@@ -108,21 +110,21 @@ func TestGmailClient_CreateDraft(t *testing.T) {
 			}
 
 			client := NewGmailClientWithBase("test-token", baseURL)
-			id, err := client.CreateDraft(newTestMail())
+			id, err := client.SendMessage(context.Background(), newTestMail())
 
 			if tc.wantErrSub == "" {
 				if err != nil {
-					t.Fatalf("CreateDraft unexpected error: %v", err)
+					t.Fatalf("SendMessage unexpected error: %v", err)
 				}
 				if id != tc.wantID {
-					t.Fatalf("CreateDraft id = %q, want %q", id, tc.wantID)
+					t.Fatalf("SendMessage id = %q, want %q", id, tc.wantID)
 				}
 			} else {
 				if err == nil {
-					t.Fatalf("CreateDraft expected error containing %q, got nil (id=%q)", tc.wantErrSub, id)
+					t.Fatalf("SendMessage expected error containing %q, got nil (id=%q)", tc.wantErrSub, id)
 				}
 				if !strings.Contains(err.Error(), tc.wantErrSub) {
-					t.Fatalf("CreateDraft error = %q, want substring %q", err.Error(), tc.wantErrSub)
+					t.Fatalf("SendMessage error = %q, want substring %q", err.Error(), tc.wantErrSub)
 				}
 			}
 
@@ -133,8 +135,8 @@ func TestGmailClient_CreateDraft(t *testing.T) {
 				if gotMethod != http.MethodPost {
 					t.Errorf("request method = %q, want POST", gotMethod)
 				}
-				if gotPath != "/drafts" {
-					t.Errorf("request path = %q, want /drafts", gotPath)
+				if gotPath != "/messages/send" {
+					t.Errorf("request path = %q, want /messages/send", gotPath)
 				}
 				if gotAuth != "Bearer test-token" {
 					t.Errorf("Authorization header = %q, want %q", gotAuth, "Bearer test-token")
@@ -144,21 +146,18 @@ func TestGmailClient_CreateDraft(t *testing.T) {
 	}
 }
 
-func TestGmailClient_CreateDraft_RequestBodyShape(t *testing.T) {
-	// Cross-check that the JSON body wraps the base64url-encoded MIME under
-	// message.raw per the Gmail drafts API shape. Keeps us honest against
-	// accidental refactors of the request envelope.
+func TestGmailClient_SendMessage_RequestBodyShape(t *testing.T) {
+	// Gmail users.messages.send expects raw at the top level, unlike the
+	// nested message.raw envelope used by drafts.create.
 	var gotRaw string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			Message struct {
-				Raw string `json:"raw"`
-			} `json:"message"`
+			Raw string `json:"raw"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Errorf("failed to decode request body: %v", err)
 		}
-		gotRaw = body.Message.Raw
+		gotRaw = body.Raw
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
 		_, _ = io.WriteString(w, `{"id":"abc"}`)
@@ -166,14 +165,52 @@ func TestGmailClient_CreateDraft_RequestBodyShape(t *testing.T) {
 	defer srv.Close()
 
 	client := NewGmailClientWithBase("t", srv.URL)
-	if _, err := client.CreateDraft(newTestMail()); err != nil {
-		t.Fatalf("CreateDraft error: %v", err)
+	if _, err := client.SendMessage(context.Background(), newTestMail()); err != nil {
+		t.Fatalf("SendMessage error: %v", err)
 	}
 	if gotRaw == "" {
-		t.Fatal("expected non-empty message.raw in request body")
+		t.Fatal("expected non-empty top-level raw in request body")
 	}
 	// base64url should not contain padding, plus or slash characters.
 	if strings.ContainsAny(gotRaw, "+/=") {
 		t.Errorf("message.raw contains non-base64url characters: %q", gotRaw)
+	}
+}
+
+func TestGmailClient_SendMessage_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	client := NewGmailClientWithBase("t", "http://127.0.0.1:1")
+	_, err := client.SendMessage(ctx, newTestMail())
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
+	}
+}
+
+func TestGmailClient_SendMessage_APIErrorDoesNotExposeResponseBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = io.WriteString(w, `{"error":"private-message-content"}`)
+	}))
+	defer srv.Close()
+
+	client := NewGmailClientWithBase("t", srv.URL)
+	_, err := client.SendMessage(context.Background(), newTestMail())
+	var apiErr *GmailAPIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("expected typed GmailAPIError(500), got %v", err)
+	}
+	if strings.Contains(err.Error(), "private-message-content") {
+		t.Fatalf("API response body leaked into error: %v", err)
+	}
+}
+
+func TestGmailClient_SendMessage_RejectsMissingRecipientBeforeNetwork(t *testing.T) {
+	msg := newTestMail()
+	msg.Recipients = Recipients{}
+	client := NewGmailClientWithBase("t", "http://127.0.0.1:1")
+	if _, err := client.SendMessage(context.Background(), msg); err == nil || !strings.Contains(err.Error(), "missing recipient") {
+		t.Fatalf("expected missing-recipient validation error, got %v", err)
 	}
 }

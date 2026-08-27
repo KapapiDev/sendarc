@@ -1,4 +1,4 @@
-//go:build windows
+//go:build windows && legacy_automode
 
 package main
 
@@ -42,12 +42,6 @@ func makeTestEmailFile(t *testing.T, dir, filename, subject, ts string) string {
 	}
 	return path
 }
-
-// nopWatcherCallback discards all callbacks (used when the bridge is not needed in tests).
-type nopWatcherCallback struct{}
-
-func (n *nopWatcherCallback) OnQueueChanged(_ []mapi.EmailWithId) {}
-func (n *nopWatcherCallback) OnError(_ error)                     {}
 
 // captureEmitter records emitted events for test assertions.
 type captureEmitter struct {

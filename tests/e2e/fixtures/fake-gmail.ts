@@ -4,7 +4,7 @@ import { AddressInfo } from 'node:net';
 // Phase 11 plan 06 — minimal HTTP server impersonating the Gmail API.
 //
 // The Wails app's GmailClient (internal/mapi/gmail.go) accepts a base URL
-// override; the e2e shim writes that override from GOMAPI_E2E_GMAIL_BASE_URL.
+// override; the e2e shim writes that override from SENDARC_E2E_GMAIL_BASE_URL.
 // Routes intentionally mirror the Gmail v1 paths the real client posts to:
 //   POST /upload/gmail/v1/users/me/drafts        → CreateDraft
 //   POST /upload/gmail/v1/users/me/messages/send → SendMessage (unused today)

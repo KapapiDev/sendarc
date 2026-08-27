@@ -1,4 +1,4 @@
-//go:build windows
+//go:build windows && silent_update_experimental
 
 package main
 
@@ -130,7 +130,7 @@ func installFullPipelineFixture(t *testing.T, manifestOverride []byte) (installD
 func setupSilentLogDir(t *testing.T) string {
 	t.Helper()
 	tmp := t.TempDir()
-	t.Setenv("GOMAPI_UPDATES_DIR", tmp)
+	t.Setenv("SENDARC_UPDATES_DIR", tmp)
 	return filepath.Join(tmp, "update.log")
 }
 
@@ -171,7 +171,7 @@ func TestRunSilentUpdate_UpdateAvailable_FullPipeline(t *testing.T) {
 
 	// Each swap target must contain the NEW content.
 	checks := []struct {
-		path    string
+		path         string
 		manifestName string
 	}{
 		{filepath.Join(installDir, "go-mapi.exe"), "go-mapi.exe"},

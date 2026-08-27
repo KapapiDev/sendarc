@@ -1,7 +1,9 @@
-To: security@example.com
+To: <security@example.com>
 Subject: Boundary collision
+MIME-Version: 1.0
+Date: Fri, 10 Apr 2026 00:00:00 +0000
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: base64
 
-V2F0Y2ggZm9yIC0tZ29fbWFwaV9QSUQgbWFya2VycyBpbiB0aGlzIGJvZHkg4oCUIHRoZXkgbXVz
-dCBiZSBiYXNlNjQtd3JhcHBlZC4=
+V2F0Y2ggZm9yIC0tc2VuZGFyY19CT1VOREFSWSBtYXJrZXJzIGluIHRoaXMgYm9keSDigJQgdGhl
+eSBtdXN0IGJlIGJhc2U2NC13cmFwcGVkLg==

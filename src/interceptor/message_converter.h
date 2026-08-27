@@ -24,7 +24,8 @@ std::string WideToUtf8(const wchar_t* wide);
 // Returns empty string for nullptr input.
 std::string AnsiToUtf8(const char* ansi);
 
-// Extract the filename portion of a path (basename).
+// Extract the filename portion of a path (basename). Returns empty for a
+// trailing separator and for the special path components "." and "..".
 // Pure string manipulation — handles both forward and backward slashes.
 std::string FilenameFromPath(const std::string& path);
 

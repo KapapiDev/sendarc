@@ -24,7 +24,7 @@ std::wstring FsUtils::GetBaseQueueDir() {
     if (!result.empty() && result.back() != L'\\') {
         result += L'\\';
     }
-    result += L"go-mapi\\queue";
+    result += L"SendArc\\queue";
     return result;
 }
 
@@ -43,7 +43,7 @@ bool FsUtils::EnsureOutputDirectory() {
     }
 
     // SHCreateDirectoryExW handles nested creation (creates the parent
-    // %LOCALAPPDATA%\go-mapi too if needed).
+    // %LOCALAPPDATA%\SendArc too if needed).
     // ERROR_ALREADY_EXISTS / ERROR_FILE_EXISTS are success cases.
     int rc = SHCreateDirectoryExW(nullptr, queueDir.c_str(), nullptr);
     if (rc != ERROR_SUCCESS && rc != ERROR_ALREADY_EXISTS && rc != ERROR_FILE_EXISTS) {
@@ -94,7 +94,7 @@ std::wstring FsUtils::GenerateUniqueFilename() {
 }
 
 std::wstring FsUtils::GetAttachmentsDirForStem(const std::wstring& stem) {
-    // Sibling of the JSON file: %LOCALAPPDATA%\go-mapi\queue\<stem>
+    // Sibling of the JSON file: %LOCALAPPDATA%\SendArc\queue\<stem>
     // (no trailing separator — callers append the basename themselves).
     std::wstring base = GetBaseQueueDir();
     if (base.empty()) return L"";
@@ -117,6 +117,16 @@ static std::wstring Utf8ToWide(const std::string& s) {
     return out;
 }
 
+static bool IsSafeDestinationBasename(const std::wstring& basename) {
+    if (basename.empty() || basename == L"." || basename == L"..") {
+        return false;
+    }
+
+    // A MAPI display filename must never become a path. Separators cover
+    // rooted and UNC paths; ':' covers drive-qualified paths and NTFS ADS.
+    return basename.find_first_of(L"\\/:") == std::wstring::npos;
+}
+
 bool FsUtils::CopyFileToDir(const std::string& srcUtf8,
                             const std::wstring& destDir,
                             const std::string& destBasenameUtf8,
@@ -128,7 +138,7 @@ bool FsUtils::CopyFileToDir(const std::string& srcUtf8,
 
     std::wstring srcWide = Utf8ToWide(srcUtf8);
     std::wstring destBasenameWide = Utf8ToWide(destBasenameUtf8);
-    if (srcWide.empty() || destBasenameWide.empty()) {
+    if (srcWide.empty() || !IsSafeDestinationBasename(destBasenameWide)) {
         return false;
     }
 

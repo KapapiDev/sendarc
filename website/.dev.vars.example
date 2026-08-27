@@ -1,0 +1,3 @@
+# This website requires no secrets for static pages.
+# Bind a local or Cloudflare D1 database as SENDARC_DB for lead storage.
+PUBLIC_SITE_URL=https://sendarc.pages.dev

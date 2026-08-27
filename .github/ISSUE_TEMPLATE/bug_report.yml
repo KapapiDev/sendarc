@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a reproducible SendArc problem.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve SendArc. Do not include email bodies, OAuth tokens, private attachments, recipient addresses, or confidential client data.
+  - type: input
+    id: version
+    attributes:
+      label: SendArc version
+      placeholder: 0.1.0-beta
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+  - type: input
+    id: calling_app
+    attributes:
+      label: Calling application and architecture
+      description: Name/version and 32-bit, 64-bit, or unknown. Write “not MAPI-related” if this does not apply.
+      placeholder: ExampleApp 7.4, 32-bit
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use sanitized examples only.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Remove personal data, paths containing usernames, credentials, tokens, message content, and attachment names.
+  - type: checkboxes
+    id: privacy_confirmation
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed email bodies, recipient addresses, OAuth tokens, private attachment names/files, confidential client data, and other secrets.
+          required: true

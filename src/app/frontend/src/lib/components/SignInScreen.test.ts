@@ -7,8 +7,9 @@ describe('SignInScreen', () => {
   it('renders the welcome heading and sign-in button copy', () => {
     const onSignIn = vi.fn();
     const { getByRole, getByText } = render(SignInScreen, { props: { onSignIn } });
-    expect(getByRole('heading', { level: 1 })).toHaveTextContent('go-mapi');
-    expect(getByText(/Sign in with Google/i)).toBeInTheDocument();
+    expect(getByRole('heading', { level: 1 })).toHaveTextContent('SendArc');
+    expect(getByRole('button', { name: /sign in with google/i })).toBeInTheDocument();
+    expect(getByText(/never sends in the background/i)).toBeInTheDocument();
   });
 
   it('calls onSignIn when the sign-in button is clicked', async () => {

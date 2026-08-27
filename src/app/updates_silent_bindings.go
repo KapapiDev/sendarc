@@ -1,4 +1,4 @@
-//go:build bindings
+//go:build bindings && silent_update_experimental
 
 package main
 

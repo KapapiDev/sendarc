@@ -12,9 +12,8 @@ using namespace mapi_test;
 int test_ansi_encoding() {
     std::cout << "\nTest: ANSI Codepage Encoding" << std::endl;
 
-    HMODULE hDll = LoadLibraryA("go-mapi.dll");
+    HMODULE hDll = TestUtilities::LoadInterceptorDll();
     if (!hDll) {
-        std::cerr << "Failed to load go-mapi.dll" << std::endl;
         return 1;
     }
 
@@ -28,7 +27,7 @@ int test_ansi_encoding() {
     }
 
     // Clean up first
-    std::string tempDir = TestUtilities::GetGoMapiTempDir();
+    std::string tempDir = TestUtilities::GetSendArcQueueDir();
     TestUtilities::CleanupTestFiles(tempDir);
 
     // Build a subject with ANSI codepage characters (Windows-1252).

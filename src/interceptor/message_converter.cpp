@@ -28,10 +28,22 @@ std::string AnsiToUtf8(const char* ansi) {
 std::string FilenameFromPath(const std::string& path) {
     // Extract filename from a Windows path (backslash or forward slash)
     auto pos = path.find_last_of("\\/");
-    if (pos != std::string::npos && pos + 1 < path.size()) {
-        return path.substr(pos + 1);
-    }
-    return path;
+    std::string filename = pos == std::string::npos ? path : path.substr(pos + 1);
+    if (filename == "." || filename == "..") return "";
+    return filename;
+}
+
+// MAPI callers control lpszFileName. It is a display name, not a destination
+// path, so ignore path-like values and derive a safe basename from the source
+// path instead. The filesystem copy layer repeats this validation at its trust
+// boundary before joining the name to the queue directory.
+static std::string AttachmentFilename(const std::string& explicitFilename,
+                                      const std::string& sourcePath) {
+    bool isPlainFilename = !explicitFilename.empty()
+        && explicitFilename != "."
+        && explicitFilename != ".."
+        && explicitFilename.find_first_of("\\/:") == std::string::npos;
+    return isPlainFilename ? explicitFilename : FilenameFromPath(sourcePath);
 }
 
 // QUICK-260423-qpx: many legacy Simple MAPI callers (Spanish SendEmail-style
@@ -102,12 +114,13 @@ MailMessage ConvertAnsiMessage(const MapiMessage& msg) {
             if (file.lpszPathName) {
                 attach.path = AnsiToUtf8(file.lpszPathName);
             }
+            std::string explicitFilename;
             if (file.lpszFileName) {
-                attach.filename = AnsiToUtf8(file.lpszFileName);
-            } else if (!attach.path.empty()) {
-                // Windows often leaves lpszFileName NULL — extract from path
-                attach.filename = FilenameFromPath(attach.path);
+                explicitFilename = AnsiToUtf8(file.lpszFileName);
             }
+            // Windows often leaves lpszFileName NULL; unsafe path-like values
+            // are likewise ignored in favor of the source path's basename.
+            attach.filename = AttachmentFilename(explicitFilename, attach.path);
             attach.size = 0;
 
             result.attachments.push_back(attach);
@@ -171,12 +184,13 @@ MailMessage ConvertWideMessage(const MapiMessageW& msg) {
             if (file.lpszPathName) {
                 attach.path = WideToUtf8(file.lpszPathName);
             }
+            std::string explicitFilename;
             if (file.lpszFileName) {
-                attach.filename = WideToUtf8(file.lpszFileName);
-            } else if (!attach.path.empty()) {
-                // Windows often leaves lpszFileName NULL — extract from path
-                attach.filename = FilenameFromPath(attach.path);
+                explicitFilename = WideToUtf8(file.lpszFileName);
             }
+            // Windows often leaves lpszFileName NULL; unsafe path-like values
+            // are likewise ignored in favor of the source path's basename.
+            attach.filename = AttachmentFilename(explicitFilename, attach.path);
             attach.size = 0;
 
             result.attachments.push_back(attach);

@@ -7,7 +7,7 @@
 
 namespace mapi_test {
 
-// Test utilities for loading and testing the go-mapi DLL
+// Test utilities for loading and testing the SendArc interceptor DLL.
 
 // Function pointer type for MAPISendMail
 typedef ULONG (WINAPI *MAPISendMailFunc)(
@@ -20,29 +20,36 @@ typedef ULONG (WINAPI *MAPISendMailFunc)(
 
 class TestUtilities {
 public:
-    // Load the go-mapi.dll and get the function pointer
+    // Configure and load the exact interceptor DLL passed to the harness.
+    static void SetInterceptorDllPath(const std::wstring& dllPath);
+    static HMODULE LoadInterceptorDll();
+
+    // Load an interceptor DLL and get the MAPISendMail function pointer.
     static MAPISendMailFunc LoadMAPISendMail(const std::string& dllPath);
 
-    // Verify a JSON file was created in the temp directory
-    static bool VerifyJsonFileCreated(const std::string& tempDir);
+    // Verify a JSON file was created by this harness in the queue directory.
+    static bool VerifyJsonFileCreated(const std::string& queueDir);
 
     // Parse and validate a JSON file
     static bool ValidateJsonFile(const std::string& filePath);
 
     // Clean up test files
-    static void CleanupTestFiles(const std::string& tempDir);
+    static void CleanupTestFiles(const std::string& queueDir);
 
-    // Get the go-mapi temp directory
-    static std::string GetGoMapiTempDir();
+    // Get the queue directory used by the interceptor DLL.
+    static std::string GetSendArcQueueDir();
 
     // Print test result
     static void PrintTestResult(const std::string& testName, bool passed);
 
     // Get count of JSON files in directory
-    static int GetJsonFileCount(const std::string& tempDir);
+    static int GetJsonFileCount(const std::string& queueDir);
+
+    // Return the newest JSON file produced by this harness, or an empty string.
+    static std::string GetNewestJsonPath(const std::string& queueDir);
 
     // Read the content of the newest JSON file in the directory
-    static std::string ReadNewestJsonContent(const std::string& tempDir);
+    static std::string ReadNewestJsonContent(const std::string& queueDir);
 };
 
 }  // namespace mapi_test

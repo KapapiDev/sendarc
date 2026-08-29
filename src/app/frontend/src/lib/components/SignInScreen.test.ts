@@ -6,7 +6,8 @@ import SignInScreen from './SignInScreen.svelte';
 describe('SignInScreen', () => {
   it('renders the welcome heading and sign-in button copy', () => {
     const onSignIn = vi.fn();
-    const { getByRole, getByText } = render(SignInScreen, { props: { onSignIn } });
+    const onAbout = vi.fn();
+    const { getByRole, getByText } = render(SignInScreen, { props: { onSignIn, onAbout } });
     expect(getByRole('heading', { level: 1 })).toHaveTextContent('SendArc');
     expect(getByRole('button', { name: /sign in with google/i })).toBeInTheDocument();
     expect(getByText(/never sends in the background/i)).toBeInTheDocument();
@@ -14,9 +15,17 @@ describe('SignInScreen', () => {
 
   it('calls onSignIn when the sign-in button is clicked', async () => {
     const onSignIn = vi.fn();
-    const { getByRole } = render(SignInScreen, { props: { onSignIn } });
+    const onAbout = vi.fn();
+    const { getByRole } = render(SignInScreen, { props: { onSignIn, onAbout } });
     const btn = getByRole('button', { name: /sign in with google/i });
     await fireEvent.click(btn);
     expect(onSignIn).toHaveBeenCalledOnce();
+  });
+
+  it('opens About from the signed-out screen', async () => {
+    const onAbout = vi.fn();
+    const { getByRole } = render(SignInScreen, { props: { onSignIn: vi.fn(), onAbout } });
+    await fireEvent.click(getByRole('button', { name: /about, privacy & licenses/i }));
+    expect(onAbout).toHaveBeenCalledOnce();
   });
 });

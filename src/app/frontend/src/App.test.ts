@@ -103,6 +103,15 @@ describe('App.svelte — smoke', () => {
     const { findByRole } = render(App);
     expect(await findByRole('button', { name: /sign in with google/i })).toBeInTheDocument();
   });
+
+  it('opens and dismisses the About panel from the signed-out screen', async () => {
+    const { findByRole, queryByRole } = render(App);
+    await fireEvent.click(await findByRole('button', { name: /about, privacy & licenses/i }));
+    expect(await findByRole('dialog', { name: /sendarc/i })).toBeInTheDocument();
+
+    await fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    expect(queryByRole('dialog', { name: /sendarc/i })).toBeNull();
+  });
 });
 
 describe('App.svelte — explicit send wiring', () => {

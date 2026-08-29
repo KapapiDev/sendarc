@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { onSignIn }: { onSignIn: () => void } = $props();
+  let { onSignIn, onAbout }: { onSignIn: () => void; onAbout: () => void } = $props();
 </script>
 
 <section class="signin">
@@ -16,6 +16,7 @@
   <p class="footnote">
     Queued emails stay on your computer until you review or dismiss them.
   </p>
+  <button class="about-btn" type="button" onclick={onAbout}>About, privacy & licenses</button>
 </section>
 
 <style>
@@ -45,4 +46,16 @@
   .signin-btn:hover { background: #1662c4; }
   .signin-btn:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
   .footnote { font-size: 0.85rem; color: var(--c-text-muted, #666); }
+  .about-btn {
+    min-height: 44px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--c-accent);
+    cursor: pointer;
+    font-size: 0.875rem;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .about-btn:hover { background: var(--c-surface-alt); }
 </style>

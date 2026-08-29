@@ -27,6 +27,7 @@
   import QueueRow from './lib/components/QueueRow.svelte';
   import UpdateBanner from './lib/components/UpdateBanner.svelte';
   import UpdatePanel from './lib/components/UpdatePanel.svelte';
+  import AboutPanel from './lib/components/AboutPanel.svelte';
   import './lib/styles.css';
 
   let queue = $state<EmailWithId[]>([]);
@@ -43,6 +44,7 @@
 
   let updateState = $state<UpdateState | null>(null);
   let showUpdatePanel = $state(false);
+  let showAboutPanel = $state(false);
 
   const unsubs: Array<() => void> = [];
 
@@ -200,6 +202,10 @@
       errorMsg = 'SendArc could not open app.log. Restart the app and try again.';
     }
   }
+
+  function handleOpenAbout() {
+    showAboutPanel = true;
+  }
 </script>
 
 {#if updateState?.updateAvailable}
@@ -216,12 +222,13 @@
     name={auth.name ?? ''}
     onSignOut={handleSignOutClick}
     onOpenLogs={handleOpenLogs}
+    onAbout={handleOpenAbout}
   />
 {/if}
 
 <main>
   {#if !auth.authenticated}
-    <SignInScreen onSignIn={handleSignInClick} />
+    <SignInScreen onSignIn={handleSignInClick} onAbout={handleOpenAbout} />
   {:else if errorMsg}
     <section class="state state--error" role="alert">
       <h2>SendArc needs attention</h2>
@@ -265,4 +272,12 @@
 
 {#if showUpdatePanel && updateState}
   <UpdatePanel update={updateState} onClose={() => { showUpdatePanel = false; }} />
+{/if}
+
+{#if showAboutPanel}
+  <AboutPanel
+    version={updateState?.currentVersion ?? ''}
+    onOpenLogs={handleOpenLogs}
+    onClose={() => { showAboutPanel = false; }}
+  />
 {/if}

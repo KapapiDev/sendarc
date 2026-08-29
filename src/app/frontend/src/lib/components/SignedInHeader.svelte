@@ -1,9 +1,10 @@
 <script lang="ts">
-  let { email, name, onSignOut, onOpenLogs }: {
+  let { email, name, onSignOut, onOpenLogs, onAbout }: {
     email: string;
     name: string;
     onSignOut: () => void;
     onOpenLogs: () => void;
+    onAbout: () => void;
   } = $props();
 
   const displayName = $derived(email || name || 'your Google account');
@@ -15,6 +16,7 @@
     <span class="who">Sending with <strong>{displayName}</strong></span>
   </div>
   <div class="actions">
+    <button type="button" class="secondary" onclick={onAbout}>About</button>
     <button type="button" class="secondary" onclick={onOpenLogs}>Open logs</button>
     <button type="button" class="secondary" onclick={onSignOut}>Sign out</button>
   </div>

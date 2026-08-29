@@ -12,6 +12,10 @@
   --c-surface-alt: #f7f9fc;
   --c-accent: #0b57d0;
   --c-accent-hover: #0842a0;
+  --c-accent-surface: #f2f7ff;
+  --c-accent-surface-strong: #f4f8ff;
+  --c-accent-border: #cbd9ee;
+  --c-accent-text: #174a91;
   --c-destructive: #b3261e;
   --c-text: #172033;
   --c-text-muted: #536078;

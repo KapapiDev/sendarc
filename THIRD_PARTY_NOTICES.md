@@ -21,12 +21,12 @@ SendArc also uses third-party packages whose own licenses and notices remain in 
 - `zalando/go-keyring` and its Windows Credential Manager backend;
 - `fyne.io/systray`;
 - `jackmordaunt/go-toast`;
-- `creativeprojects/go-selfupdate`, used for release metadata/checksum helpers while the product update behavior remains notify-only;
 - the vendored Wails `go-webview2` fork, whose [MIT license](src/app/vendor/go-webview2-e2e/LICENSE) and loader [ISC license](src/app/vendor/go-webview2-e2e/webviewloader/LICENSE) are included;
 - doctest 2.4.11, included in `src/interceptor/tests/doctest.h` under the MIT license, with portions attributed there to Catch2 and lest under the Boost Software License 1.0;
-- the vendored NSIS ApplicationID plugin described in [its README](src/installer/plugins/x86-unicode/README.md) under the stated zlib/libpng terms;
+- NSIS, which generates the installer stub under zlib/libpng terms;
+- Microsoft's signed WebView2 Evergreen bootstrapper, redistributed under Microsoft's WebView2 Runtime distribution terms;
 - Nunito font files under the [SIL Open Font License 1.1](src/app/frontend/src/assets/fonts/OFL.txt).
 
-Before a public release, generate and archive a complete dependency/license inventory from `go.mod`/build lists, npm lockfiles, vendored source, installer payloads, and website lockfiles. Resolve any missing license text before distribution; this high-level notice is not a substitute for that release inventory.
+The complete audited [dependency and distribution inventory](docs/dependency-inventory/README.md) covers Go runtime packages, both npm lockfiles, vendored source, installer payloads, and source or distribution terms. The installer ships this notice and the inventory alongside the project license. The matching public source tag and final artifact hashes must still be verified for every public release.
 
 Google, Gmail, Microsoft, Windows, Cloudflare, GitHub, Affixa, and other product names are trademarks of their respective owners. Their names describe interoperability or service providers and do not imply sponsorship or endorsement.

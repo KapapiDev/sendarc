@@ -1,4 +1,4 @@
-; SendArc.nsi — NSIS installer for SendArc
+﻿; SendArc.nsi — NSIS installer for SendArc
 ;
 ; Plan 10-01 scaffold: ModernUI2 layout, admin-elevation, machine-wide install,
 ; MAPI handler registration, previous-mail-client backup, Add/Remove Programs
@@ -48,13 +48,6 @@ InstallDir   "$PROGRAMFILES64\SendArc"
 OutFile      "SendArc-Setup.exe"
 Name         "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 BrandingText "${PRODUCT_NAME} ${PRODUCT_VERSION} — LGPL-3.0"
-
-; Repo-local plugin directory for vendored NSIS plugins (ApplicationID.dll).
-; `${__FILEDIR__}` resolves to src\installer\ at makensis time.
-; IMPORTANT: !addplugindir for user-added directories searches the directory
-; root directly — NOT an x86-unicode/ subdirectory (that convention applies
-; only to the NSIS built-in Plugins/ tree). Point directly at x86-unicode/.
-!addplugindir "${__FILEDIR__}\plugins\x86-unicode"
 
 ;------------------------------------------------------------------------------
 ; ModernUI2 pages
@@ -129,6 +122,19 @@ Section "Install" SecInstall
   SetOutPath "$INSTDIR\diagnostics"
   File "${__FILEDIR__}\..\..\scripts\diagnostics\collect-registration.ps1"
   File "${__FILEDIR__}\..\..\scripts\diagnostics\collect-runtime.ps1"
+  SetOutPath "$INSTDIR"
+
+  ; Ship the project license, attribution, and audited dependency inventories
+  ; with every installed binary. Matching source remains available through the
+  ; corresponding public release tag.
+  SetOutPath "$INSTDIR\licenses"
+  File /oname=LICENSE.txt "${__FILEDIR__}\..\..\LICENSE"
+  File "${__FILEDIR__}\..\..\THIRD_PARTY_NOTICES.md"
+  File /oname=DEPENDENCY_INVENTORY.md "${__FILEDIR__}\..\..\docs\dependency-inventory\README.md"
+  File "${__FILEDIR__}\..\..\docs\dependency-inventory\go-runtime.csv"
+  File "${__FILEDIR__}\..\..\docs\dependency-inventory\npm-workspace.csv"
+  File "${__FILEDIR__}\..\..\docs\dependency-inventory\npm-website.csv"
+  File "${__FILEDIR__}\..\..\docs\dependency-inventory\installer-payloads.csv"
   SetOutPath "$INSTDIR"
 
   ; D-10 + T-10-01-01 — MUST run BEFORE the HKLM Mail (Default) overwrite below
@@ -575,16 +581,13 @@ FunctionEnd
 ; CreateShortcutAndAUMID — D-13 / D-14 / D-15 / INST-01
 ;
 ; Creates the all-users Start Menu shortcut at $SMPROGRAMS\SendArc.lnk and
-; stamps PKEY_AppUserModel_ID on it via the ApplicationID NSIS plugin. The
+; stamps PKEY_AppUserModel_ID on it via the repository-owned PowerShell helper. The
 ; stamped AUMID is what makes Phase 9's toast notifications persist in Action
 ; Center — the shortcut AUMID MUST match the Wails app's runtime AUMID
 ; (app.sendarc.desktop per D-15), which the plan 10-06 release pipeline
 ; injects into the .exe via ldflags.
 ;
-; Plugin ABI (from NSIS ApplicationID v1.1):
-;     ApplicationID::Set "<shortcut-path>" "<aumid-string>"
-;     Pop $0     ; "0" = success, non-zero = error
-; RESEARCH §Pitfall 2 — Pop is required; without it the rc is swallowed.
+; The helper uses the documented Shell Link and Property System COM interfaces.
 ;------------------------------------------------------------------------------
 
 Function CreateShortcutAndAUMID
@@ -600,12 +603,14 @@ Function CreateShortcutAndAUMID
       SW_SHOWNORMAL "" \
       "SendArc — MAPI-to-Gmail bridge"
 
-  ; D-14: stamp PKEY_AppUserModel_ID via ApplicationID plugin. Plugin loaded
-  ; from src/installer/plugins/x86-unicode/ApplicationID.dll (vendored in plan 10-01).
-  ; ApplicationID::Set pushes "0" on success, "-1" on error.
+  ; D-14: stamp PKEY_AppUserModel_ID with the repository-owned helper.
   ; D-15: production AUMID is app.sendarc.desktop (matches the ${AUMID} define).
-  ApplicationID::Set "$SMPROGRAMS\SendArc.lnk" "${AUMID}"
+  InitPluginsDir
+  SetOutPath "$PLUGINSDIR"
+  File "${__FILEDIR__}\Set-ShortcutAumid.ps1"
+  nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\Set-ShortcutAumid.ps1" -ShortcutPath "$SMPROGRAMS\SendArc.lnk" -AppId "${AUMID}"'
   Pop $0
+  SetOutPath "$INSTDIR"
   SetShellVarContext current
   StrCmp $0 "0" AumidOk
   DetailPrint "WARNING: AUMID stamp rc=$0 — Action Center persistence may break"
@@ -733,7 +738,10 @@ Section "Uninstall"
   Delete "$INSTDIR\diagnostics\collect-runtime.ps1"
   RMDir  "$INSTDIR\diagnostics"
 
-  ; 9c. QUICK-260423-ntu T3c — x86 DLL + its parallel install dir
+  ; 9c. Installed license and dependency inventory bundle.
+  RMDir /r "$INSTDIR\licenses"
+
+  ; 9d. QUICK-260423-ntu T3c — x86 DLL + its parallel install dir
   Delete "$PROGRAMFILES32\SendArc\SendArc.dll"
   RMDir  "$PROGRAMFILES32\SendArc"
 

@@ -195,7 +195,8 @@ jobs:
           scoop bucket add extras
           scoop install nsis
           if ($LASTEXITCODE -ne 0) { throw "scoop install nsis failed (exit $LASTEXITCODE)" }
-          makensis /VERSION
+          $nsisVersion = (makensis /VERSION).Trim()
+          if ($nsisVersion -ne 'v3.12') { throw "Expected NSIS v3.12, got $nsisVersion; refresh the audited installer inventory before upgrading" }
 
       - name: Compile installer
         shell: pwsh

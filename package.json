@@ -19,6 +19,7 @@
     "test:interceptor": "powershell -ExecutionPolicy Bypass -Command \"src/interceptor/build-x64/bin/SendArc-test-harness.exe src/interceptor/build-x64/bin/SendArc.dll\"",
     "e2e": "npm run -w @sendarc/e2e test",
     "check": "npm run -w @sendarc/frontend build && go vet ./internal/mapi/... ./src/app/... && npm run -w @sendarc/frontend check",
+    "licenses:inventory": "node scripts/generate-license-inventory.mjs",
     "clean": "npm run clean:interceptor",
     "clean:interceptor": "powershell -ExecutionPolicy Bypass -Command \"Remove-Item -Recurse -Force src/interceptor/build-x64, src/interceptor/build-x86 -ErrorAction SilentlyContinue\""
   },

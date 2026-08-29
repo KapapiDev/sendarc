@@ -182,6 +182,23 @@ Describe "SendArc installer round-trip" {
             [SendArcVersionResource]::ReadString($appExe, 'ProductVersion') | Should -Be '0.1.0.0'
         }
 
+        It "2b. installed license and dependency inventory bundle is complete" {
+            $licenseDir = Join-Path $script:InstallDir 'licenses'
+            foreach ($name in @(
+                'LICENSE.txt',
+                'THIRD_PARTY_NOTICES.md',
+                'DEPENDENCY_INVENTORY.md',
+                'go-runtime.csv',
+                'npm-workspace.csv',
+                'npm-website.csv',
+                'installer-payloads.csv'
+            )) {
+                Test-Path (Join-Path $licenseDir $name) | Should -BeTrue
+            }
+            Get-Content (Join-Path $licenseDir 'LICENSE.txt') -Raw | Should -Match 'GNU LESSER GENERAL PUBLIC LICENSE'
+            Get-Content (Join-Path $licenseDir 'THIRD_PARTY_NOTICES.md') -Raw | Should -Match 'Third-party notices'
+        }
+
         # D-21 item 3
         It "3. HKLM MAPI handler key is registered with expandable DLLPath" {
             Test-Path $script:MapiKey | Should -BeTrue

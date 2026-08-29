@@ -1,0 +1,6 @@
+component,version,license_or_terms,source,sha256,review
+Microsoft Edge WebView2 Evergreen Bootstrapper,1.3.229.3,Microsoft WebView2 distribution terms,https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution,5CB35E73342E3BDFEA0293D1598A8E10D32D5FCE78E55ACB5EAD00AB918E63FB,Valid Microsoft Authenticode signature checked 2026-08-29
+NSIS-generated installer stub,3.12,zlib/libpng,https://github.com/NSIS-Dev/nsis/blob/master/COPYING,,CI build tool output; version recorded from installer smoke log
+SendArc AUMID helper,repository source,LGPL-3.0-or-later,../../src/installer/Set-ShortcutAumid.ps1,,repository-owned source replaces unlicensed precompiled ApplicationID plugin
+SendArc desktop executable and MAPI DLLs,0.1.0-beta,LGPL-3.0-or-later,../../LICENSE,,built from matching repository tag at release time
+SendArc brand icons,0.1.0-beta,project asset,../design/BRAND_ASSETS.md,,repository-owned generated brand assets

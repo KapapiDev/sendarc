@@ -107,7 +107,7 @@ jobs:
         # This keeps real OAuth secrets out of the workflow artifact (which is
         # broadly readable on public repos).
         run: |
-          wails build -platform windows/amd64 -ldflags "-X main.aumidOverride=app.sendarc.desktop -X main.oauthClientID=ci-placeholder.apps.googleusercontent.com -X main.oauthClientSecret=ci-placeholder"
+          wails build -v 0 -platform windows/amd64 -ldflags "-X main.aumidOverride=app.sendarc.desktop -X main.oauthClientID=ci-placeholder.apps.googleusercontent.com -X main.oauthClientSecret=ci-placeholder"
 
       - name: Install NSIS via scoop (extras bucket)
         shell: pwsh

@@ -94,7 +94,10 @@ try {
     Write-Host "[build-wails] CC:       $(if ($env:CC)  { $env:CC }  else { '(default)' })"
     Write-Host "[build-wails] CXX:      $(if ($env:CXX) { $env:CXX } else { '(default)' })"
     Write-Host "[build-wails] ldflags:  (oauth vars set -- values redacted)"
-    & wails build -platform $Platform -ldflags $ldflags
+    # Wails' normal build summary includes the complete ldflags string. Keep
+    # verbosity at zero whenever credentials are passed so a local transcript
+    # cannot expose either injected OAuth value.
+    & wails build -v 0 -platform $Platform -ldflags $ldflags
     $rc = $LASTEXITCODE
     if ($rc -ne 0) {
         Write-Error "wails build exited with code $rc"

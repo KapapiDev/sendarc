@@ -147,7 +147,9 @@ jobs:
             throw "Required SendArc OAuth repository secrets are not configured."
           }
           $ldf = "-X main.Version=${{ steps.version.outputs.version }} -X main.aumidOverride=app.sendarc.desktop -X main.oauthClientID=$env:SENDARC_OAUTH_CLIENT_ID -X main.oauthClientSecret=$env:SENDARC_OAUTH_CLIENT_SECRET"
-          wails build -platform windows/amd64 -ldflags "$ldf"
+          # Wails' normal summary prints the full ldflags value. GitHub masks
+          # repository secrets, but quiet mode prevents relying on masking.
+          wails build -v 0 -platform windows/amd64 -ldflags "$ldf"
 
       - name: Stage unsigned binaries
         shell: pwsh

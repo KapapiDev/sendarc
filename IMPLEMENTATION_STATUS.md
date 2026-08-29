@@ -28,6 +28,9 @@ Last updated: 2026-08-28
 - Clean GitHub Actions at commit `2be8d82` passed the Wails app, x64/x86 Debug/Release interceptors, installer Pester round-trip, website, and security/policy jobs.
 - Google Authentication Platform is configured for SendArc with external Testing audience, the controlled test account, deployed policy URLs, authorized `sendarc.pages.dev` domain, and exactly the `gmail.send` scope.
 - The enabled `SendArc Windows Desktop` OAuth client is injected only through the gitignored local environment file and protected GitHub Actions secrets; no credential values were committed.
+- Protected installer release dry-run [33126115747](https://github.com/maxtop9843-byte/sendarc/actions/runs/33126115747) built the OAuth-injected Wails app, both interceptor DLLs, unsigned beta installer, and checksum successfully without publishing a tag or release; neither OAuth value appeared in the workflow log.
+- The local Windows app reached Google's account chooser with an ephemeral loopback redirect, S256 PKCE, offline access, SendArc policy links, and exactly the `gmail.send` scope.
+- OAuth preflight copy now tells users to stop on an unverified/unsafe warning instead of instructing them to bypass it, and credential-bearing Wails builds run quietly so ldflags are not printed.
 
 ## Not yet complete
 

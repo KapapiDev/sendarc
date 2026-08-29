@@ -18,6 +18,8 @@ Use a dedicated Google Cloud project and credentials for SendArc. Do not reuse g
 
 Current console state (2026-08-28): the dedicated project exists with project ID `sendarc`, and `gmail.googleapis.com` is enabled. The Google Authentication Platform is configured as **SendArc** with external Testing audience, test user and developer/support contact `maxtop9843@gmail.com`, deployed SendArc homepage/privacy/terms URLs, authorized domain `sendarc.pages.dev`, and exactly the `gmail.send` scope. A Desktop-app client named **SendArc Windows Desktop** is enabled. Its values are stored only in the gitignored local environment file and protected GitHub Actions secrets. Real-account runtime verification remains a release gate.
 
+Runtime evidence on 2026-08-29 reached Google's account chooser from the locally built Windows app. The observed authorization request used an ephemeral `127.0.0.1` callback, `S256` PKCE, offline access, and exactly the single `gmail.send` scope. The account/consent step was intentionally not completed in that run, so token issuance and Gmail Sent verification remain open.
+
 1. Create/select a Google Cloud project named SendArc.
 2. Enable the Gmail API.
 3. Configure OAuth branding as **SendArc**.
@@ -54,7 +56,7 @@ Google Desktop-app client secrets cannot be treated as confidential once embedde
 - Request offline access so a refresh token can support later explicit sends.
 - Open the user's default system browser without shell-concatenating the URL.
 
-Do not instruct general users to bypass an unverified-app warning. Controlled testers may follow the consent flow only when the Google page identifies the app as SendArc and the test account was intentionally authorized.
+Do not instruct users to bypass an unverified-app or unsafe-app warning. The desktop explainer tells users to stop and close the tab if Google shows one. Controlled testing must proceed only through a Google flow that identifies the app as SendArc and accepts the intentionally authorized test account without bypassing a browser or Google safety barrier.
 
 ## Token lifecycle
 

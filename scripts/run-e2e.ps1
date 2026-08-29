@@ -53,7 +53,7 @@ if (-not $NoBuild) {
       '-s', '-w'
     ) -join ' '
 
-    & wails build -platform windows/amd64 -tags e2e -ldflags $ldflags -clean
+    & wails build -v 0 -platform windows/amd64 -tags e2e -ldflags $ldflags -clean
     if ($LASTEXITCODE -ne 0) { throw "wails build failed ($LASTEXITCODE)" }
   } finally {
     Pop-Location

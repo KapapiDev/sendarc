@@ -18,23 +18,23 @@
     bind:this={modal}
     onkeydown={(event) => handleModalKeydown(event, modal, onCancel)}
   >
-    <h2 id="preauth-title">One thing before we continue</h2>
+    <h2 id="preauth-title">Connect Google securely</h2>
     <p>
-      During the beta, Google may show a warning that <strong>SendArc isn't verified</strong>.
-      Only continue if the app name shown by Google is SendArc.
+      Google should identify the app as <strong>SendArc</strong> and ask only for permission
+      to send email on your behalf.
     </p>
-    <p>To continue, click:</p>
-    <ol class="steps">
-      <li><strong>Advanced</strong></li>
-      <li><strong>Go to SendArc (unsafe)</strong></li>
-    </ol>
+    <p class="warning">
+      If Google says the app is unverified or unsafe, close the tab and stop. Do not bypass
+      the warning. Beta access is limited to accounts explicitly approved for testing.
+    </p>
     <p class="note">
       SendArc requests permission to send mail with Gmail after you review it
-      locally and click Send. You can revoke access from your Google account settings.
+      locally and click Send. It cannot read your inbox, and you can revoke access from
+      your Google account settings.
     </p>
     <div class="actions">
       <button type="button" class="secondary" onclick={onCancel}>Cancel</button>
-      <button type="button" class="primary" onclick={onContinue}>Continue to Google</button>
+      <button type="button" class="primary" onclick={onContinue}>Open Google sign-in</button>
     </div>
   </div>
 </div>
@@ -55,8 +55,13 @@
     overflow-y: auto;
   }
   .modal h2 { margin-top: 0; }
-  .steps { padding-left: 1.5rem; }
-  .steps li { margin: 0.25rem 0; }
+  .warning {
+    margin: 1rem 0;
+    border-left: 3px solid #d97706;
+    padding: 0.75rem 0.875rem;
+    background: #fff8eb;
+    color: #6b3a08;
+  }
   .note { font-size: 0.85rem; color: #555; }
   .actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
   .actions button {

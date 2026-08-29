@@ -206,6 +206,12 @@ Function BackupPreviousMailClient
   ; Clean install with no prior default Mail client.
   StrCmp $0 "" BackupNull
 
+  ; Keep a machine-owned registry mirror for robust uninstall restoration.
+  ; JSON remains the documented/auditable backup, but parsing it must not be
+  ; the single point of failure for a machine-wide default-handler change.
+  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "PreviousMailClientPresent" 1
+  WriteRegStr   HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "PreviousMailClient" "$0"
+
   ; WR-02: escape $0 for JSON string context before interpolation.
   ; A mail client display name may legally contain `"` or `\` (e.g. locale-
   ; specific or custom enterprise names) which would otherwise produce
@@ -228,6 +234,9 @@ Function BackupPreviousMailClient
   Return
 
 BackupNull:
+  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "PreviousMailClientPresent" 0
+  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "PreviousMailClient"
+
   nsExec::ExecToStack 'powershell.exe -NoProfile -Command "[DateTime]::UtcNow.ToString(\"yyyy-MM-ddTHH:mm:ssZ\")"'
   Pop $2
   Pop $3
@@ -752,6 +761,20 @@ Function un.RestorePreviousMailClient
   StrCmp $0 "SendArc" 0 DoneRestore
   DetailPrint "Mail (Default) is still 'SendArc' — proceeding with restore"
 
+  ; Prefer the machine-owned registry mirror written atomically with the JSON.
+  ; This avoids making shell-output/newline behaviour a single point of failure.
+  ClearErrors
+  ReadRegDWORD $4 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "PreviousMailClientPresent"
+  IfErrors TryJsonBackup
+  StrCmp $4 "1" ReadRegistryBackup TryFallbacks
+
+ReadRegistryBackup:
+  ReadRegStr $1 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "PreviousMailClient"
+  StrCmp $1 "" TryJsonBackup
+  DetailPrint "Registry backup contains previousClient='$1'"
+  Goto VerifyAndRestore
+
+TryJsonBackup:
   ; IN-05: parse the backup JSON via PowerShell's ConvertFrom-Json instead of a
   ; naive substring search. The previous substring-based detection of
   ; `"previousClient":null` would false-match on a display-name containing that

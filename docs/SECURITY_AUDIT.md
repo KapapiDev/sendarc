@@ -51,9 +51,10 @@ deputy risks:
 - Credential Manager and firewall removal use fixed target/rule names;
 - the WebView2 bootstrapper and firewall rule quote the install path, which is
   a Windows filesystem path rather than network or message input;
-- PowerShell is used only for a fixed UTC timestamp and to parse the
-  machine-owned `%ProgramData%` backup JSON; the parsed previous-client value
-  is never re-evaluated as a command;
+- PowerShell is used only for a fixed UTC timestamp and as a backward-compatible
+  parser for the machine-owned `%ProgramData%` backup JSON; current installs
+  restore from a machine-owned registry mirror first, and the parsed value is
+  never re-evaluated as a command;
 - MAPI repair elevates the current `os.Executable()` path with one fixed
   `--repair-mapi` argument and first requires both installed DLLs;
 - previous-handler restoration verifies that SendArc is still the current

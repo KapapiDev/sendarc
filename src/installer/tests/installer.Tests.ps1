@@ -36,6 +36,7 @@ BeforeAll {
     $script:BackupJson   = "$script:ProgramData\uninst\previous-mail-client.json"
     $script:MapiKey      = 'HKLM:\SOFTWARE\Clients\Mail\SendArc'
     $script:MailKey      = 'HKLM:\SOFTWARE\Clients\Mail'
+    $script:UninstallKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\SendArc'
     $script:Shortcut     = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\SendArc.lnk"
     $script:FirewallRule = 'SendArc OAuth loopback'
     $script:ExpectedAumid = 'app.sendarc.desktop'
@@ -165,6 +166,10 @@ Describe "SendArc installer round-trip" {
             $parsedTimestamp = [DateTimeOffset]::MinValue
             [DateTimeOffset]::TryParse([string]$json.backedUpAt, [ref]$parsedTimestamp) | Should -BeTrue
             $json.previousClient | Should -Be 'SendArc Test Previous Client'
+            (Get-ItemProperty -Path $script:UninstallKey -Name 'PreviousMailClientPresent').PreviousMailClientPresent |
+                Should -Be 1
+            (Get-ItemProperty -Path $script:UninstallKey -Name 'PreviousMailClient').PreviousMailClient |
+                Should -Be 'SendArc Test Previous Client'
         }
 
         It "4b. install preserves Affixa, go-mapi, and the alternate mail-client key" {
@@ -328,6 +333,8 @@ Describe "SendArc installer round-trip" {
             if (Test-Path $uninst) {
                 Start-Process -FilePath $uninst -ArgumentList '/S' -Wait | Out-Null
                 Start-Sleep -Seconds 2
+                (Get-ItemProperty -Path $script:MailKey -Name '(default)').'(default)' |
+                    Should -Be 'SendArc Test Previous Client' -Because 'every uninstall must restore the saved alternate default'
             }
             Start-Process -FilePath $script:SetupExe -ArgumentList '/S',"/D=$($script:InstallDir)" -Wait | Out-Null
 

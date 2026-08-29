@@ -1,5 +1,5 @@
 # src/installer/tests/installer.Tests.ps1
-# Pester 5 smoke test — D-21 13-item coverage.
+# Pester 5 smoke test — install, coexistence, upgrade, and uninstall coverage.
 #
 # Pester 5 idioms only: New-PesterConfiguration, Describe/Context/It, Should -BeTrue/-BeFalse.
 # Pester 4 EnableExit switch is forbidden (D-30).
@@ -50,10 +50,66 @@ BeforeAll {
     # SendArc beta is notify-only: installing must not create an unattended updater.
     $script:TaskName    = 'SendArc Auto Update'
 
+    # Coexistence fixtures. These deliberately model the three cases from the
+    # product brief: Affixa, upstream go-mapi, and another default mail client.
+    # We record exactly which keys this run created and remove only those in
+    # AfterAll, so a pre-existing runner state is never destroyed.
+    $script:CoexistenceClients = @('Affixa', 'go-mapi', 'SendArc Test Previous Client')
+    $script:CreatedCoexistenceClients = @()
+    $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+        [Microsoft.Win32.RegistryHive]::LocalMachine,
+        [Microsoft.Win32.RegistryView]::Registry64
+    )
+    $mail = $null
+    try {
+        $mail = $base.CreateSubKey('SOFTWARE\Clients\Mail', $true)
+        $script:OriginalDefaultMailClient = $mail.GetValue('', $null)
+        foreach ($client in $script:CoexistenceClients) {
+            $existing = $mail.OpenSubKey($client)
+            if ($null -ne $existing) {
+                $existing.Dispose()
+                continue
+            }
+            $fixture = $mail.CreateSubKey($client, $true)
+            $fixture.SetValue('', $client, [Microsoft.Win32.RegistryValueKind]::String)
+            $fixture.Dispose()
+            $script:CreatedCoexistenceClients += $client
+        }
+        $mail.SetValue('', 'SendArc Test Previous Client', [Microsoft.Win32.RegistryValueKind]::String)
+    } finally {
+        if ($null -ne $mail) { $mail.Dispose() }
+        $base.Dispose()
+    }
+
     Write-Host ("[Setup] SetupExe    = {0}" -f $script:SetupExe)
     Write-Host ("[Setup] InstallDir  = {0}" -f $script:InstallDir)
     Write-Host ("[Setup] ProgramData = {0}" -f $script:ProgramData)
     Write-Host ("[Setup] CredTarget  = {0}" -f $script:CredTarget)
+}
+
+AfterAll {
+    # Restore the runner's original default and remove only fixture keys that
+    # this test created. The runner is ephemeral, but keeping teardown precise
+    # proves the same non-destructive discipline expected of the product.
+    $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+        [Microsoft.Win32.RegistryHive]::LocalMachine,
+        [Microsoft.Win32.RegistryView]::Registry64
+    )
+    $mail = $null
+    try {
+        $mail = $base.CreateSubKey('SOFTWARE\Clients\Mail', $true)
+        if ($null -eq $script:OriginalDefaultMailClient) {
+            $mail.DeleteValue('', $false)
+        } else {
+            $mail.SetValue('', $script:OriginalDefaultMailClient, [Microsoft.Win32.RegistryValueKind]::String)
+        }
+        foreach ($client in $script:CreatedCoexistenceClients) {
+            $mail.DeleteSubKeyTree($client, $false)
+        }
+    } finally {
+        if ($null -ne $mail) { $mail.Dispose() }
+        $base.Dispose()
+    }
 }
 
 Describe "SendArc installer round-trip" {
@@ -108,6 +164,14 @@ Describe "SendArc installer round-trip" {
             # DateTime, so validate parseability instead of its runtime type.
             $parsedTimestamp = [DateTimeOffset]::MinValue
             [DateTimeOffset]::TryParse([string]$json.backedUpAt, [ref]$parsedTimestamp) | Should -BeTrue
+            $json.previousClient | Should -Be 'SendArc Test Previous Client'
+        }
+
+        It "4b. install preserves Affixa, go-mapi, and the alternate mail-client key" {
+            foreach ($client in $script:CoexistenceClients) {
+                Test-Path (Join-Path $script:MailKey $client) | Should -BeTrue -Because "SendArc must coexist with $client"
+            }
+            (Get-ItemProperty -Path $script:MailKey -Name '(default)').'(default)' | Should -Be 'SendArc'
         }
 
         # D-21 item 5 — AUMID stamped on shortcut
@@ -379,6 +443,14 @@ Describe "SendArc installer round-trip" {
         # QUICK-260423-ntu item 20 — shared MAPI key removed
         It "20. HKLM MAPI handler key is gone after uninstall" {
             Test-Path $script:MapiKey | Should -BeFalse
+        }
+
+        It "20b. uninstall restores the alternate default and preserves unrelated mail clients" {
+            (Get-ItemProperty -Path $script:MailKey -Name '(default)').'(default)' |
+                Should -Be 'SendArc Test Previous Client'
+            foreach ($client in $script:CoexistenceClients) {
+                Test-Path (Join-Path $script:MailKey $client) | Should -BeTrue -Because "uninstall must not delete $client"
+            }
         }
     }
 }

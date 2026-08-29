@@ -26,6 +26,53 @@ BeforeAll {
     # Dot-source the AUMID reader helper (defines Get-ShortcutAumid + .NET types).
     . "$PSScriptRoot\AumidReader.ps1"
 
+    # FileVersionInfo does not expose UTF-16 (code page 1200) string tables on
+    # every supported PowerShell/.NET combination. Query the standard Windows
+    # VERSIONINFO resource directly so CI verifies what Explorer consumes.
+    if ($null -eq ('SendArcVersionResource' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class SendArcVersionResource
+{
+    [DllImport("version.dll", CharSet = CharSet.Unicode)]
+    private static extern uint GetFileVersionInfoSizeW(string path, out uint handle);
+
+    [DllImport("version.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetFileVersionInfoW(string path, uint handle, uint length, byte[] data);
+
+    [DllImport("version.dll", CharSet = CharSet.Unicode)]
+    private static extern bool VerQueryValueW(byte[] block, string subBlock, out IntPtr value, out uint length);
+
+    public static string ReadString(string path, string key)
+    {
+        uint handle;
+        uint size = GetFileVersionInfoSizeW(path, out handle);
+        if (size == 0) return null;
+
+        byte[] data = new byte[size];
+        if (!GetFileVersionInfoW(path, 0, size, data)) return null;
+
+        IntPtr translation;
+        uint translationLength;
+        if (!VerQueryValueW(data, @"\VarFileInfo\Translation", out translation, out translationLength) || translationLength < 4)
+            return null;
+
+        ushort language = (ushort)Marshal.ReadInt16(translation, 0);
+        ushort codePage = (ushort)Marshal.ReadInt16(translation, 2);
+        string query = string.Format(@"\StringFileInfo\{0:X4}{1:X4}\{2}", language, codePage, key);
+
+        IntPtr value;
+        uint valueLength;
+        if (!VerQueryValueW(data, query, out value, out valueLength) || valueLength == 0)
+            return null;
+        return Marshal.PtrToStringUni(value, (int)valueLength - 1);
+    }
+}
+'@
+    }
+
     # The installer binary is produced by the CI workflow (installer-smoke.yml)
     # via `makensis src\installer\SendArc.nsi` at the repo root.
     # Path resolution:
@@ -126,8 +173,13 @@ Describe "SendArc installer round-trip" {
 
         # D-21 item 2
         It "2. SendArc.exe and SendArc.dll are deposited in InstallDir" {
-            Test-Path (Join-Path $script:InstallDir 'SendArc.exe') | Should -BeTrue
+            $appExe = Join-Path $script:InstallDir 'SendArc.exe'
+            Test-Path $appExe | Should -BeTrue
             Test-Path (Join-Path $script:InstallDir 'SendArc.dll') | Should -BeTrue
+
+            [SendArcVersionResource]::ReadString($appExe, 'ProductName') | Should -Be 'SendArc'
+            [SendArcVersionResource]::ReadString($appExe, 'CompanyName') | Should -Be '장형진'
+            [SendArcVersionResource]::ReadString($appExe, 'ProductVersion') | Should -Be '0.1.0.0'
         }
 
         # D-21 item 3

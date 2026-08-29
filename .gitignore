@@ -6,6 +6,7 @@ src/app/build/*
 !src/app/build/windows/
 src/app/build/windows/*
 !src/app/build/windows/icon.ico
+!src/app/build/windows/info.json
 # QUICK-260423-ntu T3a: arch-specific CMake build dirs (x86_64 / i686 clang)
 build-x64/
 build-x86/

@@ -11,6 +11,10 @@
     "email": "maxtop9843@gmail.com"
   },
   "info": {
-    "productVersion": "0.0.0-dev"
+    "companyName": "장형진",
+    "productName": "SendArc",
+    "productVersion": "0.1.0.0",
+    "copyright": "© 2026 장형진",
+    "comments": "SendArc Gmail bridge for legacy Windows applications."
   }
 }

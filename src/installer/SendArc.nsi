@@ -765,21 +765,17 @@ Function un.RestorePreviousMailClient
   ;
   ; PowerShell output:
   ;   - missing file / parse error: non-zero exit code -> fall through to fallbacks
-  ;   - previousClient=null:        exit 0, stdout = "" (just trailing CRLF)
-  ;   - previousClient="<name>":    exit 0, stdout = "<name>" + trailing CRLF
+  ;   - previousClient=null:        exit 0, stdout = ""
+  ;   - previousClient="<name>":    exit 0, stdout = exactly "<name>"
+  ; Console.Out.Write deliberately emits no newline. nsExec output handling varies
+  ; across Windows/PowerShell versions, so blindly removing two characters can
+  ; truncate a valid client name and make restoration fall through to "clear".
   StrCpy $1 ""  ; candidate name
   IfFileExists "$6\SendArc\uninst\previous-mail-client.json" 0 NoBackup
-  nsExec::ExecToStack 'powershell.exe -NoProfile -Command "try { $$j = Get-Content -LiteralPath ''$6\SendArc\uninst\previous-mail-client.json'' -Raw | ConvertFrom-Json; if ($$null -ne $$j.previousClient) { Write-Output $$j.previousClient } exit 0 } catch { exit 1 }"'
+  nsExec::ExecToStack 'powershell.exe -NoProfile -Command "try { $$j = Get-Content -LiteralPath ''$6\SendArc\uninst\previous-mail-client.json'' -Raw | ConvertFrom-Json; if ($$null -ne $$j.previousClient) { [Console]::Out.Write([string]$$j.previousClient) } exit 0 } catch { exit 1 }"'
   Pop $4    ; exit code
   Pop $1    ; stdout (empty if null or parse error)
   StrCmp $4 "0" 0 TryFallbacks
-  ; Strip trailing CRLF if present (same pattern as BackupPreviousMailClient's timestamp)
-  ; IntCmp len 2 <equal> <less> <greater>: trim when len >= 2 (equal or greater);
-  ; skip when len < 2 (no CRLF could fit).
-  StrLen $4 $1
-  IntCmp $4 2 0 SkipTrim 0
-  StrCpy $1 $1 -2
-SkipTrim:
   StrCmp $1 "" TryFallbacks
   DetailPrint "Backup contains previousClient='$1'"
   Goto VerifyAndRestore

@@ -14,9 +14,9 @@ export function GetMode():Promise<string>;
 
 export function GetPausedState():Promise<boolean>;
 
-export function GetQueue():Promise<Array<mapi.EmailWithId>>;
+export function GetProductStatus():Promise<main.ProductStatus>;
 
-export function OpenDiagnosticLogs():Promise<void>;
+export function GetQueue():Promise<Array<mapi.EmailWithId>>;
 
 export function GetSettings():Promise<main.AppSettings>;
 
@@ -24,7 +24,11 @@ export function GetUpdateState():Promise<main.UpdateState>;
 
 export function MakeAuthenticatedGmailCall(arg1:context.Context,arg2:main.GmailCall):Promise<void>;
 
+export function OpenDiagnosticLogs():Promise<void>;
+
 export function PauseWatching():Promise<void>;
+
+export function RepairMAPIRegistration():Promise<void>;
 
 export function ResumeWatching():Promise<void>;
 
@@ -45,3 +49,5 @@ export function SetUpdateChecksEnabled(arg1:boolean):Promise<void>;
 export function SignIn():Promise<void>;
 
 export function SignOut():Promise<void>;
+
+export function TestGmailConnection():Promise<main.ConnectionTestResult>;

@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-08-28
+Last updated: 2026-08-29
 
 ## Completed
 
@@ -17,7 +17,7 @@ Last updated: 2026-08-28
 - Support issue forms and privacy/security/decision/release documentation added.
 - Reference-matched Astro/Cloudflare website, legal/support/Affixa routes, real release discovery, first-party event endpoints, and D1-backed Business Beta form implemented.
 - Website lint, typecheck, build, link checks, 5 unit tests, and 20 desktop/tablet/mobile/landscape Playwright tests (including axe accessibility) pass locally.
-- Go tests and vet pass; frontend check, 64 tests, build, and dependency audit pass with zero known npm vulnerabilities.
+- Go tests and vet pass; frontend check, 77 tests, build, and dependency audit pass with zero known npm vulnerabilities.
 - UI/UX Pro Max audit applied: consistent SVG icon language, visible keyboard focus, accessible modal focus/escape behavior, reduced-motion handling, and explicit asynchronous form progress.
 - Gitleaks current-history scan and GitHub Actions syntax validation pass locally.
 - Dedicated Google Cloud project `sendarc` created and Gmail API enabled without billing.
@@ -32,6 +32,8 @@ Last updated: 2026-08-28
 - The local Windows app reached Google's account chooser with an ephemeral loopback redirect, S256 PKCE, offline access, SendArc policy links, and exactly the `gmail.send` scope.
 - OAuth preflight copy now tells users to stop on an unverified/unsafe warning instead of instructing them to bypass it, and credential-bearing Wails builds run quietly so ldflags are not printed.
 - Active rebrand audit completed and documented in `docs/REBRAND_AUDIT.md`; obsolete pre-SendArc sandbox/Azure/installer tooling and the disabled silent binary-replacement experiment were removed rather than left as misleading or risky paths.
+- The Windows Status screen now reads real Gmail/MAPI state, 32-bit and 64-bit bridge presence, default-handler registration, and privacy-safe last-intercept/last-send timestamps; its Gmail connection test calls Google's token introspection endpoint without reading or sending mail.
+- Broken MAPI registration now has a guarded administrator repair path that preserves the installer's prior-handler backup and refuses to run when installed bridge files are incomplete. The non-elevated boundary, backend logic, small-window layout, keyboard focus, and Escape/focus-return behavior are tested; final installed UAC repair remains an acceptance check.
 
 ## Not yet complete
 

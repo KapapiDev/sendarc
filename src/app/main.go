@@ -16,6 +16,19 @@ var assets embed.FS
 var Version = "0.0.0-dev" // overridden via -ldflags "-X main.Version=..."
 
 func main() {
+	// Repair runs in the short-lived elevated child launched by the Status
+	// screen. Handle it before the single-instance guard so the normal tray app
+	// can remain open while Windows applies the machine-wide registration fix.
+	if len(os.Args) == 2 && os.Args[1] == repairMAPIArg {
+		if err := repairMAPIRegistrationNow(); err != nil {
+			logError("MAPI repair failed: %v", err)
+			closeLog()
+			os.Exit(1)
+		}
+		closeLog()
+		os.Exit(0)
+	}
+
 	raised, siErr := acquireSingleInstance()
 	if siErr != nil {
 		logError("single-instance: %v", siErr)

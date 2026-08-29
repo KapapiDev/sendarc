@@ -1,5 +1,9 @@
 <script lang="ts">
-  let { onSignIn, onAbout }: { onSignIn: () => void; onAbout: () => void } = $props();
+  let { onSignIn, onAbout, onStatus }: {
+    onSignIn: () => void;
+    onAbout: () => void;
+    onStatus: () => void;
+  } = $props();
 </script>
 
 <section class="signin">
@@ -16,7 +20,10 @@
   <p class="footnote">
     Queued emails stay on your computer until you review or dismiss them.
   </p>
-  <button class="about-btn" type="button" onclick={onAbout}>About, privacy & licenses</button>
+  <div class="utility-actions">
+    <button type="button" onclick={onStatus}>Status</button>
+    <button type="button" onclick={onAbout}>About, privacy & licenses</button>
+  </div>
 </section>
 
 <style>
@@ -46,7 +53,8 @@
   .signin-btn:hover { background: #1662c4; }
   .signin-btn:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
   .footnote { font-size: 0.85rem; color: var(--c-text-muted, #666); }
-  .about-btn {
+  .utility-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-sm); }
+  .utility-actions button {
     min-height: 44px;
     border: 0;
     border-radius: 6px;
@@ -57,5 +65,5 @@
     text-decoration: underline;
     text-underline-offset: 3px;
   }
-  .about-btn:hover { background: var(--c-surface-alt); }
+  .utility-actions button:hover { background: var(--c-surface-alt); }
 </style>

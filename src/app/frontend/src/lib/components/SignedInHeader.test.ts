@@ -5,7 +5,7 @@ import SignedInHeader from './SignedInHeader.svelte';
 describe('SignedInHeader', () => {
   it('renders SendArc and prefers the account email over the profile name', () => {
     const { getByText } = render(SignedInHeader, {
-      props: { email: 'a@b.com', name: 'Alice', onSignOut: vi.fn(), onOpenLogs: vi.fn(), onAbout: vi.fn() },
+      props: { email: 'a@b.com', name: 'Alice', onSignOut: vi.fn(), onOpenLogs: vi.fn(), onAbout: vi.fn(), onStatus: vi.fn() },
     });
     expect(getByText('SendArc')).toBeInTheDocument();
     expect(getByText('a@b.com')).toBeInTheDocument();
@@ -13,13 +13,13 @@ describe('SignedInHeader', () => {
 
   it('falls back to the profile name, then a generic account label', () => {
     const named = render(SignedInHeader, {
-      props: { email: '', name: 'Alice', onSignOut: vi.fn(), onOpenLogs: vi.fn(), onAbout: vi.fn() },
+      props: { email: '', name: 'Alice', onSignOut: vi.fn(), onOpenLogs: vi.fn(), onAbout: vi.fn(), onStatus: vi.fn() },
     });
     expect(named.getByText('Alice')).toBeInTheDocument();
     named.unmount();
 
     const generic = render(SignedInHeader, {
-      props: { email: '', name: '', onSignOut: vi.fn(), onOpenLogs: vi.fn(), onAbout: vi.fn() },
+      props: { email: '', name: '', onSignOut: vi.fn(), onOpenLogs: vi.fn(), onAbout: vi.fn(), onStatus: vi.fn() },
     });
     expect(generic.getByText('your Google account')).toBeInTheDocument();
   });
@@ -27,7 +27,7 @@ describe('SignedInHeader', () => {
   it('calls onSignOut when Sign out is clicked', async () => {
     const onSignOut = vi.fn();
     const { getByRole } = render(SignedInHeader, {
-      props: { email: 'a@b.com', name: '', onSignOut, onOpenLogs: vi.fn(), onAbout: vi.fn() },
+      props: { email: 'a@b.com', name: '', onSignOut, onOpenLogs: vi.fn(), onAbout: vi.fn(), onStatus: vi.fn() },
     });
     await fireEvent.click(getByRole('button', { name: /sign out/i }));
     expect(onSignOut).toHaveBeenCalledOnce();
@@ -36,7 +36,7 @@ describe('SignedInHeader', () => {
   it('opens the diagnostic log from the header', async () => {
     const onOpenLogs = vi.fn();
     const { getByRole } = render(SignedInHeader, {
-      props: { email: 'a@b.com', name: '', onSignOut: vi.fn(), onOpenLogs, onAbout: vi.fn() },
+      props: { email: 'a@b.com', name: '', onSignOut: vi.fn(), onOpenLogs, onAbout: vi.fn(), onStatus: vi.fn() },
     });
     await fireEvent.click(getByRole('button', { name: /open logs/i }));
     expect(onOpenLogs).toHaveBeenCalledOnce();
@@ -45,15 +45,24 @@ describe('SignedInHeader', () => {
   it('opens About from the signed-in header', async () => {
     const onAbout = vi.fn();
     const { getByRole } = render(SignedInHeader, {
-      props: { email: 'a@b.com', name: '', onSignOut: vi.fn(), onOpenLogs: vi.fn(), onAbout },
+      props: { email: 'a@b.com', name: '', onSignOut: vi.fn(), onOpenLogs: vi.fn(), onAbout, onStatus: vi.fn() },
     });
     await fireEvent.click(getByRole('button', { name: /^about$/i }));
     expect(onAbout).toHaveBeenCalledOnce();
   });
 
+  it('opens Status from the signed-in header', async () => {
+    const onStatus = vi.fn();
+    const { getByRole } = render(SignedInHeader, {
+      props: { email: 'a@b.com', name: '', onSignOut: vi.fn(), onOpenLogs: vi.fn(), onAbout: vi.fn(), onStatus },
+    });
+    await fireEvent.click(getByRole('button', { name: /^status$/i }));
+    expect(onStatus).toHaveBeenCalledOnce();
+  });
+
   it('does not render any automatic-mode controls', () => {
     const { queryByRole, queryByText } = render(SignedInHeader, {
-      props: { email: 'a@b.com', name: '', onSignOut: vi.fn(), onOpenLogs: vi.fn(), onAbout: vi.fn() },
+      props: { email: 'a@b.com', name: '', onSignOut: vi.fn(), onOpenLogs: vi.fn(), onAbout: vi.fn(), onStatus: vi.fn() },
     });
     expect(queryByRole('group', { name: /mode/i })).toBeNull();
     expect(queryByText(/auto-draft/i)).toBeNull();

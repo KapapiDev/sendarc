@@ -53,6 +53,10 @@ type App struct {
 	sendMu       sync.Mutex
 	sendInflight map[string]struct{}
 
+	// Non-message operational timestamps shown on the Status screen.
+	statusMu      sync.Mutex
+	runtimeStatus RuntimeStatus
+
 	// Backlog skip-set (D-10): emails that failed automode with errorCategory
 	// "signed-out" during a signed-out window stay manual after re-auth.
 	// In-memory only — NEVER persisted. Pruned on every queue-update to
@@ -121,6 +125,7 @@ func NewApp() *App {
 		sendInflight:  make(map[string]struct{}),
 		settings:      AppSettings{Mode: defaultMode},
 		trayRefreshCh: make(chan struct{}, 1),
+		runtimeStatus: loadRuntimeStatus(),
 	}
 }
 
@@ -207,6 +212,7 @@ func (a *App) startup(ctx context.Context) {
 		// knownIds seeds to the current queue at startup to prevent stale emails
 		// from triggering arrival toasts (NOTIF-04: no spam on app restart).
 		initialSnap := a.watcher.Snapshot()
+		a.recordLastIntercepted(initialSnap)
 		knownIds := make(map[string]struct{}, len(initialSnap))
 		for _, e := range initialSnap {
 			knownIds[e.Id] = struct{}{}
@@ -217,6 +223,7 @@ func (a *App) startup(ctx context.Context) {
 				return
 			}
 			snap := a.watcher.Snapshot()
+			a.recordLastIntercepted(snap)
 			currentIds := make(map[string]struct{}, len(snap))
 			for _, e := range snap {
 				currentIds[e.Id] = struct{}{}
@@ -593,6 +600,7 @@ func (a *App) SendMessageForID(id string) error {
 	if err := a.watcher.MarkProcessed(id); err != nil {
 		logError("SendMessageForID: MarkProcessed %s: %v", safeIDPrefix(id), err)
 	}
+	a.recordSuccessfulSend(time.Now())
 	// Send-success toast: only when window is hidden. Subject is safe to
 	// include per UI-SPEC; privacy is preserved (no body text, no recipient email).
 	if target.Message != nil {

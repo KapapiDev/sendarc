@@ -1,6 +1,6 @@
 # SendArc requirement-completion matrix
 
-Last audited: 2026-08-28 against `SENDARC_AUTONOMOUS_A_TO_Z_BUILD_PROMPT.md`, the current worktree, GitHub repository state, and the conversation overrides.
+Last audited: 2026-08-29 against `SENDARC_AUTONOMOUS_A_TO_Z_BUILD_PROMPT.md`, the current worktree, GitHub repository state, and the conversation overrides.
 
 This file separates **implementation** from **verification**. A source file or unit test does not prove a clean installer, real Gmail send, deployed website, or end-to-end user flow.
 
@@ -33,14 +33,14 @@ Status meanings:
 | Gmail `users.messages.send` transport | Implemented; verification pending | `internal/mapi/gmail.go` uses `/messages/send`; request/error tests in `gmail_test.go` | Current clean Windows CI and a real Gmail Sent result |
 | Exact `gmail.send` scope; no mailbox/profile scope | Verified | `src/app/auth.go`, [OAUTH.md](OAUTH.md); Google Cloud data-access configuration contains only `https://www.googleapis.com/auth/gmail.send`; the 2026-08-29 live Windows authorization request reached Google with that single scope, S256 PKCE, and an ephemeral loopback redirect | Reconfirm at the release candidate without broadening the scope |
 | Windows Credential Manager token storage | Implemented; verification pending | Keyring service `SendArc`, account `oauth-tokens` in `src/app/auth.go` | Real Windows save/load/refresh/disconnect/reconnect evidence |
-| Local preview before transmission | Implemented; verification pending | `QueueRow.svelte` and `App.svelte`; 70 frontend tests passed locally on 2026-08-29 | Wails/Windows runtime and real MAPI foreground/preview flow |
+| Local preview before transmission | Implemented; verification pending | `QueueRow.svelte` and `App.svelte`; 77 frontend tests passed locally on 2026-08-29 | Wails/Windows runtime and real MAPI foreground/preview flow |
 | Explicit Send and Cancel/Discard; no auto-send/draft | Implemented; verification pending | `App.SendMessageForID`, manual-only settings, removed auto-mode controls; [ARCHITECTURE.md](ARCHITECTURE.md) | Current Go suite/Windows build plus runtime proof that notifications cannot send |
 | Preserve To/Cc/Bcc/subject/body/attachments/Unicode | Implemented; verification pending | Go protocol/MIME tests and C++ converter/harness tests in the worktree | x86 and x64 harness must run against exact built DLLs; representative real applications still untested |
 | Attachment/path/header validation | Implemented; verification pending | Go validation tests and C++ `fs_utils`/`message_converter` regression tests | Clean x86/x64 CTest and adversarial Windows file tests |
 | Privacy-safe errors/logging/diagnostics | Implemented; verification pending | Typed Gmail errors, generic frontend errors, sanitized ID logging, [SECURITY.md](../SECURITY.md) | Full log inspection under auth/API/path failures and secret scan |
 | Success/actionable failure and retry | Implemented; verification pending | `send-result` event/UI states and queue retention on failure | Runtime offline, expired-auth, Gmail 4xx/5xx, success, retry evidence |
 | Single-account connect/disconnect/re-auth | Implemented; verification pending | Auth manager/bindings/UI and tests in `src/app` | Real account flow; account identity is intentionally generic without profile scopes |
-| Polished Status/Account/Settings/About functions | In progress | Auth, queue, pause/update, diagnostics, and a real About/privacy/license/support surface are wired; the About modal passed keyboard-focus, Escape/focus-return, small-window scroll, type/accessibility, and Windows runtime checks on 2026-08-29 | Add and verify requested MAPI status/repair/test-connection functions; remove any control without a real action |
+| Polished Status/Account/Settings/About functions | Implemented; verification pending | Real Gmail/MAPI/component/default-handler status, privacy-safe activity timestamps, Google token-introspection test, guarded elevated MAPI repair, auth/diagnostics/update controls, and About/privacy/license/support are wired. The Status and About modals passed type/accessibility, small-window scroll, keyboard focus, and Escape/focus-return Windows checks on 2026-08-29 | Verify Gmail test with the real account and complete installed UAC repair/refresh once in final Windows acceptance |
 | Complete active rebrand | Verified | Shipping identifiers use SendArc; stale sandbox/Azure/installer and disabled silent-update paths were removed; intentional module/namespace/legal/test-only matches are classified in [REBRAND_AUDIT.md](REBRAND_AUDIT.md) | Re-run the classified audit at the release tag |
 | Clean checkout desktop build | Verified | GitHub Actions [run 33122480690](https://github.com/maxtop9843-byte/sendarc/actions/runs/33122480690) passed the Wails app and all interceptor matrices at `2be8d82` on `windows-2025` | Repeat at the immutable release candidate/tag |
 
@@ -76,7 +76,7 @@ Status meanings:
 
 | Requirement | Status | Evidence | Gap / release gate |
 |---|---|---|---|
-| Current app/frontend tests | Verified at current head | GitHub Actions [run 33122480690](https://github.com/maxtop9843-byte/sendarc/actions/runs/33122480690) passed the Wails app at `2be8d82`; locally, 64 frontend tests, Svelte check, production build, and Go tests pass | Repeat at the immutable release candidate/tag |
+| Current app/frontend tests | Verified locally; CI pending current commit | Locally, 77 frontend tests, Svelte check, production build, Go tests, and Go vet pass on 2026-08-29; the last pushed CI run is tracked separately | Confirm all current-head GitHub Actions, then repeat at the immutable release candidate/tag |
 | C++/installer CI | Verified at current head | x64/x86 Debug/Release jobs passed in run 33122480690; installer Pester round-trip passed in [run 33122480705](https://github.com/maxtop9843-byte/sendarc/actions/runs/33122480705) | Repeat at the immutable release candidate/tag |
 | Website CI/QA | Verified | [Website run 33122480669](https://github.com/maxtop9843-byte/sendarc/actions/runs/33122480669) passed; 20 live cross-viewport Playwright/axe scenarios also pass on the deployed site | Repeat after the release asset changes download state |
 | Dependency/secret/security audit | In progress | Attachment/header/error hardening and policies exist | Resolve/document npm audit findings; Go/vendored/website dependency review; secret scan; update-integrity and installer command-injection review |

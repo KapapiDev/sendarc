@@ -28,6 +28,7 @@
   import UpdateBanner from './lib/components/UpdateBanner.svelte';
   import UpdatePanel from './lib/components/UpdatePanel.svelte';
   import AboutPanel from './lib/components/AboutPanel.svelte';
+  import StatusPanel from './lib/components/StatusPanel.svelte';
   import './lib/styles.css';
 
   let queue = $state<EmailWithId[]>([]);
@@ -45,6 +46,7 @@
   let updateState = $state<UpdateState | null>(null);
   let showUpdatePanel = $state(false);
   let showAboutPanel = $state(false);
+  let showStatusPanel = $state(false);
 
   const unsubs: Array<() => void> = [];
 
@@ -206,6 +208,10 @@
   function handleOpenAbout() {
     showAboutPanel = true;
   }
+
+  function handleOpenStatus() {
+    showStatusPanel = true;
+  }
 </script>
 
 {#if updateState?.updateAvailable}
@@ -223,12 +229,13 @@
     onSignOut={handleSignOutClick}
     onOpenLogs={handleOpenLogs}
     onAbout={handleOpenAbout}
+    onStatus={handleOpenStatus}
   />
 {/if}
 
 <main>
   {#if !auth.authenticated}
-    <SignInScreen onSignIn={handleSignInClick} onAbout={handleOpenAbout} />
+    <SignInScreen onSignIn={handleSignInClick} onAbout={handleOpenAbout} onStatus={handleOpenStatus} />
   {:else if errorMsg}
     <section class="state state--error" role="alert">
       <h2>SendArc needs attention</h2>
@@ -279,5 +286,12 @@
     version={updateState?.currentVersion ?? ''}
     onOpenLogs={handleOpenLogs}
     onClose={() => { showAboutPanel = false; }}
+  />
+{/if}
+
+{#if showStatusPanel}
+  <StatusPanel
+    onOpenLogs={handleOpenLogs}
+    onClose={() => { showStatusPanel = false; }}
   />
 {/if}

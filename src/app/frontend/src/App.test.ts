@@ -10,6 +10,22 @@ vi.mock('../wailsjs/go/main/App', () => ({
   SendMessageForID: vi.fn().mockResolvedValue(undefined),
   DismissEmail: vi.fn().mockResolvedValue(undefined),
   OpenDiagnosticLogs: vi.fn().mockResolvedValue(undefined),
+  GetProductStatus: vi.fn().mockResolvedValue({
+    gmail: { authenticated: false },
+    mapi: {
+      registered: false,
+      default: false,
+      dll64Present: false,
+      dll32Present: false,
+      healthy: false,
+      canRepair: false,
+      detail: 'Run the installer again.',
+    },
+    lastInterceptedAt: '',
+    lastSuccessfulSend: '',
+  }),
+  TestGmailConnection: vi.fn(),
+  RepairMAPIRegistration: vi.fn(),
   GetUpdateState: vi.fn().mockResolvedValue({
     currentVersion: '3.0.0',
     latestVersion: '',
@@ -111,6 +127,13 @@ describe('App.svelte — smoke', () => {
 
     await fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
     expect(queryByRole('dialog', { name: /sendarc/i })).toBeNull();
+  });
+
+  it('opens the real Status panel from the signed-out screen', async () => {
+    const { findByRole, findByText } = render(App);
+    await fireEvent.click(await findByRole('button', { name: /^status$/i }));
+    expect(await findByRole('dialog', { name: /sendarc status/i })).toBeInTheDocument();
+    expect(await findByText(/simple mapi handler/i)).toBeInTheDocument();
   });
 });
 

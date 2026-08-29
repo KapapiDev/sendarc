@@ -22,12 +22,12 @@ export function GetPausedState() {
   return window['go']['main']['App']['GetPausedState']();
 }
 
-export function GetQueue() {
-  return window['go']['main']['App']['GetQueue']();
+export function GetProductStatus() {
+  return window['go']['main']['App']['GetProductStatus']();
 }
 
-export function OpenDiagnosticLogs() {
-  return window['go']['main']['App']['OpenDiagnosticLogs']();
+export function GetQueue() {
+  return window['go']['main']['App']['GetQueue']();
 }
 
 export function GetSettings() {
@@ -42,8 +42,16 @@ export function MakeAuthenticatedGmailCall(arg1, arg2) {
   return window['go']['main']['App']['MakeAuthenticatedGmailCall'](arg1, arg2);
 }
 
+export function OpenDiagnosticLogs() {
+  return window['go']['main']['App']['OpenDiagnosticLogs']();
+}
+
 export function PauseWatching() {
   return window['go']['main']['App']['PauseWatching']();
+}
+
+export function RepairMAPIRegistration() {
+  return window['go']['main']['App']['RepairMAPIRegistration']();
 }
 
 export function ResumeWatching() {
@@ -84,4 +92,8 @@ export function SignIn() {
 
 export function SignOut() {
   return window['go']['main']['App']['SignOut']();
+}
+
+export function TestGmailConnection() {
+  return window['go']['main']['App']['TestGmailConnection']();
 }

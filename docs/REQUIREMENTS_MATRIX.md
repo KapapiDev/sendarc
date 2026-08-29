@@ -41,7 +41,7 @@ Status meanings:
 | Success/actionable failure and retry | Implemented; verification pending | `send-result` event/UI states and queue retention on failure | Runtime offline, expired-auth, Gmail 4xx/5xx, success, retry evidence |
 | Single-account connect/disconnect/re-auth | Implemented; verification pending | Auth manager/bindings/UI and tests in `src/app` | Real account flow; account identity is intentionally generic without profile scopes |
 | Polished Status/Account/Settings/About functions | In progress | Existing Wails/Svelte UI provides auth, queue, pause/update surfaces | Audit requested status/MAPI repair/test-connection/diagnostics/About functions; remove any control without a real action |
-| Complete active rebrand | In progress | SendArc names/paths/AUMID/package/installer work exists in the worktree | Run classified search; distinguish lawful upstream module/license references from stale active product identifiers |
+| Complete active rebrand | Verified | Shipping identifiers use SendArc; stale sandbox/Azure/installer and disabled silent-update paths were removed; intentional module/namespace/legal/test-only matches are classified in [REBRAND_AUDIT.md](REBRAND_AUDIT.md) | Re-run the classified audit at the release tag |
 | Clean checkout desktop build | Verified | GitHub Actions [run 33122480690](https://github.com/maxtop9843-byte/sendarc/actions/runs/33122480690) passed the Wails app and all interceptor matrices at `2be8d82` on `windows-2025` | Repeat at the immutable release candidate/tag |
 
 ## Installer, updates, and Windows validation

@@ -1,38 +1,35 @@
 # scripts/register-dev-aumid.ps1
-# Registers a HKCU Start Menu shortcut for go-mapi dev builds with AUMID
-# "com.marcfargas.gomapi.dev" so toast notifications during `wails dev` persist
+# Registers a HKCU Start Menu shortcut for SendArc dev builds with the
+# development AUMID so toast notifications persist
 # in Windows Action Center.
 #
 # Idempotent: running twice is a no-op (skip-if-exists). Safe to re-run after
 # every git pull. Re-run with -Force to recreate the shortcut.
 #
-# Phase 10 (INST-04) will ship the prod equivalent via the NSIS installer with:
-#   - AUMID: com.marcfargas.gomapi (no .dev suffix)
-#   - Shortcut path: %ProgramFiles%\go-mapi\go-mapi.lnk
-#   - Registration: NSIS installer (not PowerShell).
+# The NSIS installer owns the production shortcut and AUMID registration.
 #
 # Usage:
 #   .\scripts\register-dev-aumid.ps1
-#   .\scripts\register-dev-aumid.ps1 -ExePath 'C:\path\to\go-mapi.exe'
+#   .\scripts\register-dev-aumid.ps1 -ExePath 'C:\path\to\SendArc.exe'
 #   .\scripts\register-dev-aumid.ps1 -Force  # recreate even if shortcut exists
 
 [CmdletBinding()]
 param(
-    [string]$Aumid   = 'com.marcfargas.gomapi.dev',
-    [string]$Name    = 'go-mapi (dev)',
-    [string]$ExePath,                  # absolute path to go-mapi.exe; defaults below
+    [string]$Aumid   = 'app.sendarc.desktop.dev',
+    [string]$Name    = 'SendArc (dev)',
+    [string]$ExePath,                  # absolute path to SendArc.exe; defaults below
     [switch]$Force                     # recreate shortcut even if it already exists
 )
 
 $ErrorActionPreference = 'Stop'
 
 if (-not $ExePath) {
-    # Default: src/app/build/bin/go-mapi.exe relative to repo root.
+    # Default: src/app/build/bin/SendArc.exe relative to repo root.
     $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
-    $ExePath  = Join-Path $repoRoot 'src\app\build\bin\go-mapi.exe'
+    $ExePath  = Join-Path $repoRoot 'src\app\build\bin\SendArc.exe'
 }
 if (-not (Test-Path -LiteralPath $ExePath)) {
-    Write-Warning "go-mapi.exe not found at $ExePath"
+    Write-Warning "SendArc.exe not found at $ExePath"
     Write-Warning 'Run `wails build` first, or pass -ExePath explicitly.'
     # Still proceed: the shortcut can point to a not-yet-existing path;
     # wails build will place the binary there before the next dev session.
@@ -53,15 +50,15 @@ $wsh = New-Object -ComObject WScript.Shell
 $sc  = $wsh.CreateShortcut($lnkPath)
 $sc.TargetPath       = $ExePath
 $sc.WorkingDirectory = Split-Path $ExePath -Parent
-$sc.Description      = 'go-mapi (dev) — MAPI-to-Gmail bridge'
+$sc.Description      = 'SendArc (dev) — local MAPI-to-Gmail bridge'
 $sc.Save()
 [System.Runtime.InteropServices.Marshal]::ReleaseComObject($wsh) | Out-Null
 
 # ---- Stamp PKEY_AppUserModel_ID on the .lnk via inline C# + IShellLink + IPropertyStore.
 # Reference: https://learn.microsoft.com/en-us/windows/win32/properties/props-system-appusermodel-id
 # The Add-Type call is idempotent within a PowerShell session (already-defined type is silently reused).
-if (-not ([System.Management.Automation.PSTypeName]'GoMapi.AumidShortcut').Type) {
-    Add-Type -Namespace GoMapi -Name AumidShortcut -MemberDefinition @'
+if (-not ([System.Management.Automation.PSTypeName]'SendArc.AumidShortcut').Type) {
+    Add-Type -Namespace SendArc -Name AumidShortcut -MemberDefinition @'
         using System;
         using System.Runtime.InteropServices;
 
@@ -165,10 +162,9 @@ if (-not ([System.Management.Automation.PSTypeName]'GoMapi.AumidShortcut').Type)
 '@
 }
 
-[GoMapi.AumidShortcut+SetAumid]::Apply($lnkPath, $Aumid)
+[SendArc.AumidShortcut+SetAumid]::Apply($lnkPath, $Aumid)
 
 Write-Host "Registered AUMID '$Aumid' on shortcut '$lnkPath'" -ForegroundColor Green
 Write-Host "Target: $ExePath"
 Write-Host
-Write-Host "NOTE: log out and back in (or run 'Stop-Process -Name explorer && Start-Process explorer')"
-Write-Host "      if the first toast from 'wails dev' does not persist in Action Center."
+Write-Host "NOTE: sign out and back in if the first development toast does not persist in Action Center."

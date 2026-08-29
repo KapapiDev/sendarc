@@ -31,6 +31,7 @@ Last updated: 2026-08-28
 - Protected installer release dry-run [33126115747](https://github.com/maxtop9843-byte/sendarc/actions/runs/33126115747) built the OAuth-injected Wails app, both interceptor DLLs, unsigned beta installer, and checksum successfully without publishing a tag or release; neither OAuth value appeared in the workflow log.
 - The local Windows app reached Google's account chooser with an ephemeral loopback redirect, S256 PKCE, offline access, SendArc policy links, and exactly the `gmail.send` scope.
 - OAuth preflight copy now tells users to stop on an unverified/unsafe warning instead of instructing them to bypass it, and credential-bearing Wails builds run quietly so ldflags are not printed.
+- Active rebrand audit completed and documented in `docs/REBRAND_AUDIT.md`; obsolete pre-SendArc sandbox/Azure/installer tooling and the disabled silent binary-replacement experiment were removed rather than left as misleading or risky paths.
 
 ## Not yet complete
 

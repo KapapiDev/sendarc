@@ -267,7 +267,7 @@ $csharp = @'
 using System;
 using System.Runtime.InteropServices;
 
-public static class GoMapiProbe
+public static class SendArcProbe
 {
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern IntPtr LoadLibraryExW(string lpFileName, IntPtr hFile, uint dwFlags);
@@ -310,24 +310,24 @@ foreach ($dll in $dllCandidates) {
         continue
     }
     # DONT_RESOLVE_DLL_REFERENCES lets us inspect exports without running DllMain.
-    $h = [GoMapiProbe]::LoadLibraryExW($dll, [IntPtr]::Zero, [GoMapiProbe]::DONT_RESOLVE_DLL_REFERENCES)
+    $h = [SendArcProbe]::LoadLibraryExW($dll, [IntPtr]::Zero, [SendArcProbe]::DONT_RESOLVE_DLL_REFERENCES)
     if ($h -eq [IntPtr]::Zero) {
-        $err = [GoMapiProbe]::GetLastError()
+        $err = [SendArcProbe]::GetLastError()
         Append-Line ('  LoadLibraryEx failed (GetLastError=0x{0:X8} / {1})' -f $err, $err)
         continue
     }
     try {
         foreach ($exp in $expectedExports) {
-            $addr = [GoMapiProbe]::GetProcAddress($h, $exp)
+            $addr = [SendArcProbe]::GetProcAddress($h, $exp)
             if ($addr -eq [IntPtr]::Zero) {
-                $err = [GoMapiProbe]::GetLastError()
+                $err = [SendArcProbe]::GetLastError()
                 Append-Line ('  {0,-20} NOT FOUND (GetLastError=0x{1:X8})' -f $exp, $err)
             } else {
                 Append-Line ('  {0,-20} found  at 0x{1:X}' -f $exp, $addr.ToInt64())
             }
         }
     } finally {
-        [void][GoMapiProbe]::FreeLibrary($h)
+        [void][SendArcProbe]::FreeLibrary($h)
     }
 }
 

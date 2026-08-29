@@ -7,7 +7,7 @@
 
     1. The `-tags e2e` build tag, which compiles src/app/auth_e2e.go —
        that file swaps the Windows Credential Manager keyring for an
-       in-memory fake populated from GOMAPI_E2E_FAKE_TOKEN_JSON.
+       in-memory fake populated from SENDARC_E2E_FAKE_TOKEN_JSON.
     2. The GOMAPI_DEBUG_BROWSER_ARGS env var, honored by our vendored
        go-webview2 fork (src/app/vendor/go-webview2-e2e) to forward
        --remote-debugging-port=... to WebView2.
@@ -76,11 +76,11 @@ if ($workflowCode -match 'GOMAPI_DEBUG_BROWSER_ARGS') {
   Pass "no GOMAPI_DEBUG_BROWSER_ARGS in installer-release workflow"
 }
 
-# 3. Likewise for GOMAPI_E2E_* overrides.
-if ($workflowCode -match 'GOMAPI_E2E_') {
-  Fail "installer-release workflow references GOMAPI_E2E_* — e2e fakes must never reach release builds"
+# 3. Likewise for SENDARC_E2E_* overrides.
+if ($workflowCode -match 'SENDARC_E2E_') {
+  Fail "installer-release workflow references SENDARC_E2E_* — e2e fakes must never reach release builds"
 } else {
-  Pass "no GOMAPI_E2E_* env vars in installer-release workflow"
+  Pass "no SENDARC_E2E_* env vars in installer-release workflow"
 }
 
 # 4. Optional: scan an env dump captured at build time.
@@ -91,10 +91,10 @@ if ($BuildEnvDump -and (Test-Path $BuildEnvDump)) {
   } else {
     Pass "build env dump has no GOMAPI_DEBUG_BROWSER_ARGS"
   }
-  if ($envContent -match 'GOMAPI_E2E_') {
-    Fail "build env dump ($BuildEnvDump) contains GOMAPI_E2E_*"
+  if ($envContent -match 'SENDARC_E2E_') {
+    Fail "build env dump ($BuildEnvDump) contains SENDARC_E2E_*"
   } else {
-    Pass "build env dump has no GOMAPI_E2E_* vars"
+    Pass "build env dump has no SENDARC_E2E_* vars"
   }
 } else {
   Write-Host "[release-hygiene] INFO: no BuildEnvDump provided — skipping env dump scan" -ForegroundColor Yellow

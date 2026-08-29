@@ -128,7 +128,7 @@ type AuthManager struct {
 // keyringStoreFactory is the seam for build-tag injection. Production code
 // leaves it pointing at realKeyringStore (Windows Credential Manager via
 // zalando/go-keyring); the //go:build e2e shim in auth_e2e.go swaps it for a
-// fake populated from GOMAPI_E2E_FAKE_TOKEN_JSON so the Playwright harness can
+// fake populated from SENDARC_E2E_FAKE_TOKEN_JSON so the Playwright harness can
 // boot the app pre-authenticated without touching the real credential store.
 var keyringStoreFactory func() KeyringStore = func() KeyringStore { return realKeyringStore{} }
 

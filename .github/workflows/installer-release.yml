@@ -119,7 +119,7 @@ jobs:
           Write-Host "Release version: $version (prerelease: $preStr)"
 
       # Phase 11 plan 06 guard: prove this workflow would not ship e2e hooks.
-      # Fails fast if '-tags e2e', GOMAPI_DEBUG_BROWSER_ARGS, or any GOMAPI_E2E_*
+      # Fails fast if '-tags e2e', GOMAPI_DEBUG_BROWSER_ARGS, or any SENDARC_E2E_*
       # marker is present in the build definition.
       - name: Verify release hygiene (no e2e hooks)
         shell: pwsh

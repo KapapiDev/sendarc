@@ -1,5 +1,6 @@
 # test-drop-email.ps1
-# Drop a test email JSON into %TEMP%\go-mapi\ to simulate a MAPI intercept.
+# Drop a test email JSON into the real per-user SendArc queue to simulate a
+# MAPI intercept without changing machine registration.
 # Usage:
 #   .\scripts\test-drop-email.ps1                                          # Simple email
 #   .\scripts\test-drop-email.ps1 -WithAttachment -AttachmentPath "C:\file.pdf"
@@ -7,7 +8,7 @@
 #   .\scripts\test-drop-email.ps1 -CC "cc@example.com" -BCC "bcc@example.com"
 
 param(
-    [string]$Subject = "go-mapi test email",
+    [string]$Subject = "SendArc test email",
     [string]$Body = "This is a test email dropped by test-drop-email.ps1.",
     [string]$To = "test@example.com",
     [string]$ToName = "Test User",
@@ -20,9 +21,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$goMapiDir = Join-Path $env:TEMP "go-mapi"
-if (-not (Test-Path $goMapiDir)) {
-    New-Item -ItemType Directory -Path $goMapiDir -Force | Out-Null
+if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+    throw 'LOCALAPPDATA is unavailable; cannot resolve the SendArc queue.'
+}
+$sendArcQueueDir = Join-Path $env:LOCALAPPDATA 'SendArc\queue'
+if (-not (Test-Path -LiteralPath $sendArcQueueDir)) {
+    New-Item -ItemType Directory -Path $sendArcQueueDir -Force | Out-Null
 }
 
 # Build recipients
@@ -42,7 +46,7 @@ $attachments = @()
 if ($WithAttachment) {
     if (-not $AttachmentPath) {
         # Create a small test file
-        $testFile = Join-Path $env:TEMP "go-mapi-test-attachment.txt"
+        $testFile = Join-Path $env:TEMP "SendArc-test-attachment.txt"
         "This is a test attachment created by test-drop-email.ps1." | Out-File -FilePath $testFile -Encoding UTF8
         $AttachmentPath = $testFile
         Write-Host "Created test attachment: $testFile"
@@ -86,7 +90,7 @@ $json = $email | ConvertTo-Json -Depth 5
 $ts = (Get-Date).ToString("yyyyMMdd_HHmmss")
 $rand = -join ((0..5) | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) })
 $filename = "msg_${ts}_${rand}.json"
-$filePath = Join-Path $goMapiDir $filename
+$filePath = Join-Path $sendArcQueueDir $filename
 
 # Write the file
 $json | Out-File -FilePath $filePath -Encoding UTF8 -NoNewline

@@ -17,7 +17,6 @@
     "build:installer": "cd src/installer && makensis -DSENDARC_VERSION=0.1.0-beta SendArc.nsi",
     "test": "npm run -w @sendarc/frontend build && go test ./internal/mapi/... ./src/app/... && npm run -w @sendarc/frontend test:run",
     "test:interceptor": "powershell -ExecutionPolicy Bypass -Command \"src/interceptor/build-x64/bin/SendArc-test-harness.exe src/interceptor/build-x64/bin/SendArc.dll\"",
-    "test:dll:sandbox": "powershell -ExecutionPolicy Bypass -File tests/sandbox/run-sandbox-test.ps1",
     "e2e": "npm run -w @sendarc/e2e test",
     "check": "npm run -w @sendarc/frontend build && go vet ./internal/mapi/... ./src/app/... && npm run -w @sendarc/frontend check",
     "clean": "npm run clean:interceptor",

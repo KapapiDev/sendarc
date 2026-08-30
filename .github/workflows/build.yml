@@ -172,6 +172,13 @@ jobs:
         working-directory: src/app
         run: wails build -platform windows/amd64
 
+      - name: Verify production app contains no E2E hooks
+        shell: pwsh
+        run: |
+          & scripts/verify-release-hygiene.ps1 -ArtifactPaths @(
+            'src/app/build/bin/SendArc.exe'
+          )
+
       - name: Upload Wails app artifact
         uses: actions/upload-artifact@v6
         with:

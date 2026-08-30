@@ -12,10 +12,9 @@
        go-webview2 fork (src/app/vendor/go-webview2-e2e) to forward
        --remote-debugging-port=... to WebView2.
 
-  Neither may appear in the release artifact. This script greps the
-  installer-release workflow for both markers and exits non-zero if
-  anything is found. It is meant to run as a workflow step on every
-  release-tag push before binaries are built.
+  Neither may appear in the release artifact. This script checks the release
+  workflow and, when artifact paths are supplied, scans the compiled bytes for
+  ASCII or UTF-16 E2E markers.
 
 .PARAMETER WorkflowPath
   Path to the release workflow YAML. Defaults to
@@ -25,11 +24,16 @@
   Optional path to a file containing a dump of `env` (or PowerShell
   Get-ChildItem Env:) captured during the build job. When provided, the
   script also asserts GOMAPI_DEBUG_BROWSER_ARGS is absent from the dump.
+
+.PARAMETER ArtifactPaths
+  Optional compiled EXE/DLL paths. Every file is checked for test-only browser,
+  OAuth, Gmail, and queue override markers without printing binary contents.
 #>
 [CmdletBinding()]
 param(
   [string]$WorkflowPath = ".github/workflows/installer-release.yml",
-  [string]$BuildEnvDump = ""
+  [string]$BuildEnvDump = "",
+  [string[]]$ArtifactPaths = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -98,6 +102,34 @@ if ($BuildEnvDump -and (Test-Path $BuildEnvDump)) {
   }
 } else {
   Write-Host "[release-hygiene] INFO: no BuildEnvDump provided — skipping env dump scan" -ForegroundColor Yellow
+}
+
+# 5. Scan compiled release artifacts. E2E-only variables are isolated behind
+# build tags, so their names must be absent from both Go EXEs and native DLLs.
+foreach ($artifact in $ArtifactPaths) {
+  if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
+    Fail "compiled artifact not found: $artifact"
+    continue
+  }
+
+  $resolved = (Resolve-Path -LiteralPath $artifact).Path
+  $bytes = [IO.File]::ReadAllBytes($resolved)
+  $ascii = [Text.Encoding]::ASCII.GetString($bytes)
+  $unicode = [Text.Encoding]::Unicode.GetString($bytes)
+  $found = $false
+  foreach ($marker in @('GOMAPI_DEBUG_BROWSER_ARGS', 'SENDARC_E2E_')) {
+    if ($ascii.Contains($marker) -or $unicode.Contains($marker)) {
+      Fail "compiled artifact contains test-only marker '$marker': $artifact"
+      $found = $true
+    }
+  }
+  if (-not $found) {
+    Pass "compiled artifact contains no E2E override markers: $artifact"
+  }
+}
+
+if ($ArtifactPaths.Count -eq 0) {
+  Write-Host "[release-hygiene] INFO: no ArtifactPaths provided — skipping compiled-byte scan" -ForegroundColor Yellow
 }
 
 if ($failed) {

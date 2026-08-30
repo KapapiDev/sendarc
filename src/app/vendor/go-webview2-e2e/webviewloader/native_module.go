@@ -125,16 +125,7 @@ func CreateCoreWebView2EnvironmentWithOptions(browserExecutableFolder, userDataF
 		return 0, err
 	}
 
-	// go-mapi Phase 11 plan 06 patch: mirror the env_create.go injection so
-	// -tags native_webview2loader builds also honor GOMAPI_DEBUG_BROWSER_ARGS.
-	// Inert when the env var is unset (production default).
-	if extra := os.Getenv("GOMAPI_DEBUG_BROWSER_ARGS"); extra != "" {
-		if additionalBrowserArgs == "" {
-			additionalBrowserArgs = extra
-		} else {
-			additionalBrowserArgs = additionalBrowserArgs + " " + extra
-		}
-	}
+	additionalBrowserArgs = appendSendArcE2EBrowserArgs(additionalBrowserArgs)
 
 	preventEnvAndRegistryOverrides(browserExecutableFolder, userDataFolder, additionalBrowserArgs)
 	res, _, _ := memCreate.Call(

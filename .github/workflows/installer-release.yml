@@ -151,6 +151,15 @@ jobs:
           # repository secrets, but quiet mode prevents relying on masking.
           wails build -v 0 -platform windows/amd64 -ldflags "$ldf"
 
+      - name: Verify compiled release binaries contain no E2E hooks
+        shell: pwsh
+        run: |
+          & scripts/verify-release-hygiene.ps1 -ArtifactPaths @(
+            'src/app/build/bin/SendArc.exe',
+            'src/interceptor/build-x64/bin/SendArc.dll',
+            'src/interceptor/build-x86/bin/SendArc.dll'
+          )
+
       - name: Stage unsigned binaries
         shell: pwsh
         run: |

@@ -52,11 +52,14 @@ target_compile_definitions(message_converter_obj PRIVATE
 # object files themselves are compatible either way.
 if(MSVC)
     # Current 64-bit Windows MAPI32 stubs use XFG type-hash dispatch for legacy
-    # ANSI entry points. Emit CFG everywhere and XFG on x64; the MSVC linker
-    # explicitly rejects /GUARD:XFG for the x86 target.
-    target_compile_options(message_converter_obj PRIVATE /W4 /WX- /guard:cf)
+    # ANSI entry points. XFG includes CFG on x64; specifying both modes makes
+    # current MSVC lower indirect calls to plain CFG. The x86 linker explicitly
+    # rejects XFG, so that architecture remains CFG-only.
+    target_compile_options(message_converter_obj PRIVATE /W4 /WX-)
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         target_compile_options(message_converter_obj PRIVATE /guard:xfg)
+    else()
+        target_compile_options(message_converter_obj PRIVATE /guard:cf)
     endif()
 elseif(MINGW)
     target_compile_options(message_converter_obj PRIVATE
@@ -97,16 +100,19 @@ endif()
 # Platform-specific settings
 if(MSVC)
     # MSVC specific options
-    target_compile_options(SendArc PRIVATE /W4 /WX- /guard:cf)
+    target_compile_options(SendArc PRIVATE /W4 /WX-)
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         target_compile_options(SendArc PRIVATE /guard:xfg)
+    else()
+        target_compile_options(SendArc PRIVATE /guard:cf)
     endif()
     # XFG must be selected for both compilation and linking. Compiling with
     # /guard:xfg alone emits intermediate gxfg records, but a plain CFG link
     # omits the final type hashes and XFG load-config dispatch pointers.
-    target_link_options(SendArc PRIVATE /guard:cf)
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         target_link_options(SendArc PRIVATE /guard:xfg)
+    else()
+        target_link_options(SendArc PRIVATE /guard:cf)
     endif()
     target_link_libraries(SendArc PRIVATE kernel32.lib user32.lib shell32.lib)
     set_target_properties(SendArc PROPERTIES

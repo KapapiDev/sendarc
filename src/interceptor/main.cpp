@@ -81,10 +81,53 @@ SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPISendDocuments(
 #undef SENDARC_MAPI_NOEXCEPT
 #undef SENDARC_MAPI_EXPORT
 
+#if defined(_MSC_VER) && defined(_M_X64)
+namespace {
+
+// MSVC emits a gxfg prototype record only when a function is a possible
+// target of an instrumented indirect call. DLL exports alone receive CFG
+// metadata but no XFG type hash. Keep a disabled, volatile dispatch anchor so
+// every Simple MAPI export is compiled as a genuine XFG call target. The
+// selector is initialized before DllMain and is never changed by SendArc.
+volatile LONG g_xfgMetadataSelector = 0;
+decltype(&MAPISendMail) volatile g_xfgMapiSendMail = &MAPISendMail;
+decltype(&MAPISendMailW) volatile g_xfgMapiSendMailW = &MAPISendMailW;
+decltype(&MAPILogon) volatile g_xfgMapiLogon = &MAPILogon;
+decltype(&MAPILogoff) volatile g_xfgMapiLogoff = &MAPILogoff;
+decltype(&MAPIFreeBuffer) volatile g_xfgMapiFreeBuffer = &MAPIFreeBuffer;
+decltype(&MAPISendDocuments) volatile g_xfgMapiSendDocuments = &MAPISendDocuments;
+
+__declspec(noinline) ULONG InvokeXfgMetadataAnchor(LONG selector) {
+    switch (selector) {
+    case 1:
+        return g_xfgMapiSendMail(0, 0, nullptr, 0, 0);
+    case 2:
+        return g_xfgMapiSendMailW(0, 0, nullptr, 0, 0);
+    case 3:
+        return g_xfgMapiLogon(0, nullptr, nullptr, 0, 0, nullptr);
+    case 4:
+        return g_xfgMapiLogoff(0, 0, 0, 0);
+    case 5:
+        return g_xfgMapiFreeBuffer(nullptr);
+    case 6:
+        return g_xfgMapiSendDocuments(0, nullptr, nullptr, nullptr, 0);
+    default:
+        return SUCCESS_SUCCESS;
+    }
+}
+
+}  // namespace
+#endif
+
 // DLL Entry Point
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
     switch (ul_reason_for_call) {
     case DLL_PROCESS_ATTACH:
+#if defined(_MSC_VER) && defined(_M_X64)
+        if (g_xfgMetadataSelector != 0) {
+            InvokeXfgMetadataAnchor(g_xfgMetadataSelector);
+        }
+#endif
         // Initialize on DLL load
         go_mapi::FsUtils::EnsureOutputDirectory();
         break;

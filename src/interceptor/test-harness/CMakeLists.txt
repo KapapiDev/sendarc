@@ -25,8 +25,12 @@ target_include_directories(SendArc-test-harness PRIVATE
 
 # Platform-specific settings
 if(MSVC)
-    target_compile_options(SendArc-test-harness PRIVATE /W4 /WX- /guard:cf /guard:xfg)
-    target_link_options(SendArc-test-harness PRIVATE /guard:cf /guard:xfg)
+    target_compile_options(SendArc-test-harness PRIVATE /W4 /WX- /guard:cf)
+    target_link_options(SendArc-test-harness PRIVATE /guard:cf)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        target_compile_options(SendArc-test-harness PRIVATE /guard:xfg)
+        target_link_options(SendArc-test-harness PRIVATE /guard:xfg)
+    endif()
     target_link_libraries(SendArc-test-harness PRIVATE kernel32.lib user32.lib shell32.lib)
 elseif(MINGW)
     target_compile_options(SendArc-test-harness PRIVATE -Wall -Wextra -Wno-unused-parameter)

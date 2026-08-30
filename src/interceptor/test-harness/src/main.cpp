@@ -13,6 +13,7 @@ extern int test_unicode_wide();
 extern int test_ansi_encoding();
 extern int test_null_filename();
 extern int emit_e2e_message();
+extern int emit_e2e_ansi_message();
 
 using namespace mapi_test;
 
@@ -25,15 +26,19 @@ int main(int argc, char* argv[]) {
     // `--emit-e2e <dll>` performs one real wide Simple MAPI call directly
     // through a test interceptor. `--emit-system-mapi` sends the same message
     // through Windows' MAPI32 stub so installer acceptance can prove that the
-    // registered default handler routes into the installed SendArc DLL.
+    // registered default handler routes into the installed SendArc DLL. The
+    // ANSI mode independently exercises the legacy entry point most existing
+    // line-of-business applications use.
     bool emitE2E = argc == 3 && std::string(argv[1]) == "--emit-e2e";
     bool emitSystemMapi = argc == 2 && std::string(argv[1]) == "--emit-system-mapi";
+    bool emitSystemMapiAnsi = argc == 2 &&
+        std::string(argv[1]) == "--emit-system-mapi-ansi";
 
     // Determine DLL path
     std::string dllPath = "SendArc.dll";
     if (emitE2E) {
         dllPath = argv[2];
-    } else if (emitSystemMapi) {
+    } else if (emitSystemMapi || emitSystemMapiAnsi) {
         wchar_t systemDirectory[MAX_PATH] = {};
         UINT length = GetSystemDirectoryW(systemDirectory, MAX_PATH);
         if (length == 0 || length >= MAX_PATH) {
@@ -53,6 +58,9 @@ int main(int argc, char* argv[]) {
 
     TestUtilities::SetInterceptorDllPath(absoluteDllPath.wstring());
 
+    if (emitSystemMapiAnsi) {
+        return emit_e2e_ansi_message();
+    }
     if (emitE2E || emitSystemMapi) {
         return emit_e2e_message();
     }

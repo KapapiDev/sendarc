@@ -26,8 +26,11 @@ using MAPISendMailWFunc = ULONG(WINAPI *)(
 // Unlike the ordinary harness cases, this deliberately leaves the generated
 // queue item in place for the caller to inspect and remove.
 int emit_e2e_message() {
+    std::cout << "Loading configured MAPI module" << std::endl;
     HMODULE module = TestUtilities::LoadInterceptorDll();
     if (!module) return 1;
+
+    std::cout << "Resolving MAPISendMailW" << std::endl;
 
     auto sendMail = reinterpret_cast<MAPISendMailWFunc>(
         GetProcAddress(module, "MAPISendMailW"));
@@ -84,7 +87,11 @@ int emit_e2e_message() {
     message.nFileCount = 1;
     message.lpFiles = &attachment;
 
+    attachment.nPosition = static_cast<ULONG>(-1);
+
+    std::cout << "Calling MAPISendMailW" << std::endl;
     ULONG result = sendMail(0, 0, &message, 0, 0);
+    std::cout << "MAPISendMailW returned " << result << std::endl;
     std::error_code removeError;
     std::filesystem::remove(sourcePath, removeError);
     FreeLibrary(module);
@@ -94,5 +101,51 @@ int emit_e2e_message() {
         return 1;
     }
     std::cout << "Native Simple MAPI message queued" << std::endl;
+    return 0;
+}
+
+// Exercise the ANSI Simple MAPI path separately from the Unicode representative
+// message above. This is intentionally minimal (one recipient, no attachment)
+// so an installed-provider failure can be localized to Windows dispatch rather
+// than MIME fields or attachment handling.
+int emit_e2e_ansi_message() {
+    std::cout << "Loading configured MAPI module" << std::endl;
+    HMODULE module = TestUtilities::LoadInterceptorDll();
+    if (!module) return 1;
+
+    std::cout << "Resolving MAPISendMail" << std::endl;
+    auto sendMail = reinterpret_cast<MAPISendMailFunc>(
+        GetProcAddress(module, "MAPISendMail"));
+    if (!sendMail) {
+        std::cerr << "Failed to resolve MAPISendMail" << std::endl;
+        FreeLibrary(module);
+        return 1;
+    }
+
+    char subject[] = "Native ANSI MAPI routing proof";
+    char body[] = "Native ANSI Simple MAPI body";
+    char toName[] = "Alice";
+    char toAddress[] = "SMTP:alice@example.com";
+
+    MapiRecipDesc recipient = {};
+    recipient.ulRecipClass = MAPI_TO;
+    recipient.lpszName = toName;
+    recipient.lpszAddress = toAddress;
+
+    MapiMessage message = {};
+    message.lpszSubject = subject;
+    message.lpszNoteText = body;
+    message.nRecipCount = 1;
+    message.lpRecips = &recipient;
+
+    std::cout << "Calling MAPISendMail" << std::endl;
+    ULONG result = sendMail(0, 0, &message, 0, 0);
+    std::cout << "MAPISendMail returned " << result << std::endl;
+    FreeLibrary(module);
+
+    if (result != SUCCESS_SUCCESS) {
+        return 1;
+    }
+    std::cout << "Native ANSI Simple MAPI message queued" << std::endl;
     return 0;
 }

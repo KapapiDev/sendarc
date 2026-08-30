@@ -230,7 +230,34 @@ Describe "SendArc installer round-trip" {
             (Get-ItemProperty -Path $script:MapiKey -Name '(default)').'(default)' | Should -Be 'SendArc'
         }
 
-        It "3b. Windows MAPI32 routes a real Simple MAPI call into the installed handler" {
+        It "3a. Windows MAPI32 routes a legacy ANSI call into the installed handler" {
+            $queueDir = Join-Path $env:LOCALAPPDATA 'SendArc\queue'
+            New-Item -ItemType Directory -Path $queueDir -Force | Out-Null
+            $before = @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File -ErrorAction SilentlyContinue |
+                ForEach-Object FullName)
+            $created = @()
+            try {
+                $proc = Start-Process -FilePath $script:SystemMapiProbe -ArgumentList '--emit-system-mapi-ansi' -Wait -PassThru -NoNewWindow
+                $proc.ExitCode | Should -Be 0
+
+                $created = @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File -ErrorAction Stop |
+                    Where-Object FullName -NotIn $before)
+                $created.Count | Should -Be 1 -Because 'one ANSI system MAPI call must create exactly one queue item'
+
+                $message = Get-Content -LiteralPath $created[0].FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+                $message.subject | Should -Be 'Native ANSI MAPI routing proof'
+                @($message.recipients.to).Count | Should -Be 1
+                $message.recipients.to[0].address | Should -Be 'alice@example.com'
+                @($message.attachments).Count | Should -Be 0
+                $message.originApp | Should -Be 'SendArc-test-harness.exe'
+            } finally {
+                foreach ($item in $created) {
+                    Remove-Item -LiteralPath $item.FullName -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+
+        It "3b. Windows MAPI32 routes a Unicode call with attachment into the installed handler" {
             $queueDir = Join-Path $env:LOCALAPPDATA 'SendArc\queue'
             New-Item -ItemType Directory -Path $queueDir -Force | Out-Null
             $before = @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File -ErrorAction SilentlyContinue |

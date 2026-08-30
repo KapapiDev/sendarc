@@ -247,7 +247,10 @@ Describe "SendArc installer round-trip" {
                 $message = Get-Content -LiteralPath $created[0].FullName -Raw -Encoding UTF8 | ConvertFrom-Json
                 $message.subject | Should -Be 'Native ANSI MAPI routing proof'
                 @($message.recipients.to).Count | Should -Be 1
-                $message.recipients.to[0].address | Should -Be 'alice@example.com'
+                # Raw queue JSON intentionally preserves the provider-qualified
+                # MAPI address. The Go ingestion boundary normalizes SMTP:/mailto:
+                # before validation and MIME generation.
+                $message.recipients.to[0].address | Should -Be 'SMTP:alice@example.com'
                 @($message.attachments).Count | Should -Be 0
                 $message.originApp | Should -Be 'SendArc-test-harness.exe'
             } finally {
@@ -277,9 +280,9 @@ Describe "SendArc installer round-trip" {
                 @($message.recipients.to).Count | Should -Be 1
                 @($message.recipients.cc).Count | Should -Be 1
                 @($message.recipients.bcc).Count | Should -Be 1
-                $message.recipients.to[0].address | Should -Be 'alice@example.com'
-                $message.recipients.cc[0].address | Should -Be 'carlos@example.com'
-                $message.recipients.bcc[0].address | Should -Be 'bea@example.com'
+                $message.recipients.to[0].address | Should -Be 'SMTP:alice@example.com'
+                $message.recipients.cc[0].address | Should -Be 'SMTP:carlos@example.com'
+                $message.recipients.bcc[0].address | Should -Be 'SMTP:bea@example.com'
                 @($message.attachments).Count | Should -Be 1
                 $message.attachments[0].filename | Should -Be '네이티브-증빙.txt'
                 $message.originApp | Should -Be 'SendArc-test-harness.exe'

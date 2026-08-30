@@ -40,9 +40,10 @@ target_compile_definitions(message_converter_obj PRIVATE
 # are ABI-compatible. MSVC /W4 and MinGW -Wall are purely compile-time,
 # object files themselves are compatible either way.
 if(MSVC)
-    target_compile_options(message_converter_obj PRIVATE /W4 /WX-)
+    target_compile_options(message_converter_obj PRIVATE /W4 /WX- /guard:cf)
 elseif(MINGW)
-    target_compile_options(message_converter_obj PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    target_compile_options(message_converter_obj PRIVATE
+        -Wall -Wextra -Wno-unused-parameter -mguard=cf)
 endif()
 
 # Create the DLL
@@ -79,14 +80,20 @@ endif()
 # Platform-specific settings
 if(MSVC)
     # MSVC specific options
-    target_compile_options(SendArc PRIVATE /W4 /WX-)
+    target_compile_options(SendArc PRIVATE /W4 /WX- /guard:cf)
+    target_link_options(SendArc PRIVATE /guard:cf)
     target_link_libraries(SendArc PRIVATE kernel32.lib user32.lib shell32.lib)
     set_target_properties(SendArc PROPERTIES
         LINK_FLAGS "/DEF:\"${CMAKE_CURRENT_SOURCE_DIR}/mapi_exports.def\""
     )
 elseif(MINGW)
     # MinGW specific options
-    target_compile_options(SendArc PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    # CFG metadata is required for robust dispatch from current Windows
+    # MAPI32 stubs, which make guarded indirect calls into the selected mail
+    # provider. It also constrains unrelated indirect calls inside the DLL.
+    target_compile_options(SendArc PRIVATE
+        -Wall -Wextra -Wno-unused-parameter -mguard=cf)
+    target_link_options(SendArc PRIVATE -mguard=cf)
     target_link_libraries(SendArc PRIVATE kernel32 user32 shell32 -static-libgcc -static-libstdc++)
     set_target_properties(SendArc PROPERTIES
         LINK_FLAGS "-Wl,--output-def,${CMAKE_BINARY_DIR}/bin/SendArc.def -static"

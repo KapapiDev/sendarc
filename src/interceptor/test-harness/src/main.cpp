@@ -22,15 +22,25 @@ int main(int argc, char* argv[]) {
     std::cout << "=================================" << std::endl;
     std::cout << std::endl;
 
-    // `--emit-e2e <dll>` performs one real wide Simple MAPI call and leaves
-    // the resulting queue item in SENDARC_E2E_QUEUE_DIR for the Wails E2E
-    // suite. The ordinary harness mode below remains unchanged.
+    // `--emit-e2e <dll>` performs one real wide Simple MAPI call directly
+    // through a test interceptor. `--emit-system-mapi` sends the same message
+    // through Windows' MAPI32 stub so installer acceptance can prove that the
+    // registered default handler routes into the installed SendArc DLL.
     bool emitE2E = argc == 3 && std::string(argv[1]) == "--emit-e2e";
+    bool emitSystemMapi = argc == 2 && std::string(argv[1]) == "--emit-system-mapi";
 
     // Determine DLL path
     std::string dllPath = "SendArc.dll";
     if (emitE2E) {
         dllPath = argv[2];
+    } else if (emitSystemMapi) {
+        wchar_t systemDirectory[MAX_PATH] = {};
+        UINT length = GetSystemDirectoryW(systemDirectory, MAX_PATH);
+        if (length == 0 || length >= MAX_PATH) {
+            std::cerr << "Failed to resolve the Windows system directory" << std::endl;
+            return 1;
+        }
+        dllPath = (std::filesystem::path(systemDirectory) / L"mapi32.dll").string();
     } else if (argc > 1) {
         dllPath = argv[1];
     }
@@ -43,7 +53,7 @@ int main(int argc, char* argv[]) {
 
     TestUtilities::SetInterceptorDllPath(absoluteDllPath.wstring());
 
-    if (emitE2E) {
+    if (emitE2E || emitSystemMapi) {
         return emit_e2e_message();
     }
 

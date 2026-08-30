@@ -21,9 +21,10 @@ using MAPISendMailWFunc = ULONG(WINAPI *)(
 
 }  // namespace
 
-// Emit one representative wide Simple MAPI message through the actual
-// interceptor DLL. Unlike the ordinary harness cases, this deliberately leaves
-// the generated queue item in place so the live Wails watcher can render it.
+// Emit one representative wide Simple MAPI message through the configured
+// module: either the test interceptor directly or Windows' MAPI32 routing stub.
+// Unlike the ordinary harness cases, this deliberately leaves the generated
+// queue item in place for the caller to inspect and remove.
 int emit_e2e_message() {
     HMODULE module = TestUtilities::LoadInterceptorDll();
     if (!module) return 1;

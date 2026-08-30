@@ -83,6 +83,7 @@ public static class SendArcVersionResource
     } else {
         '0.1.0.0'
     }
+    $script:SystemMapiProbe = Join-Path $PSScriptRoot '..\..\interceptor\build-x64\bin\SendArc-test-harness.exe' | Resolve-Path -ErrorAction Stop | ForEach-Object Path
     $script:InstallDir   = "$env:ProgramFiles\SendArc"
     $script:ProgramData  = "$env:ProgramData\SendArc"
     $script:BackupJson   = "$script:ProgramData\uninst\previous-mail-client.json"
@@ -227,6 +228,44 @@ Describe "SendArc installer round-trip" {
             }
             # (Default) value read via Get-ItemProperty with '(default)' property name
             (Get-ItemProperty -Path $script:MapiKey -Name '(default)').'(default)' | Should -Be 'SendArc'
+        }
+
+        It "3b. Windows MAPI32 routes a real Simple MAPI call into the installed handler" {
+            $queueDir = Join-Path $env:LOCALAPPDATA 'SendArc\queue'
+            New-Item -ItemType Directory -Path $queueDir -Force | Out-Null
+            $before = @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File -ErrorAction SilentlyContinue |
+                ForEach-Object FullName)
+            $created = @()
+            try {
+                $proc = Start-Process -FilePath $script:SystemMapiProbe -ArgumentList '--emit-system-mapi' -Wait -PassThru -NoNewWindow
+                $proc.ExitCode | Should -Be 0
+
+                $created = @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File -ErrorAction Stop |
+                    Where-Object FullName -NotIn $before)
+                $created.Count | Should -Be 1 -Because 'one system MAPI call must create exactly one queue item'
+
+                $message = Get-Content -LiteralPath $created[0].FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+                $message.subject | Should -Be 'Native MAPI preview proof'
+                $message.body | Should -Match 'Native Simple MAPI body'
+                @($message.recipients.to).Count | Should -Be 1
+                @($message.recipients.cc).Count | Should -Be 1
+                @($message.recipients.bcc).Count | Should -Be 1
+                $message.recipients.to[0].address | Should -Be 'alice@example.com'
+                $message.recipients.cc[0].address | Should -Be 'carlos@example.com'
+                $message.recipients.bcc[0].address | Should -Be 'bea@example.com'
+                @($message.attachments).Count | Should -Be 1
+                $message.attachments[0].filename | Should -Be '네이티브-증빙.txt'
+                $message.originApp | Should -Be 'SendArc-test-harness.exe'
+                Test-Path -LiteralPath $message.attachments[0].path | Should -BeTrue
+            } finally {
+                foreach ($item in $created) {
+                    $attachmentDir = Join-Path $queueDir $item.BaseName
+                    if (Test-Path -LiteralPath $attachmentDir) {
+                        Remove-Item -LiteralPath $attachmentDir -Recurse -Force
+                    }
+                    Remove-Item -LiteralPath $item.FullName -Force -ErrorAction SilentlyContinue
+                }
+            }
         }
 
         # D-21 item 4

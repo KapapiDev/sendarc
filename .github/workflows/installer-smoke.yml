@@ -95,7 +95,7 @@ jobs:
       - name: Build interceptor DLLs
         shell: pwsh
         run: |
-          .\src\interceptor\build.ps1 -Arch x64 -Config Release -Version 0.0.0-smoke -Clean
+          .\src\interceptor\build.ps1 -Arch x64 -Config Release -Version 0.0.0-smoke -Tests -Clean
           .\src\interceptor\build.ps1 -Arch x86 -Config Release -Version 0.0.0-smoke -Clean
 
       - name: Build Wails app (dev ldflags - unsigned, AUMID only, no OAuth secrets)

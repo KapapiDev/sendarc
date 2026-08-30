@@ -133,7 +133,7 @@ jobs:
         env:
           INTERCEPTOR_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          .\src\interceptor\build.ps1 -Arch x64 -Config Release -Version $env:INTERCEPTOR_VERSION -Clean
+          .\src\interceptor\build.ps1 -Arch x64 -Config Release -Version $env:INTERCEPTOR_VERSION -Tests -Clean
           .\src\interceptor\build.ps1 -Arch x86 -Config Release -Version $env:INTERCEPTOR_VERSION -Clean
 
       # PATTERNS.md §Shared Pattern 4: all four injectable vars are in `package main`

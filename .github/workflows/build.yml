@@ -141,6 +141,10 @@ jobs:
         shell: bash
         run: go test -race -coverprofile=coverage-src-app.out -v ./src/app/...
 
+      - name: Windows Credential Manager integration (isolated test entry)
+        working-directory: src/app
+        run: go test -tags credentialstore_integration -run '^(TestRealKeyring_WindowsRoundTrip|TestAuthManagerKeyringRoundTrip_RealKeyring)$' -count=1 -v .
+
       - name: Upload Go coverage (internal/mapi)
         uses: actions/upload-artifact@v6
         with:

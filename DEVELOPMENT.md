@@ -125,6 +125,16 @@ can target a per-test temporary queue. Normal app, installer, and release builds
 do not contain the environment-variable queue redirection hook.
 GitHub Actions runs the same suite on `windows-2025` for every pull request.
 
+The real Windows Credential Manager integration is opt-in so routine local
+tests can never touch a user's SendArc login. It creates a unique fake entry,
+proves save, fresh-store reload, delete, and `AuthManager` clear behavior, then
+removes the entry:
+
+```powershell
+Set-Location src/app
+go test -tags credentialstore_integration -run '^(TestRealKeyring_WindowsRoundTrip|TestAuthManagerKeyringRoundTrip_RealKeyring)$' -count=1 -v .
+```
+
 ## Desktop development and builds
 
 For hot reload:

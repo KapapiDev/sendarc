@@ -25,7 +25,24 @@
 #undef WIN_NOEXCEPT_PFN
 #define WIN_NOEXCEPT_PFN
 #endif
+
+// The SDK also declares the Simple MAPI entry points themselves. Rename only
+// those declarations while the header is parsed so main.cpp can provide
+// dllexport definitions. The SDK typedefs and structures keep their canonical
+// names, which preserves the exact ABI and XFG prototype used by mapi32.dll.
+#define MAPISendMail SendArcSdkDeclaration_MAPISendMail
+#define MAPISendMailW SendArcSdkDeclaration_MAPISendMailW
+#define MAPILogon SendArcSdkDeclaration_MAPILogon
+#define MAPILogoff SendArcSdkDeclaration_MAPILogoff
+#define MAPIFreeBuffer SendArcSdkDeclaration_MAPIFreeBuffer
+#define MAPISendDocuments SendArcSdkDeclaration_MAPISendDocuments
 #include <mapi.h>
+#undef MAPISendMail
+#undef MAPISendMailW
+#undef MAPILogon
+#undef MAPILogoff
+#undef MAPIFreeBuffer
+#undef MAPISendDocuments
 
 using LPMapiFileDesc = lpMapiFileDesc;
 using LPMapiRecipDesc = lpMapiRecipDesc;

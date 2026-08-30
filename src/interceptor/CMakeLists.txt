@@ -95,7 +95,10 @@ endif()
 if(MSVC)
     # MSVC specific options
     target_compile_options(SendArc PRIVATE /W4 /WX- /guard:cf /guard:xfg)
-    target_link_options(SendArc PRIVATE /guard:cf)
+    # XFG must be selected for both compilation and linking. Compiling with
+    # /guard:xfg alone emits intermediate gxfg records, but a plain CFG link
+    # omits the final type hashes and XFG load-config dispatch pointers.
+    target_link_options(SendArc PRIVATE /guard:cf /guard:xfg)
     target_link_libraries(SendArc PRIVATE kernel32.lib user32.lib shell32.lib)
     set_target_properties(SendArc PROPERTIES
         LINK_FLAGS "/DEF:\"${CMAKE_CURRENT_SOURCE_DIR}/mapi_exports.def\""

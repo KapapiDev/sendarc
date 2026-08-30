@@ -12,6 +12,7 @@ extern int test_multiple_recipients();
 extern int test_unicode_wide();
 extern int test_ansi_encoding();
 extern int test_null_filename();
+extern int emit_e2e_message();
 
 using namespace mapi_test;
 
@@ -21,9 +22,16 @@ int main(int argc, char* argv[]) {
     std::cout << "=================================" << std::endl;
     std::cout << std::endl;
 
+    // `--emit-e2e <dll>` performs one real wide Simple MAPI call and leaves
+    // the resulting queue item in SENDARC_E2E_QUEUE_DIR for the Wails E2E
+    // suite. The ordinary harness mode below remains unchanged.
+    bool emitE2E = argc == 3 && std::string(argv[1]) == "--emit-e2e";
+
     // Determine DLL path
     std::string dllPath = "SendArc.dll";
-    if (argc > 1) {
+    if (emitE2E) {
+        dllPath = argv[2];
+    } else if (argc > 1) {
         dllPath = argv[1];
     }
 
@@ -34,6 +42,10 @@ int main(int argc, char* argv[]) {
     }
 
     TestUtilities::SetInterceptorDllPath(absoluteDllPath.wstring());
+
+    if (emitE2E) {
+        return emit_e2e_message();
+    }
 
     std::cout << "Using DLL: " << absoluteDllPath.string() << std::endl;
     std::cout << std::endl;

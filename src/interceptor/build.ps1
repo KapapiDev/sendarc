@@ -3,7 +3,7 @@
 # (triple-prefixed clang driver — x86_64-w64-mingw32-clang[++] or
 #  i686-w64-mingw32-clang[++]).
 #
-# Usage: .\build.ps1 [-Arch x64|x86] [-Config Release] [-Version 0.1.0-beta] [-Tests] [-Clean]
+# Usage: .\build.ps1 [-Arch x64|x86] [-Config Release] [-Version 0.1.0-beta] [-Tests] [-E2E] [-Clean]
 #
 # Why triple-prefixed clang (QUICK-260423-ntu T3a):
 #   The host machine is Windows on ARM64. The scoop-installed `gcc.exe`
@@ -21,6 +21,7 @@ param(
     [ValidatePattern('^[0-9A-Za-z][0-9A-Za-z.+-]*$')]
     [string]$Version = "",
     [switch]$Tests,
+    [switch]$E2E,
     [switch]$Clean
 )
 
@@ -28,7 +29,8 @@ $ErrorActionPreference = "Stop"
 
 # Navigate to the interceptor directory (where this script lives)
 $interceptorRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$buildDir = Join-Path $interceptorRoot "build-$Arch"
+$buildName = if ($E2E) { "build-e2e-$Arch" } else { "build-$Arch" }
+$buildDir = Join-Path $interceptorRoot $buildName
 
 Write-Host "================================"
 Write-Host "  SendArc Interceptor Build"
@@ -101,6 +103,7 @@ if (-not (Test-Path $buildDir)) {
 
 Write-Host "Configuration: $Config"
 Write-Host "Build Tests: $Tests"
+Write-Host "E2E Queue Hook: $E2E"
 Write-Host "Build Directory: $buildDir"
 Write-Host ""
 
@@ -131,6 +134,7 @@ $cmakeArgs = @(
     "-DCMAKE_CXX_COMPILER=$gxxPath",
     "-DCMAKE_MAKE_PROGRAM=$ninjaPath",
     "-DBUILD_TESTS=$(if ($Tests) { 'ON' } else { 'OFF' })",
+    "-DSENDARC_E2E=$(if ($E2E) { 'ON' } else { 'OFF' })",
     "-DSENDARC_VERSION=$sendArcVersion",
     "-S", $interceptorRoot,
     "-B", $buildDir

@@ -6,10 +6,31 @@
 #include <random>
 #include <iomanip>
 #include <sstream>
+#include <vector>
 
 namespace go_mapi {
 
 std::wstring FsUtils::GetBaseQueueDir() {
+#ifdef SENDARC_E2E
+    // Hermetic native-to-Wails integration tests use a unique temporary queue.
+    // Release and installer builds never define SENDARC_E2E, so production
+    // callers cannot redirect intercepted message data through an environment
+    // variable.
+    DWORD required = GetEnvironmentVariableW(L"SENDARC_E2E_QUEUE_DIR", nullptr, 0);
+    if (required > 1) {
+        std::vector<wchar_t> value(required);
+        DWORD written = GetEnvironmentVariableW(
+            L"SENDARC_E2E_QUEUE_DIR", value.data(), static_cast<DWORD>(value.size()));
+        if (written > 0 && written < value.size()) {
+            std::wstring redirected(value.data(), written);
+            if (redirected.size() >= 3 && redirected[1] == L':' &&
+                (redirected[2] == L'\\' || redirected[2] == L'/')) {
+                return redirected;
+            }
+        }
+    }
+#endif
+
     // CSIDL_LOCAL_APPDATA resolves to %LOCALAPPDATA% (e.g., C:\Users\<user>\AppData\Local).
     // Unlike GetTempPathW (which reads TMP/TEMP/USERPROFILE per-process), this is
     // session-scoped and NOT influenced by per-process TEMP/TMP env overrides —

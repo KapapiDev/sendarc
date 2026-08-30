@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures/wails-app';
+import { readFile } from 'node:fs/promises';
 
 // Phase 11 plan 06 — queue lifecycle regression coverage.
 //
@@ -11,22 +12,21 @@ import { test, expect } from './fixtures/wails-app';
 // draft request.
 
 test.describe.serial('queue lifecycle', () => {
-  test('Test 1 — arrival renders a queue row within 3s', async ({ app }) => {
-    const dropped = await app.watchDir.dropEmail({
-      subject: 'Arrival test',
-      to: [{ name: 'Alice', address: 'alice@example.com' }],
-    });
+  test('Test 1 — native Simple MAPI interception renders a complete preview', async ({ app }) => {
+    await app.nativeMAPI.emitMessage();
 
     const row = app.page.locator('[data-testid="queue-row"]').first();
     await expect(row).toBeVisible({ timeout: 3_000 });
-    // Subject is the canonical user-visible content; sender renders
-    // '(unknown sender)' because the MailMessage schema has no `from` field
-    // in the current codebase (QueueRow reads msg.from if present; the Go
-    // watcher only populates recipients). Asserting the subject proves the
-    // arrival → render round-trip.
-    await expect(row).toContainText('Arrival test');
-    // Sanity check that the file we dropped exists on disk.
-    expect(dropped.fullPath).toMatch(/\.json$/);
+    await expect(row).toContainText('Native MAPI preview proof');
+    await row.getByTestId('queue-row-preview').click();
+    const preview = row.getByRole('region', { name: /email preview/i });
+    await expect(preview).toContainText('alice@example.com');
+    await expect(preview).toContainText('carlos@example.com');
+    await expect(preview).toContainText('bea@example.com');
+    await expect(preview.getByTestId('message-body')).toContainText('안녕하세요 · café');
+    await expect(preview).toContainText('네이티브-증빙.txt');
+    expect(app.gmail.messages).toHaveLength(0);
+    expect(app.gmail.draftAttempts).toHaveLength(0);
   });
 
   test('Test 2 — preview is local and explicit Send posts the complete MIME message', async ({ app }) => {
@@ -151,6 +151,12 @@ test.describe.serial('queue lifecycle', () => {
     expect(app.gmail.messages).toHaveLength(1);
     expect(app.gmail.draftAttempts).toHaveLength(0);
 
+    const failureLog = await readFile(app.appLogPath, 'utf8');
+    expect(failureLog).not.toContain('Retry after Gmail outage');
+    expect(failureLog).not.toContain('alice@example.com');
+    expect(failureLog).not.toContain('e2e-fake-token-do-not-use');
+    expect(failureLog).not.toContain('fake-gmail forced 503');
+
     await row.getByTestId('queue-row-send').click();
     await expect(app.page.locator('[data-testid="queue-row"]')).toHaveCount(0, { timeout: 3_000 });
     expect(app.gmail.messages).toHaveLength(2);
@@ -176,5 +182,10 @@ test.describe.serial('queue lifecycle', () => {
     await expect(row).toContainText('Offline queue retention');
     expect(app.gmail.messages).toHaveLength(0);
     expect(app.gmail.draftAttempts).toHaveLength(0);
+
+    const offlineLog = await readFile(app.appLogPath, 'utf8');
+    expect(offlineLog).not.toContain('Offline queue retention');
+    expect(offlineLog).not.toContain('alice@example.com');
+    expect(offlineLog).not.toContain('e2e-fake-token-do-not-use');
   });
 });

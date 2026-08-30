@@ -112,13 +112,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-e2e.ps1
 ```
 
 The seven Playwright scenarios launch the e2e-tagged Wails/WebView2 binary and
-verify queue arrival, a local-only preview, explicit `users.messages.send`,
+verify a real x64 `MAPISendMailW` call through the test-only interceptor into
+the live queue and local preview, explicit `users.messages.send`,
 To/Cc/Bcc, Unicode body and attachment MIME preservation, Cancel/Dismiss with
 zero Gmail requests, multi-arrival behavior, Gmail 503 retry, offline queue
 retention, and the expired-sign-in banner.
 The fake Gmail server records and rejects every draft attempt. E2E settings
 disable update checks and all Google endpoints are replaced, so this suite does
 not use real credentials, contact Gmail, or touch Windows Credential Manager.
+The native interceptor is compiled with `SENDARC_E2E` only for this suite so it
+can target a per-test temporary queue. Normal app, installer, and release builds
+do not contain the environment-variable queue redirection hook.
 GitHub Actions runs the same suite on `windows-2025` for every pull request.
 
 ## Desktop development and builds

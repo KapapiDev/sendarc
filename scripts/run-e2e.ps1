@@ -3,23 +3,29 @@
   Build the e2e-tagged Wails binary and run the Playwright suite.
 
 .DESCRIPTION
-  Builds src/app/build/bin/SendArc.exe with -tags e2e and
-  ldflags-injected fake OAuth credentials so checkOAuthCredentials() does
-  not fatal-exit. Then invokes `npm run e2e` from the repo root.
+  Builds a test-only x64 Simple MAPI interceptor plus
+  src/app/build/bin/SendArc.exe with -tags e2e and ldflags-injected fake
+  OAuth credentials. Then invokes `npm run e2e` from the repo root.
 
 .PARAMETER NoBuild
-  Skip the wails build step. Use when iterating on test code without Go
-  changes - the harness still requires the binary at the expected path.
+  Skip both native and Wails build steps. Use when iterating on test code;
+  the previously built binaries must still exist at their expected paths.
 
 .PARAMETER InstallDeps
   Run `npm ci` before testing. The first invocation on a fresh clone
   needs this to fetch the Playwright client library. The suite connects to
   Wails' WebView2 instance and does not download a separate browser.
+
+.PARAMETER SkipNativeBuild
+  Use a prebuilt test-only x64 interceptor and harness under
+  src/interceptor/build-e2e-x64/bin. CI downloads these from the interceptor
+  matrix so it does not install the native toolchain twice.
 #>
 [CmdletBinding()]
 param(
   [switch]$NoBuild,
-  [switch]$InstallDeps
+  [switch]$InstallDeps,
+  [switch]$SkipNativeBuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -30,6 +36,18 @@ if ($InstallDeps) {
   Write-Host '[run-e2e] npm ci (root workspaces)...' -ForegroundColor Cyan
   npm ci
   if ($LASTEXITCODE -ne 0) { throw "npm ci failed ($LASTEXITCODE)" }
+}
+
+if (-not $NoBuild -and -not $SkipNativeBuild) {
+  Write-Host '[run-e2e] building test-only x64 MAPI interceptor...' -ForegroundColor Cyan
+  Push-Location (Join-Path $repoRoot 'src/interceptor')
+  try {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 `
+      -Arch x64 -Config Release -Version e2e -Tests -E2E -Clean
+    if ($LASTEXITCODE -ne 0) { throw "native E2E build failed ($LASTEXITCODE)" }
+  } finally {
+    Pop-Location
+  }
 }
 
 if (-not $NoBuild) {
@@ -57,6 +75,15 @@ if (-not (Test-Path $binary)) {
   throw "expected $binary after build but it does not exist"
 }
 Write-Host "[run-e2e] binary at $binary" -ForegroundColor Green
+
+$nativeDir = Join-Path $repoRoot 'src/interceptor/build-e2e-x64/bin'
+foreach ($nativeName in @('SendArc.dll', 'SendArc-test-harness.exe')) {
+  $nativePath = Join-Path $nativeDir $nativeName
+  if (-not (Test-Path $nativePath)) {
+    throw "expected native E2E artifact $nativePath but it does not exist"
+  }
+}
+Write-Host "[run-e2e] native MAPI probe at $nativeDir" -ForegroundColor Green
 
 # Belt-and-braces: kill only an orphan whose executable path is the e2e build.
 # Never terminate a separately installed SendArc instance.

@@ -77,6 +77,29 @@ jobs:
           path: src/interceptor/build-${{ matrix.arch }}/bin/SendArc-test-harness.exe
           if-no-files-found: error
 
+      - name: Build test-only native E2E probe
+        if: matrix.arch == 'x64' && matrix.config == 'Release'
+        working-directory: src/interceptor
+        run: .\build.ps1 -Arch x64 -Config Release -Version e2e -Tests -E2E -Clean
+
+      - name: Verify test hook is absent from production DLL
+        if: matrix.arch == 'x64' && matrix.config == 'Release'
+        shell: pwsh
+        run: >-
+          .\scripts\verify-e2e-native-isolation.ps1
+          -ProductionDLL .\src\interceptor\build-x64\bin\SendArc.dll
+          -E2EDLL .\src\interceptor\build-e2e-x64\bin\SendArc.dll
+
+      - name: Upload test-only native E2E probe
+        if: matrix.arch == 'x64' && matrix.config == 'Release'
+        uses: actions/upload-artifact@v6
+        with:
+          name: sendarc-native-e2e-x64
+          path: |
+            src/interceptor/build-e2e-x64/bin/SendArc.dll
+            src/interceptor/build-e2e-x64/bin/SendArc-test-harness.exe
+          if-no-files-found: error
+
   build-wails-app:
     name: Build Wails App (Go + Svelte)
     runs-on: windows-2025
@@ -155,6 +178,7 @@ jobs:
   e2e-windows:
     name: Windows app end-to-end (local preview + explicit send)
     runs-on: windows-2025
+    needs: build-interceptor
 
     steps:
       - uses: actions/checkout@v5
@@ -175,6 +199,12 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
+      - name: Download test-only native MAPI probe
+        uses: actions/download-artifact@v8
+        with:
+          name: sendarc-native-e2e-x64
+          path: src/interceptor/build-e2e-x64/bin
+
       - name: Run hermetic Windows app E2E
         shell: pwsh
-        run: .\scripts\run-e2e.ps1
+        run: .\scripts\run-e2e.ps1 -SkipNativeBuild

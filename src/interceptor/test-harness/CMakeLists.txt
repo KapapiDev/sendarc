@@ -15,6 +15,7 @@ add_executable(SendArc-test-harness
     src/test_multiple_recipients.cpp
     src/test_ansi_encoding.cpp
     src/test_null_filename.cpp
+    src/emit_e2e_message.cpp
 )
 
 # Include directories (interceptor is now parent directory)

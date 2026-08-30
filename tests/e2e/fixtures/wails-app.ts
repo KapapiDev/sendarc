@@ -35,6 +35,9 @@ import { WatchDirHelper } from './email';
 export interface WailsAppFixture {
   page: Page;
   watchDir: WatchDirHelper;
+  nativeMAPI: {
+    emitMessage(): Promise<void>;
+  };
   gmail: FakeGmailControl;
   oauth: FakeOAuthControl;
   appLogPath: string;
@@ -42,6 +45,41 @@ export interface WailsAppFixture {
 
 const REPO_ROOT = resolve(__dirname, '..', '..', '..');
 const APP_BINARY = join(REPO_ROOT, 'src', 'app', 'build', 'bin', 'SendArc.exe');
+const NATIVE_E2E_DIR = join(REPO_ROOT, 'src', 'interceptor', 'build-e2e-x64', 'bin');
+const NATIVE_HARNESS = join(NATIVE_E2E_DIR, 'SendArc-test-harness.exe');
+const NATIVE_DLL = join(NATIVE_E2E_DIR, 'SendArc.dll');
+
+function runNativeMAPIProbe(watchDir: string): Promise<void> {
+  if (!existsSync(NATIVE_HARNESS) || !existsSync(NATIVE_DLL)) {
+    throw new Error(
+      `e2e: native MAPI probe missing under ${NATIVE_E2E_DIR} — build via scripts/run-e2e.ps1`,
+    );
+  }
+  return new Promise((resolveProbe, rejectProbe) => {
+    const probe = spawn(NATIVE_HARNESS, ['--emit-e2e', NATIVE_DLL], {
+      env: {
+        ...process.env,
+        SENDARC_E2E_QUEUE_DIR: watchDir,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    let stdout = '';
+    let stderr = '';
+    probe.stdout?.on('data', (chunk) => { stdout += chunk.toString(); });
+    probe.stderr?.on('data', (chunk) => { stderr += chunk.toString(); });
+    probe.on('error', rejectProbe);
+    probe.on('exit', (code) => {
+      if (code === 0) {
+        resolveProbe();
+        return;
+      }
+      rejectProbe(new Error(
+        `native MAPI probe exited ${code}\nstdout:\n${stdout}\nstderr:\n${stderr}`,
+      ));
+    });
+  });
+}
 
 function isPortFree(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -186,6 +224,9 @@ export const test = base.extend<{ app: WailsAppFixture }>({
       await use({
         page,
         watchDir: new WatchDirHelper(watchDir),
+        nativeMAPI: {
+          emitMessage: () => runNativeMAPIProbe(watchDir),
+        },
         gmail,
         oauth,
         appLogPath,

@@ -11,6 +11,7 @@ endif()
 
 # Build options
 option(BUILD_TESTS "Build test harness" ON)
+option(SENDARC_E2E "Enable test-only queue redirection for hermetic E2E" OFF)
 
 # CPPTEST-01: enable CTest so add_subdirectory(tests) can register the
 # doctest message_converter_tests target with `ctest --output-on-failure`.
@@ -69,6 +70,11 @@ target_include_directories(SendArc PRIVATE
 target_compile_definitions(SendArc PRIVATE
     SENDARC_VERSION="${SENDARC_VERSION}"
 )
+if(SENDARC_E2E)
+    # Test builds may write into a per-test temporary queue. This definition is
+    # never enabled for installer or release artifacts.
+    target_compile_definitions(SendArc PRIVATE SENDARC_E2E=1)
+endif()
 
 # Platform-specific settings
 if(MSVC)
@@ -101,4 +107,5 @@ message(STATUS "SendArc Interceptor Build Configuration")
 message(STATUS "========================================")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID}")
 message(STATUS "Build Tests: ${BUILD_TESTS}")
+message(STATUS "E2E Queue Hook: ${SENDARC_E2E}")
 message(STATUS "")

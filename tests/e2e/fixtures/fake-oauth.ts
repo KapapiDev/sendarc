@@ -12,6 +12,7 @@ export interface FakeOAuthControl {
   baseURL: string;
   tokenURL: string;
   revokeURL: string;
+  userinfoURL: string;
   port: number;
   refreshCalls: number;
   revokeCalls: number;
@@ -59,6 +60,13 @@ export async function startFakeOAuth(): Promise<FakeOAuthControl> {
       return;
     }
 
+    if (method === 'GET' && url.endsWith('/userinfo')) {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ email: 'e2e@example.com', name: 'SendArc E2E' }));
+      return;
+    }
+
     res.statusCode = 404;
     res.end(`fake-oauth: no route for ${method} ${url}`);
   };
@@ -73,6 +81,7 @@ export async function startFakeOAuth(): Promise<FakeOAuthControl> {
     baseURL,
     tokenURL: `${baseURL}/token`,
     revokeURL: `${baseURL}/revoke`,
+    userinfoURL: `${baseURL}/userinfo`,
     port,
     get refreshCalls() { return refreshCalls; },
     get revokeCalls() { return revokeCalls; },

@@ -11,18 +11,14 @@
   Skip the wails build step. Use when iterating on test code without Go
   changes — the harness still requires the binary at the expected path.
 
-.PARAMETER SmokeOnly
-  Run only smoke.spec.ts. Used by Task 2's acceptance check to prove the
-  harness boots before the full regression suite is added in Task 3.
-
 .PARAMETER InstallDeps
-  Run `npm install` before testing. The first invocation on a fresh clone
-  needs this to fetch @playwright/test + browser binaries.
+  Run `npm ci` before testing. The first invocation on a fresh clone
+  needs this to fetch the Playwright client library. The suite connects to
+  Wails' WebView2 instance and does not download a separate browser.
 #>
 [CmdletBinding()]
 param(
   [switch]$NoBuild,
-  [switch]$SmokeOnly,
   [switch]$InstallDeps
 )
 
@@ -31,13 +27,9 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 Set-Location $repoRoot
 
 if ($InstallDeps) {
-  Write-Host '[run-e2e] npm install (root workspaces)…' -ForegroundColor Cyan
-  npm install
-  if ($LASTEXITCODE -ne 0) { throw "npm install failed ($LASTEXITCODE)" }
-
-  Write-Host '[run-e2e] playwright install chromium…' -ForegroundColor Cyan
-  npm exec --workspace=@sendarc/e2e -- playwright install chromium
-  if ($LASTEXITCODE -ne 0) { throw "playwright install failed ($LASTEXITCODE)" }
+  Write-Host '[run-e2e] npm ci (root workspaces)…' -ForegroundColor Cyan
+  npm ci
+  if ($LASTEXITCODE -ne 0) { throw "npm ci failed ($LASTEXITCODE)" }
 }
 
 if (-not $NoBuild) {
@@ -66,25 +58,25 @@ if (-not (Test-Path $binary)) {
 }
 Write-Host "[run-e2e] binary at $binary" -ForegroundColor Green
 
-# Belt-and-braces: kill any orphan SendArc.exe from a previous failed run
-# (the single-instance mutex would block our spawn otherwise — T-11-06-03).
-Get-Process -Name 'SendArc' -ErrorAction SilentlyContinue | ForEach-Object {
-  Write-Host "[run-e2e] killing orphan SendArc.exe pid=$($_.Id)" -ForegroundColor Yellow
-  Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
-}
+# Belt-and-braces: kill only an orphan whose executable path is the e2e build.
+# Never terminate a separately installed SendArc instance.
+Get-CimInstance Win32_Process -Filter "Name='SendArc.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.ExecutablePath -eq $binary } |
+  ForEach-Object {
+    Write-Host "[run-e2e] killing orphan e2e SendArc.exe pid=$($_.ProcessId)" -ForegroundColor Yellow
+    Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+  }
 
 Write-Host '[run-e2e] running Playwright…' -ForegroundColor Cyan
-if ($SmokeOnly) {
-  npm exec --workspace=@sendarc/e2e -- playwright test smoke.spec.ts
-} else {
-  npm run e2e
-}
+npm run e2e
 $exitCode = $LASTEXITCODE
 
-# Final cleanup pass — any test that crashed mid-run leaves orphans.
-Get-Process -Name 'SendArc' -ErrorAction SilentlyContinue | ForEach-Object {
-  Write-Host "[run-e2e] post-run cleanup pid=$($_.Id)" -ForegroundColor Yellow
-  Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
-}
+# Final path-filtered cleanup pass for a test that crashed mid-run.
+Get-CimInstance Win32_Process -Filter "Name='SendArc.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.ExecutablePath -eq $binary } |
+  ForEach-Object {
+    Write-Host "[run-e2e] post-run cleanup pid=$($_.ProcessId)" -ForegroundColor Yellow
+    Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+  }
 
 exit $exitCode

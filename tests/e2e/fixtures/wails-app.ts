@@ -1,6 +1,6 @@
 import { test as base, chromium, type Page, type BrowserContext, type Browser } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { existsSync } from 'node:fs';
@@ -119,6 +119,13 @@ export const test = base.extend<{ app: WailsAppFixture }>({
     const oauth = await startFakeOAuth();
     const cdpPort = await pickCdpPort();
 
+    // Keep the runtime test hermetic. A fresh app enables update checks by
+    // default, which would otherwise contact GitHub during startup.
+    await writeFile(join(appDataDir, 'settings.json'), JSON.stringify({
+      mode: 'manual',
+      update_checks_enabled: false,
+    }), 'utf8');
+
     // Token expiry one hour out so refreshIfNeededLocked is a no-op.
     const tokenBlob = JSON.stringify({
       access_token: 'e2e-fake-token-do-not-use',
@@ -138,6 +145,7 @@ export const test = base.extend<{ app: WailsAppFixture }>({
       SENDARC_E2E_GMAIL_BASE_URL: gmail.url,
       SENDARC_E2E_TOKEN_ENDPOINT: oauth.tokenURL,
       SENDARC_E2E_REVOKE_ENDPOINT: oauth.revokeURL,
+      SENDARC_E2E_USERINFO_ENDPOINT: oauth.userinfoURL,
       SENDARC_WATCH_DIR: watchDir,
       SENDARC_APPDATA_DIR: appDataDir,
     };
@@ -153,9 +161,10 @@ export const test = base.extend<{ app: WailsAppFixture }>({
     child.stderr?.on('data', (b) => process.stderr.write(`[app!] ${b}`));
 
     let appExitedEarly = false;
+    let teardownStarted = false;
     child.on('exit', (code, sig) => {
-      appExitedEarly = true;
-      if (code !== 0 && code !== null) {
+      if (!teardownStarted) appExitedEarly = true;
+      if (!teardownStarted && code !== 0 && code !== null) {
         process.stderr.write(`[app] exited code=${code} signal=${sig}\n`);
       }
     });
@@ -182,6 +191,7 @@ export const test = base.extend<{ app: WailsAppFixture }>({
         appLogPath,
       });
     } finally {
+      teardownStarted = true;
       try {
         if (browser) await browser.close();
       } catch {

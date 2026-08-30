@@ -5,9 +5,9 @@ import { test, expect } from './fixtures/wails-app';
 // Each test drives the real Wails app: the harness drops MailMessage JSON
 // into the watched temp dir, the Go watcher picks it up, emits
 // 'queue-changed', the Svelte app re-renders, the test asserts visible
-// queue rows and drives clicks. Round-trip proof that the bug class from
-// the Phase 11 manual smoke (drafted rows lingering, Dismiss no-op,
-// multi-arrival "overwrite") cannot regress silently.
+// queue rows and drives clicks. This proves the current preview-first contract:
+// no network call on arrival/preview/cancel/dismiss, exactly one users.messages.send
+// call after explicit confirmation, and no Gmail draft request.
 
 test.describe.serial('queue lifecycle', () => {
   test('Test 1 — arrival renders a queue row within 3s', async ({ app }) => {
@@ -28,28 +28,71 @@ test.describe.serial('queue lifecycle', () => {
     expect(dropped.fullPath).toMatch(/\.json$/);
   });
 
-  test('Test 2 — create-draft removes the row within 3s (f1221d7 regression guard)', async ({ app }) => {
-    await app.watchDir.dropEmail({ subject: 'Draft this one' });
+  test('Test 2 — preview is local and explicit Send posts the complete MIME message', async ({ app }) => {
+    const body = 'Unicode body: 안녕하세요 · café';
+    const attachmentBody = 'SendArc attachment proof';
+    await app.watchDir.dropEmail({
+      subject: 'Explicit send proof',
+      body,
+      to: [{ name: 'Alice', address: 'alice@example.com' }],
+      cc: [{ name: 'Carlos', address: 'carlos@example.com' }],
+      bcc: [{ name: 'Bea', address: 'bea@example.com' }],
+      attachments: [{ filename: 'proof.txt', content: attachmentBody }],
+    });
 
     const row = app.page.locator('[data-testid="queue-row"]').first();
     await expect(row).toBeVisible({ timeout: 3_000 });
+    expect(app.gmail.messages).toHaveLength(0);
+    expect(app.gmail.draftAttempts).toHaveLength(0);
 
-    await row.getByTestId('queue-row-create-draft').click();
+    await row.getByTestId('queue-row-preview').click();
+    const preview = row.getByRole('region', { name: /email preview/i });
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText('alice@example.com');
+    await expect(preview).toContainText('carlos@example.com');
+    await expect(preview).toContainText('bea@example.com');
+    await expect(preview.getByTestId('message-body')).toHaveText(body);
+    await expect(preview).toContainText('proof.txt');
 
-    // Row must disappear within 3s. This is the exact regression fixed in
-    // internal/mapi/watcher.go f1221d7 — MarkProcessed now dispatches
-    // queue-changed directly so the frontend sees the deletion.
+    // Preview itself is strictly local. The fake Gmail server must remain
+    // untouched until the separate confirmation button is clicked.
+    expect(app.gmail.messages).toHaveLength(0);
+    expect(app.gmail.draftAttempts).toHaveLength(0);
+
+    await row.getByTestId('queue-row-send').click();
+
     await expect(app.page.locator('[data-testid="queue-row"]')).toHaveCount(0, { timeout: 3_000 });
 
-    // Fake Gmail should have received exactly one draft call.
-    expect(app.gmail.drafts.length).toBe(1);
+    expect(app.gmail.messages).toHaveLength(1);
+    expect(app.gmail.draftAttempts).toHaveLength(0);
+    expect(app.gmail.messages[0].headers.authorization).toBe('Bearer e2e-fake-token-do-not-use');
+
+    const request = JSON.parse(app.gmail.messages[0].body) as { raw?: string; message?: unknown };
+    expect(typeof request.raw).toBe('string');
+    expect(request.message).toBeUndefined();
+    const mime = Buffer.from(request.raw!, 'base64url').toString('utf8');
+    expect(mime).toContain('To: "Alice" <alice@example.com>');
+    expect(mime).toContain('Cc: "Carlos" <carlos@example.com>');
+    expect(mime).toContain('Bcc: "Bea" <bea@example.com>');
+    expect(mime).toContain('Subject: Explicit send proof');
+    expect(mime).toContain(Buffer.from(body, 'utf8').toString('base64'));
+    expect(mime).toContain('proof.txt');
+    expect(mime).toContain(Buffer.from(attachmentBody, 'utf8').toString('base64'));
   });
 
-  test('Test 3 — dismiss removes the row within 3s', async ({ app }) => {
-    await app.watchDir.dropEmail({ subject: 'Dismiss this one' });
+  test('Test 3 — Cancel closes preview without sending; Dismiss removes the row', async ({ app }) => {
+    await app.watchDir.dropEmail({ subject: 'Cancel and dismiss' });
 
     const row = app.page.locator('[data-testid="queue-row"]').first();
     await expect(row).toBeVisible({ timeout: 3_000 });
+
+    await row.getByTestId('queue-row-preview').click();
+    const preview = row.getByRole('region', { name: /email preview/i });
+    await expect(preview).toBeVisible();
+    await row.getByTestId('queue-row-cancel').click();
+    await expect(preview).toBeHidden();
+    expect(app.gmail.messages).toHaveLength(0);
+    expect(app.gmail.draftAttempts).toHaveLength(0);
 
     await row.getByTestId('queue-row-dismiss').click();
 
@@ -57,8 +100,9 @@ test.describe.serial('queue lifecycle', () => {
     // after os.Remove so the Svelte app re-renders empty.
     await expect(app.page.locator('[data-testid="queue-row"]')).toHaveCount(0, { timeout: 3_000 });
 
-    // Dismiss must NOT create a Gmail draft.
-    expect(app.gmail.drafts.length).toBe(0);
+    // Dismiss must not contact Gmail at all.
+    expect(app.gmail.messages).toHaveLength(0);
+    expect(app.gmail.draftAttempts).toHaveLength(0);
   });
 
   test('Test 4 — multi-arrival shows BOTH rows (overwrite regression guard)', async ({ app }) => {

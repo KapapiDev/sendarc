@@ -19,8 +19,9 @@ package main
 //                               fake-gmail.ts). Wires gmailBaseURLOverride.
 //   SENDARC_E2E_TOKEN_ENDPOINT  Override for the OAuth token endpoint.
 //   SENDARC_E2E_REVOKE_ENDPOINT Override for the OAuth revoke endpoint.
+//   SENDARC_E2E_USERINFO_ENDPOINT Override for the OAuth userinfo endpoint.
 //
-// All four are optional individually so tests can mix-and-match (e.g. a test
+// All endpoint/token overrides are optional individually so tests can mix-and-match (e.g. a test
 // that exercises sign-in flow may leave FAKE_TOKEN_JSON unset). Production
 // builds without -tags e2e get a no-op (init never runs because this file is
 // not compiled in); no stub file is needed because keyringStoreFactory has a
@@ -104,5 +105,8 @@ func init() {
 	}
 	if v := os.Getenv("SENDARC_E2E_REVOKE_ENDPOINT"); v != "" {
 		revokeEndpointOverride = v
+	}
+	if v := os.Getenv("SENDARC_E2E_USERINFO_ENDPOINT"); v != "" {
+		userinfoEndpointOverride = v
 	}
 }

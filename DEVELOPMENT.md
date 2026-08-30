@@ -104,6 +104,22 @@ ctest --test-dir src/interceptor/build-x86 --output-on-failure -C Release
 
 The deterministic harness must load the exact DLL path passed on its command line and verify that all expected queue items are produced. A zero-test or zero-artifact harness run is a failure, not a pass.
 
+Run the real Windows desktop flow against hermetic local OAuth and Gmail
+stand-ins:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-e2e.ps1
+```
+
+The five Playwright scenarios launch the e2e-tagged Wails/WebView2 binary and
+verify queue arrival, a local-only preview, explicit `users.messages.send`,
+To/Cc/Bcc, Unicode body and attachment MIME preservation, Cancel/Dismiss with
+zero Gmail requests, multi-arrival behavior, and the expired-sign-in banner.
+The fake Gmail server records and rejects every draft attempt. E2E settings
+disable update checks and all Google endpoints are replaced, so this suite does
+not use real credentials, contact Gmail, or touch Windows Credential Manager.
+GitHub Actions runs the same suite on `windows-2025` for every pull request.
+
 ## Desktop development and builds
 
 For hot reload:

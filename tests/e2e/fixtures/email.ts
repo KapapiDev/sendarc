@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 
@@ -11,12 +11,19 @@ export interface EmailFixtureRecipient {
   address: string;
 }
 
+export interface EmailFixtureAttachment {
+  filename: string;
+  content: string | Buffer;
+}
+
 export interface EmailFixtureOptions {
   subject?: string;
   body?: string;
   bodyFormat?: 'plain' | 'html';
   to?: EmailFixtureRecipient[];
   cc?: EmailFixtureRecipient[];
+  bcc?: EmailFixtureRecipient[];
+  attachments?: EmailFixtureAttachment[];
   originApp?: string;
   timestamp?: string;
   filename?: string;
@@ -33,6 +40,26 @@ export class WatchDirHelper {
   /** Drop a valid MailMessage JSON into the watch dir. Resolves once written. */
   async dropEmail(opts: EmailFixtureOptions = {}): Promise<DroppedEmail> {
     const filename = opts.filename ?? `email-${Date.now()}-${randomBytes(4).toString('hex')}.json`;
+    if (!filename.endsWith('.json')) throw new Error('e2e fixture filename must end in .json');
+
+    const stem = filename.slice(0, -'.json'.length);
+    const attachments = [];
+    if (opts.attachments?.length) {
+      const attachmentDir = join(this.dir, stem);
+      await mkdir(attachmentDir, { recursive: false });
+      for (const attachment of opts.attachments) {
+        if (!attachment.filename || /[\\/:\r\n]/.test(attachment.filename)) {
+          throw new Error(`e2e fixture has unsafe attachment filename: ${attachment.filename}`);
+        }
+        const content = Buffer.isBuffer(attachment.content)
+          ? attachment.content
+          : Buffer.from(attachment.content, 'utf8');
+        const path = join(attachmentDir, attachment.filename);
+        await writeFile(path, content);
+        attachments.push({ filename: attachment.filename, path, size: content.byteLength });
+      }
+    }
+
     const message = {
       version: 1,
       interceptorVersion: 'e2e',
@@ -44,9 +71,9 @@ export class WatchDirHelper {
       recipients: {
         to: opts.to ?? [{ name: 'Recipient', address: 'recipient@example.com' }],
         cc: opts.cc ?? [],
-        bcc: [],
+        bcc: opts.bcc ?? [],
       },
-      attachments: [],
+      attachments,
       originApp: opts.originApp ?? 'e2e-harness',
     };
     const fullPath = join(this.dir, filename);

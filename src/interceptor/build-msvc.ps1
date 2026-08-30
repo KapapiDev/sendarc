@@ -21,11 +21,52 @@ $ErrorActionPreference = "Stop"
 $interceptorRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $buildName = if ($E2E) { "build-e2e-$Arch" } else { "build-$Arch" }
 $buildDir = Join-Path $interceptorRoot $buildName
-$platform = if ($Arch -eq "x64") { "x64" } else { "Win32" }
 
 $cmake = Get-Command cmake -ErrorAction SilentlyContinue
 if (-not $cmake) {
     throw "CMake was not found. Install Visual Studio 2022 with Desktop development with C++."
+}
+
+$ninja = Get-Command ninja -ErrorAction SilentlyContinue
+if (-not $ninja) {
+    throw "Ninja was not found. Install Ninja or use the GitHub Windows runner image."
+}
+
+# Do not depend on CMake's Visual Studio instance discovery. Some hardened
+# Windows Server 2025 runner revisions have a complete VS installation but do
+# not expose it as a registered generator instance. Import VsDevCmd's compiler
+# environment explicitly and drive cl.exe with Ninja instead.
+$vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+$vsInstall = ""
+if (Test-Path -LiteralPath $vswhere) {
+    $vsInstall = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1)
+}
+if (-not $vsInstall) {
+    $knownInstall = Join-Path $env:ProgramFiles "Microsoft Visual Studio\2022\Enterprise"
+    if (Test-Path -LiteralPath $knownInstall) {
+        $vsInstall = $knownInstall
+    }
+}
+if (-not $vsInstall) {
+    throw "Visual Studio 2022 C++ tools were not found."
+}
+
+$vsDevCmd = Join-Path $vsInstall "Common7\Tools\VsDevCmd.bat"
+if (-not (Test-Path -LiteralPath $vsDevCmd)) {
+    throw "VsDevCmd.bat was not found at $vsDevCmd."
+}
+$targetArch = if ($Arch -eq "x64") { "amd64" } else { "x86" }
+$environmentLines = & $env:ComSpec /s /c "`"$vsDevCmd`" -arch=$targetArch -host_arch=amd64 -no_logo && set"
+if ($LASTEXITCODE -ne 0) {
+    throw "VsDevCmd failed for $targetArch (exit $LASTEXITCODE)."
+}
+foreach ($line in $environmentLines) {
+    if ($line -match '^([^=][^=]*)=(.*)$') {
+        Set-Item -Path "Env:$($matches[1])" -Value $matches[2]
+    }
+}
+if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
+    throw "VsDevCmd did not expose cl.exe for $targetArch."
 }
 
 if ($Clean -and (Test-Path -LiteralPath $buildDir)) {
@@ -52,8 +93,11 @@ Write-Host "  Arch: $Arch"
 Write-Host "================================"
 
 $configureArgs = @(
-    "-G", "Visual Studio 17 2022",
-    "-A", $platform,
+    "-G", "Ninja",
+    "-DCMAKE_BUILD_TYPE=$Config",
+    "-DCMAKE_C_COMPILER=cl.exe",
+    "-DCMAKE_CXX_COMPILER=cl.exe",
+    "-DCMAKE_MAKE_PROGRAM=$($ninja.Source)",
     "-DBUILD_TESTS=$(if ($Tests) { 'ON' } else { 'OFF' })",
     "-DSENDARC_E2E=$(if ($E2E) { 'ON' } else { 'OFF' })",
     "-DSENDARC_VERSION=$sendArcVersion",

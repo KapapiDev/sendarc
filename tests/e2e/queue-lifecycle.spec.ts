@@ -7,7 +7,8 @@ import { test, expect } from './fixtures/wails-app';
 // 'queue-changed', the Svelte app re-renders, the test asserts visible
 // queue rows and drives clicks. This proves the current preview-first contract:
 // no network call on arrival/preview/cancel/dismiss, exactly one users.messages.send
-// call after explicit confirmation, and no Gmail draft request.
+// call after explicit confirmation, retry-safe failure handling, and no Gmail
+// draft request.
 
 test.describe.serial('queue lifecycle', () => {
   test('Test 1 — arrival renders a queue row within 3s', async ({ app }) => {
@@ -128,5 +129,52 @@ test.describe.serial('queue lifecycle', () => {
     const allText = await rows.allTextContents();
     expect(allText.some((t) => t.includes('First arrival'))).toBe(true);
     expect(allText.some((t) => t.includes('Second arrival'))).toBe(true);
+  });
+
+  test('Test 5 — Gmail 503 keeps the row and a second explicit Send succeeds', async ({ app }) => {
+    app.gmail.failNextWith(503);
+    await app.watchDir.dropEmail({
+      subject: 'Retry after Gmail outage',
+      to: [{ name: 'Alice', address: 'alice@example.com' }],
+    });
+
+    const row = app.page.locator('[data-testid="queue-row"]').first();
+    await expect(row).toBeVisible({ timeout: 3_000 });
+    await row.getByTestId('queue-row-preview').click();
+    await row.getByTestId('queue-row-send').click();
+
+    await expect(row.getByTestId('send-error')).toContainText(
+      'network is unavailable',
+      { timeout: 3_000 },
+    );
+    await expect(row).toContainText('Retry after Gmail outage');
+    expect(app.gmail.messages).toHaveLength(1);
+    expect(app.gmail.draftAttempts).toHaveLength(0);
+
+    await row.getByTestId('queue-row-send').click();
+    await expect(app.page.locator('[data-testid="queue-row"]')).toHaveCount(0, { timeout: 3_000 });
+    expect(app.gmail.messages).toHaveLength(2);
+    expect(app.gmail.draftAttempts).toHaveLength(0);
+  });
+
+  test('Test 6 — offline send keeps the message queued with an actionable error', async ({ app }) => {
+    await app.gmail.close();
+    await app.watchDir.dropEmail({
+      subject: 'Offline queue retention',
+      to: [{ name: 'Alice', address: 'alice@example.com' }],
+    });
+
+    const row = app.page.locator('[data-testid="queue-row"]').first();
+    await expect(row).toBeVisible({ timeout: 3_000 });
+    await row.getByTestId('queue-row-preview').click();
+    await row.getByTestId('queue-row-send').click();
+
+    await expect(row.getByTestId('send-error')).toContainText(
+      'network is unavailable',
+      { timeout: 3_000 },
+    );
+    await expect(row).toContainText('Offline queue retention');
+    expect(app.gmail.messages).toHaveLength(0);
+    expect(app.gmail.draftAttempts).toHaveLength(0);
   });
 });

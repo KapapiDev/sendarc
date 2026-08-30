@@ -7,7 +7,7 @@ import { test, expect } from './fixtures/wails-app';
 // clears the in-memory tokens, and emits auth-changed{authenticated:false}.
 // App.svelte flips showReAuthBanner = true and the banner renders.
 
-test('Test 5 — invalid_grant surfaces the re-auth banner within 3s', async ({ app }) => {
+test('Test 7 — invalid_grant surfaces the re-auth banner within 3s', async ({ app }) => {
   // Configure fake Gmail to 401 the next two calls (MakeAuthenticatedGmailCall
   // forces one refresh-and-retry, so two 401s are needed to reach the
   // classified invalid_grant path).

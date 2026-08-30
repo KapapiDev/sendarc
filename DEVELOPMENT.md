@@ -111,10 +111,11 @@ stand-ins:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-e2e.ps1
 ```
 
-The five Playwright scenarios launch the e2e-tagged Wails/WebView2 binary and
+The seven Playwright scenarios launch the e2e-tagged Wails/WebView2 binary and
 verify queue arrival, a local-only preview, explicit `users.messages.send`,
 To/Cc/Bcc, Unicode body and attachment MIME preservation, Cancel/Dismiss with
-zero Gmail requests, multi-arrival behavior, and the expired-sign-in banner.
+zero Gmail requests, multi-arrival behavior, Gmail 503 retry, offline queue
+retention, and the expired-sign-in banner.
 The fake Gmail server records and rejects every draft attempt. E2E settings
 disable update checks and all Google endpoints are replaced, so this suite does
 not use real credentials, contact Gmail, or touch Windows Credential Manager.

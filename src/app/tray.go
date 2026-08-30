@@ -267,6 +267,10 @@ func (a *App) toggleWindow() {
 }
 
 func (a *App) showWindow() {
+	if a.windowShowOverride != nil {
+		a.windowShowOverride()
+		return
+	}
 	wruntime.WindowShow(a.ctx)
 	wruntime.WindowUnminimise(a.ctx)
 	a.setVisible(true)

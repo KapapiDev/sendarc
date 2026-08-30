@@ -103,7 +103,7 @@ func (b *watcherBridge) AutomodeWake() <-chan struct{} {
 
 // SetAfterDispatch registers an optional callback invoked after each queue-update
 // emit in the dispatcher loop. Plan 03 uses this to prune the backlogSkip set
-// (D-10) after every queue-update so dismissed/manually-drafted rows are freed.
+// (D-10) after every queue-update so dismissed/manually-sent rows are freed.
 // Must be called before Start (not concurrent-safe with dispatch).
 func (b *watcherBridge) SetAfterDispatch(fn func()) {
 	b.afterDispatch = fn

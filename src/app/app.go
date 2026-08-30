@@ -31,6 +31,10 @@ type App struct {
 	// and written by showWindow / hideWindow / beforeClose.
 	visibilityMu sync.Mutex
 	visible      bool
+	// windowShowOverride is a narrow test seam for notification actions. It is
+	// nil in production; tests use it to prove Review opens the app without
+	// requiring a live Wails window or invoking any send path.
+	windowShowOverride func()
 
 	// intentionalQuit is set true by the tray Quit menu BEFORE calling wruntime.Quit,
 	// so beforeClose can distinguish a "quit-now" from "X button = hide-to-tray".
@@ -60,7 +64,7 @@ type App struct {
 	// Backlog skip-set (D-10): emails that failed automode with errorCategory
 	// "signed-out" during a signed-out window stay manual after re-auth.
 	// In-memory only — NEVER persisted. Pruned on every queue-update to
-	// release memory for emails the user manually drafted or dismissed.
+	// release memory for emails the user manually sent or dismissed.
 	backlogSkipMu sync.Mutex
 	backlogSkip   map[string]struct{}
 
@@ -244,7 +248,7 @@ func (a *App) startup(ctx context.Context) {
 			if hasNewMessage {
 				a.showWindow()
 			}
-			// Prune knownIds for emails that left the queue (drafted / dismissed)
+			// Prune knownIds for emails that left the queue (sent / dismissed)
 			// to avoid unbounded memory growth in long-running sessions.
 			for id := range knownIds {
 				if _, ok := currentIds[id]; !ok {
@@ -494,7 +498,7 @@ func (a *App) markBacklogSkipped(id string) {
 
 // pruneBacklogSkip removes entries whose ids are absent from currentIds. Called
 // after each queue-update event (via bridge.afterDispatch) so dismissed or
-// manually-drafted rows do not permanently occupy memory for the session lifetime.
+// manually-sent rows do not permanently occupy memory for the session lifetime.
 func (a *App) pruneBacklogSkip(currentIds map[string]struct{}) {
 	a.backlogSkipMu.Lock()
 	defer a.backlogSkipMu.Unlock()

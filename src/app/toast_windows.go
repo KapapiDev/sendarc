@@ -11,7 +11,7 @@ package main
 //   - Body: subject + "📎 N attachment(s)" (never body text, filenames, recipients)
 //   - Icon: absolute path to app icon (not email content)
 //
-// D-11: Arrival + draft-success toasts suppressed when main window is visible
+// D-11: Arrival + send-success toasts suppressed when main window is visible
 // and focused; error toasts always fire.
 
 import (
@@ -145,7 +145,7 @@ func emitSendSuccessToast(a *App, subject, emailID string) {
 	}
 	// Use emailID+":success" as the tag so it's distinct from the arrival toast.
 	// The ":success" toast is not cleared by clearToastForEmail — left for the
-	// user to dismiss (it confirms a successful draft).
+	// user to dismiss (it confirms a successful send).
 	tag := emailID + ":success"
 	if err := shimPushWithTagGroup(activeAUMID(), n, tag, toastGroup); err != nil {
 		logError("toast: send-success push failed for %s: %v", safeIDPrefix(emailID), err)

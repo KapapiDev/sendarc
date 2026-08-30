@@ -103,7 +103,7 @@ type AuthStatus struct {
 // AuthManager owns the OAuth token lifecycle. Ref held on *App.
 type AuthManager struct {
 	// refresh serializes token refresh (D-13) AND sign-in (a user-initiated
-	// sign-in with no token cannot race a refresh — draft buttons are
+	// sign-in with no token cannot race a refresh — send buttons are
 	// disabled per D-07, so contention is impossible in practice).
 	refresh sync.Mutex
 
@@ -624,7 +624,7 @@ func (am *AuthManager) revokeRefreshToken(parent context.Context) {
 	logError("oauth revoke: status %d", resp.StatusCode)
 }
 
-// GmailCall is the signature Phase 9's draft-creation code will satisfy.
+// GmailCall is the signature used by authenticated Gmail operations.
 // The statusCode return is ONLY inspected for 401 — it is the caller's signal
 // that the access token was rejected and a refresh + retry should be attempted.
 // Any other status with a non-nil err is bubbled up verbatim (no retry).
@@ -713,8 +713,8 @@ func (a *App) emitAuthChanged() {
 // Does NOT quit the app (D-16) — watcher keeps running, tray stays.
 //
 // The revoke HTTP call is made under a.auth.refresh with a 5s bound
-// (see revokeRefreshToken). Intentional: per D-07 UI disables draft-
-// creating buttons while signing out, so no other caller can contend for
+// (see revokeRefreshToken). Intentional: per D-07 UI disables send controls
+// while signing out, so no other caller can contend for
 // this mutex; holding it across revoke prevents any partial-state window.
 func (a *App) SignOut() error {
 	if a.auth == nil {

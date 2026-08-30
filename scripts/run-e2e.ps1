@@ -9,7 +9,7 @@
 
 .PARAMETER NoBuild
   Skip the wails build step. Use when iterating on test code without Go
-  changes — the harness still requires the binary at the expected path.
+  changes - the harness still requires the binary at the expected path.
 
 .PARAMETER InstallDeps
   Run `npm ci` before testing. The first invocation on a fresh clone
@@ -27,13 +27,13 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 Set-Location $repoRoot
 
 if ($InstallDeps) {
-  Write-Host '[run-e2e] npm ci (root workspaces)…' -ForegroundColor Cyan
+  Write-Host '[run-e2e] npm ci (root workspaces)...' -ForegroundColor Cyan
   npm ci
   if ($LASTEXITCODE -ne 0) { throw "npm ci failed ($LASTEXITCODE)" }
 }
 
 if (-not $NoBuild) {
-  Write-Host '[run-e2e] building e2e-tagged Wails binary…' -ForegroundColor Cyan
+  Write-Host '[run-e2e] building e2e-tagged Wails binary...' -ForegroundColor Cyan
   Push-Location (Join-Path $repoRoot 'src/app')
   try {
     # ldflags injects fake OAuth creds so checkOAuthCredentials() passes.
@@ -67,7 +67,7 @@ Get-CimInstance Win32_Process -Filter "Name='SendArc.exe'" -ErrorAction Silently
     Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
   }
 
-Write-Host '[run-e2e] running Playwright…' -ForegroundColor Cyan
+Write-Host '[run-e2e] running Playwright...' -ForegroundColor Cyan
 npm run e2e
 $exitCode = $LASTEXITCODE
 

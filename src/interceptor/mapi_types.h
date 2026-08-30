@@ -12,6 +12,19 @@
 // MAPISendMail. The MinGW toolchain retains the local declarations because its
 // SDK/header coverage varies between host architectures.
 #ifdef _MSC_VER
+// Match Microsoft's MAPIStubLibrary ABI exactly. Its forwarding function
+// pointer types deliberately neutralize the modern SDK's noexcept macros
+// before including mapi.h. XFG includes the exception specification in the
+// function-type hash, so retaining WIN_NOEXCEPT_PFN here makes current
+// Windows MAPI32 reject the otherwise-correct ANSI provider entry point.
+#ifdef WIN_NOEXCEPT
+#undef WIN_NOEXCEPT
+#define WIN_NOEXCEPT
+#endif
+#ifdef WIN_NOEXCEPT_PFN
+#undef WIN_NOEXCEPT_PFN
+#define WIN_NOEXCEPT_PFN
+#endif
 #include <mapi.h>
 
 using LPMapiFileDesc = lpMapiFileDesc;

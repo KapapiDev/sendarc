@@ -10,6 +10,9 @@ namespace mapi_test {
 // Test utilities for loading and testing the SendArc interceptor DLL.
 
 // Function pointer type for MAPISendMail
+#ifdef _MSC_VER
+using MAPISendMailFunc = LPMAPISENDMAIL;
+#else
 typedef ULONG (WINAPI *MAPISendMailFunc)(
     LHANDLE lhSession,
     ULONG_PTR ulUIParam,
@@ -17,6 +20,7 @@ typedef ULONG (WINAPI *MAPISendMailFunc)(
     ULONG flFlags,
     ULONG ulReserved
 );
+#endif
 
 class TestUtilities {
 public:

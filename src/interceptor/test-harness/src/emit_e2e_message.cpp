@@ -12,12 +12,16 @@ using namespace mapi_test;
 
 namespace {
 
+#ifdef _MSC_VER
+using MAPISendMailWFunc = LPMAPISENDMAILW;
+#else
 using MAPISendMailWFunc = ULONG(WINAPI *)(
     LHANDLE,
     ULONG_PTR,
     LPMapiMessageW,
     ULONG,
     ULONG);
+#endif
 
 }  // namespace
 

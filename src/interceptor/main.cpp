@@ -3,6 +3,12 @@
 #include "mapi_types.h"
 #include "fs_utils.h"
 
+#ifdef _MSC_VER
+#define SENDARC_MAPI_NOEXCEPT WIN_NOEXCEPT
+#else
+#define SENDARC_MAPI_NOEXCEPT
+#endif
+
 // Forward exports - these will be called through the .def file
 extern "C" {
 
@@ -12,7 +18,7 @@ ULONG STDAPICALLTYPE MAPISendMail(
     LPMapiMessage lpMessage,
     FLAGS flFlags,
     ULONG ulReserved
-) {
+) SENDARC_MAPI_NOEXCEPT {
     return go_mapi::MapiImpl::MAPISendMailA(lhSession, ulUIParam, lpMessage, flFlags, ulReserved);
 }
 
@@ -22,7 +28,7 @@ ULONG STDAPICALLTYPE MAPISendMailW(
     LPMapiMessageW lpMessage,
     FLAGS flFlags,
     ULONG ulReserved
-) {
+) SENDARC_MAPI_NOEXCEPT {
     return go_mapi::MapiImpl::MAPISendMailW(lhSession, ulUIParam, lpMessage, flFlags, ulReserved);
 }
 
@@ -33,7 +39,7 @@ ULONG STDAPICALLTYPE MAPILogon(
     FLAGS flFlags,
     ULONG ulReserved,
     LPLHANDLE lphSession
-) {
+) SENDARC_MAPI_NOEXCEPT {
     return go_mapi::MapiImpl::MAPILogon(ulUIParam, lpszProfileName, lpszPassword, flFlags, ulReserved, lphSession);
 }
 
@@ -42,11 +48,11 @@ ULONG STDAPICALLTYPE MAPILogoff(
     ULONG_PTR ulUIParam,
     FLAGS flFlags,
     ULONG ulReserved
-) {
+) SENDARC_MAPI_NOEXCEPT {
     return go_mapi::MapiImpl::MAPILogoff(lhSession, ulUIParam, flFlags, ulReserved);
 }
 
-ULONG STDAPICALLTYPE MAPIFreeBuffer(LPVOID pv) {
+ULONG STDAPICALLTYPE MAPIFreeBuffer(LPVOID pv) SENDARC_MAPI_NOEXCEPT {
     return go_mapi::MapiImpl::MAPIFreeBuffer(pv);
 }
 
@@ -56,11 +62,13 @@ ULONG STDAPICALLTYPE MAPISendDocuments(
     LPSTR lpszFilePaths,
     LPSTR lpszFileNames,
     ULONG ulReserved
-) {
+) SENDARC_MAPI_NOEXCEPT {
     return go_mapi::MapiImpl::MAPISendDocuments(ulUIParam, lpszDelimChar, lpszFilePaths, lpszFileNames, ulReserved);
 }
 
 }  // extern "C"
+
+#undef SENDARC_MAPI_NOEXCEPT
 
 // DLL Entry Point
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {

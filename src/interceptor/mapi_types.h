@@ -17,6 +17,9 @@
 using LPMapiFileDesc = lpMapiFileDesc;
 using LPMapiRecipDesc = lpMapiRecipDesc;
 using LPMapiMessage = lpMapiMessage;
+using LPMapiFileDescW = lpMapiFileDescW;
+using LPMapiRecipDescW = lpMapiRecipDescW;
+using LPMapiMessageW = lpMapiMessageW;
 #else
 
 // MAPI handle types (not defined in MinGW headers)
@@ -93,8 +96,6 @@ typedef struct
     LPMapiFileDesc lpFiles;
 } MapiMessage, *LPMapiMessage;
 
-#endif  // _MSC_VER
-
 // --- Wide (Unicode) versions (MAPISendMailW) ---
 
 typedef struct
@@ -136,3 +137,5 @@ typedef struct
 #ifdef __cplusplus
 }
 #endif
+
+#endif  // _MSC_VER

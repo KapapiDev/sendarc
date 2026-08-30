@@ -64,14 +64,17 @@ static bool CopyAttachmentsForStem(MailMessage& msg, const std::wstring& stem) {
 
         // Rewrite attachment path/size so the Gmail client reads from the
         // stable copy instead of the caller's about-to-be-deleted TEMP.
-        int n = WideCharToMultiByte(CP_UTF8, 0, newPath.c_str(), -1,
-                                    nullptr, 0, nullptr, nullptr);
-        if (n > 0) {
-            std::string newPathUtf8(n - 1, 0);
-            WideCharToMultiByte(CP_UTF8, 0, newPath.c_str(), -1,
-                                &newPathUtf8[0], n, nullptr, nullptr);
-            att.path = newPathUtf8;
+        std::string newPathUtf8 = message_converter::WideToUtf8(newPath.c_str());
+        if (newPathUtf8.empty()) {
+            for (const auto& p : landed) {
+                DeleteFileW(p.c_str());
+            }
+            RemoveDirectoryW(attachDir.c_str());
+            FsUtils::WriteErrorForStem(stem,
+                "failed to encode queued attachment path");
+            return false;
         }
+        att.path = newPathUtf8;
         att.size = newSize;
     }
     return true;
@@ -90,11 +93,8 @@ std::string MapiImpl::GetOriginApplicationName() {
             filename = processPath;
         }
 
-        // Convert to UTF-8
-        int size_needed = WideCharToMultiByte(CP_UTF8, 0, filename, -1, NULL, 0, NULL, NULL);
-        std::string result(size_needed - 1, 0);
-        WideCharToMultiByte(CP_UTF8, 0, filename, -1, &result[0], size_needed, NULL, NULL);
-        return result;
+        std::string result = message_converter::WideToUtf8(filename);
+        return result.empty() ? "unknown.exe" : result;
     }
 
     return "unknown.exe";

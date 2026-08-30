@@ -42,6 +42,13 @@ TEST_CASE("WideToUtf8 converts ASCII") {
     CHECK(WideToUtf8(L"hello") == "hello");
 }
 
+TEST_CASE("WideToUtf8 preserves a long heap-backed string") {
+    std::wstring input(4096, L'x');
+    std::string converted = WideToUtf8(input.c_str());
+    CHECK(converted.size() == input.size());
+    CHECK(converted == std::string(4096, 'x'));
+}
+
 TEST_CASE("WideToUtf8 converts non-ASCII UTF-16 to UTF-8") {
     // "résumé" — expected UTF-8 byte sequence:
     //   r  é    s  u  m  é
@@ -68,6 +75,11 @@ TEST_CASE("AnsiToUtf8 handles empty string") {
 
 TEST_CASE("AnsiToUtf8 passes through ASCII") {
     CHECK(AnsiToUtf8("hello@example.com") == "hello@example.com");
+}
+
+TEST_CASE("AnsiToUtf8 preserves a long heap-backed ASCII string") {
+    std::string input(4096, 'y');
+    CHECK(AnsiToUtf8(input.c_str()) == input);
 }
 
 TEST_CASE("FilenameFromPath forward slash") {

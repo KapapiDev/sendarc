@@ -60,8 +60,12 @@ static bool fileExists(const std::wstring& path) {
 static std::string toUtf8(const std::wstring& w) {
     if (w.empty()) return "";
     int n = WideCharToMultiByte(CP_UTF8, 0, w.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    std::string out(n - 1, 0);
-    WideCharToMultiByte(CP_UTF8, 0, w.c_str(), -1, &out[0], n, nullptr, nullptr);
+    if (n <= 0) return "";
+    std::string out(n, 0);
+    int converted = WideCharToMultiByte(
+        CP_UTF8, 0, w.c_str(), -1, out.data(), n, nullptr, nullptr);
+    if (converted != n) return "";
+    out.resize(static_cast<size_t>(converted - 1));
     return out;
 }
 

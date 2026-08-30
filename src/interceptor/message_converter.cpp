@@ -9,8 +9,13 @@ std::string WideToUtf8(const wchar_t* wide) {
     if (!wide || !wide[0]) return "";
     int size = WideCharToMultiByte(CP_UTF8, 0, wide, -1, NULL, 0, NULL, NULL);
     if (size <= 0) return "";
-    std::string result(size - 1, 0);
-    WideCharToMultiByte(CP_UTF8, 0, wide, -1, &result[0], size, NULL, NULL);
+    // Include space for the terminator while Win32 writes, then remove it.
+    // Allocating size-1 and passing size is a one-byte buffer overflow.
+    std::string result(size, 0);
+    int converted = WideCharToMultiByte(
+        CP_UTF8, 0, wide, -1, result.data(), size, NULL, NULL);
+    if (converted != size) return "";
+    result.resize(static_cast<size_t>(converted - 1));
     return result;
 }
 
@@ -19,8 +24,11 @@ std::string AnsiToUtf8(const char* ansi) {
     // Step 1: ANSI (system codepage) → UTF-16
     int wideLen = MultiByteToWideChar(CP_ACP, 0, ansi, -1, NULL, 0);
     if (wideLen <= 0) return ansi;  // fallback: return raw bytes
-    std::wstring wide(wideLen - 1, 0);
-    MultiByteToWideChar(CP_ACP, 0, ansi, -1, &wide[0], wideLen);
+    std::wstring wide(wideLen, 0);
+    int converted = MultiByteToWideChar(
+        CP_ACP, 0, ansi, -1, wide.data(), wideLen);
+    if (converted != wideLen) return ansi;
+    wide.resize(static_cast<size_t>(converted - 1));
     // Step 2: UTF-16 → UTF-8
     return WideToUtf8(wide.c_str());
 }

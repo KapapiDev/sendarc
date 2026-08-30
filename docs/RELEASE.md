@@ -36,7 +36,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File src/interceptor/build.ps1 -A
 ctest --test-dir src/interceptor/build-x86 --output-on-failure -C Release
 ```
 
-The release workflow owns the pinned Wails/NSIS commands and version injection. Review that workflow at the tagged commit; do not assume this guide can compensate for stale automation.
+The release workflow owns the pinned Wails/NSIS commands and version injection. Before publication it runs the full installer install/upgrade/uninstall round-trip against the exact final signed-or-unsigned installer bytes, including previous-handler restoration. Review that workflow at the tagged commit; do not assume this guide can compensate for stale automation.
 
 ## Artifact contract
 

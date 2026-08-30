@@ -150,6 +150,8 @@ jobs:
 
       - name: Run Pester smoke tests
         shell: pwsh
+        env:
+          SENDARC_EXPECTED_PRODUCT_VERSION: 0.1.0.0
         run: |
           Import-Module Pester -RequiredVersion 5.7.1 -Force
           $config = New-PesterConfiguration

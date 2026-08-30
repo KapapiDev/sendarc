@@ -73,11 +73,16 @@ public static class SendArcVersionResource
 '@
     }
 
-    # The installer binary is produced by the CI workflow (installer-smoke.yml)
-    # via `makensis src\installer\SendArc.nsi` at the repo root.
+    # The installer binary is staged at the repository root by either the
+    # smoke workflow or the release workflow's exact-artifact acceptance step.
     # Path resolution:
     #   From src/installer/tests/installer.Tests.ps1 ..\..\..\ = repo root
     $script:SetupExe     = Join-Path $PSScriptRoot '..\..\..\SendArc-setup.exe' | Resolve-Path -ErrorAction Stop | ForEach-Object Path
+    $script:ExpectedProductVersion = if ($env:SENDARC_EXPECTED_PRODUCT_VERSION) {
+        $env:SENDARC_EXPECTED_PRODUCT_VERSION
+    } else {
+        '0.1.0.0'
+    }
     $script:InstallDir   = "$env:ProgramFiles\SendArc"
     $script:ProgramData  = "$env:ProgramData\SendArc"
     $script:BackupJson   = "$script:ProgramData\uninst\previous-mail-client.json"
@@ -179,7 +184,7 @@ Describe "SendArc installer round-trip" {
 
             [SendArcVersionResource]::ReadString($appExe, 'ProductName') | Should -Be 'SendArc'
             [SendArcVersionResource]::ReadString($appExe, 'CompanyName') | Should -Be '장형진'
-            [SendArcVersionResource]::ReadString($appExe, 'ProductVersion') | Should -Be '0.1.0.0'
+            [SendArcVersionResource]::ReadString($appExe, 'ProductVersion') | Should -Be $script:ExpectedProductVersion
         }
 
         It "2b. installed license and dependency inventory bundle is complete" {

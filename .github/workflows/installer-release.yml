@@ -96,13 +96,13 @@ jobs:
       - name: Derive version + patch wails.json
         id: version
         shell: pwsh
+        env:
+          RAW_RELEASE_VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
         run: |
-          if ("${{ github.event_name }}" -eq 'push') {
-            $version = "${{ github.ref_name }}" -replace '^v',''
-          } else {
-            $version = "${{ inputs.version }}"
+          $version = $env:RAW_RELEASE_VERSION -replace '^v',''
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') {
+            throw "Invalid release version. Expected SemVer without build metadata."
           }
-          if (-not $version) { throw "Empty version — refusing to build." }
 
           # Patch wails.json so Wails picks the right value for PE metadata
           # (FileVersion / ProductVersion resources). Ephemeral — not committed.
@@ -261,6 +261,33 @@ jobs:
             "### Code signing: unsigned beta`nNo signing credential was configured; the beta artifacts are intentionally unsigned." | Add-Content $env:GITHUB_STEP_SUMMARY
           }
 
+      # Exercise the exact signed-or-unsigned installer that would be published,
+      # not a separately rebuilt smoke artifact. This runs only on the ephemeral
+      # Windows runner and restores the planted previous mail client on teardown.
+      - name: Install Pester 5 for release acceptance
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run installer round-trip against exact release artifact
+        shell: pwsh
+        env:
+          SENDARC_EXPECTED_PRODUCT_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $source = '${{ steps.final.outputs.path }}'
+          Copy-Item -LiteralPath $source -Destination 'SendArc-Setup.exe' -Force
+          $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
+          $testHash = (Get-FileHash -LiteralPath 'SendArc-Setup.exe' -Algorithm SHA256).Hash
+          if ($sourceHash -ne $testHash) { throw 'Release acceptance copy does not match the final installer.' }
+
+          Import-Module Pester -RequiredVersion 5.7.1 -Force
+          $config = New-PesterConfiguration
+          $config.Run.Path         = 'src/installer/tests/installer.Tests.ps1'
+          $config.Run.Exit         = $true
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config
+
       - name: Generate SHA256SUMS.txt
         shell: pwsh
         run: |
@@ -302,5 +329,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: sendarc-setup-release-${{ github.sha }}
-          path: ${{ steps.final.outputs.path }}
+          path: |
+            ${{ steps.final.outputs.path }}
+            SHA256SUMS.txt
           retention-days: 7

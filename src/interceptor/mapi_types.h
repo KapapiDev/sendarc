@@ -6,6 +6,19 @@
 // MAPI Types and Structures
 // Reference: https://learn.microsoft.com/en-us/windows/win32/api/mapi/ns-mapi-mapimessage
 
+// For production MSVC builds, use the Windows SDK's canonical Simple MAPI
+// declarations. Besides preventing ABI drift, this makes the compiler emit
+// the same XFG function-type hash that current Windows MAPI32 stubs expect for
+// MAPISendMail. The MinGW toolchain retains the local declarations because its
+// SDK/header coverage varies between host architectures.
+#ifdef _MSC_VER
+#include <mapi.h>
+
+using LPMapiFileDesc = lpMapiFileDesc;
+using LPMapiRecipDesc = lpMapiRecipDesc;
+using LPMapiMessage = lpMapiMessage;
+#else
+
 // MAPI handle types (not defined in MinGW headers)
 #ifndef LHANDLE
 typedef ULONG_PTR LHANDLE;
@@ -33,7 +46,7 @@ typedef ULONG FLAGS;
 #define MAPI_E_DISK_FULL     4
 #define MAPI_E_INSUFFICIENT_MEMORY 5
 #define MAPI_E_ACCESS_DENIED 6
-#define MAPI_E_INVALID_MESSAGE 7
+#define MAPI_E_INVALID_MESSAGE 17
 
 #ifdef __cplusplus
 extern "C" {
@@ -79,6 +92,8 @@ typedef struct
     ULONG nFileCount;
     LPMapiFileDesc lpFiles;
 } MapiMessage, *LPMapiMessage;
+
+#endif  // _MSC_VER
 
 // --- Wide (Unicode) versions (MAPISendMailW) ---
 

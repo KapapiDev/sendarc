@@ -25,7 +25,8 @@ target_include_directories(SendArc-test-harness PRIVATE
 
 # Platform-specific settings
 if(MSVC)
-    target_compile_options(SendArc-test-harness PRIVATE /W4 /WX-)
+    target_compile_options(SendArc-test-harness PRIVATE /W4 /WX- /guard:cf /guard:xfg)
+    target_link_options(SendArc-test-harness PRIVATE /guard:cf)
     target_link_libraries(SendArc-test-harness PRIVATE kernel32.lib user32.lib shell32.lib)
 elseif(MINGW)
     target_compile_options(SendArc-test-harness PRIVATE -Wall -Wextra -Wno-unused-parameter)
@@ -37,3 +38,10 @@ endif()
 set_target_properties(SendArc-test-harness PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+
+foreach(SENDARC_CONFIG Debug Release RelWithDebInfo MinSizeRel)
+    string(TOUPPER "${SENDARC_CONFIG}" SENDARC_CONFIG_UPPER)
+    set_target_properties(SendArc-test-harness PROPERTIES
+        "RUNTIME_OUTPUT_DIRECTORY_${SENDARC_CONFIG_UPPER}" "${CMAKE_BINARY_DIR}/bin"
+    )
+endforeach()

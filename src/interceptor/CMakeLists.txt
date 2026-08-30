@@ -1,8 +1,19 @@
 cmake_minimum_required(VERSION 3.16)
+
+# The production Windows provider is built with MSVC and a static runtime so
+# the installer does not acquire an undeclared Visual C++ Redistributable
+# dependency. This policy must be selected before project().
+if(POLICY CMP0091)
+    cmake_policy(SET CMP0091 NEW)
+endif()
 project(SendArc-interceptor)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 
 # Version — injected at build time (default if not passed via -D)
 if(NOT DEFINED SENDARC_VERSION)
@@ -40,7 +51,10 @@ target_compile_definitions(message_converter_obj PRIVATE
 # are ABI-compatible. MSVC /W4 and MinGW -Wall are purely compile-time,
 # object files themselves are compatible either way.
 if(MSVC)
-    target_compile_options(message_converter_obj PRIVATE /W4 /WX- /guard:cf)
+    # Current Windows MAPI32 stubs use XFG type-hash dispatch for legacy ANSI
+    # entry points. Emit both CFG and XFG metadata so the system stub can
+    # safely dispatch to this third-party provider on Windows 11/Server 2025.
+    target_compile_options(message_converter_obj PRIVATE /W4 /WX- /guard:cf /guard:xfg)
 elseif(MINGW)
     target_compile_options(message_converter_obj PRIVATE
         -Wall -Wextra -Wno-unused-parameter -mguard=cf)
@@ -80,7 +94,7 @@ endif()
 # Platform-specific settings
 if(MSVC)
     # MSVC specific options
-    target_compile_options(SendArc PRIVATE /W4 /WX- /guard:cf)
+    target_compile_options(SendArc PRIVATE /W4 /WX- /guard:cf /guard:xfg)
     target_link_options(SendArc PRIVATE /guard:cf)
     target_link_libraries(SendArc PRIVATE kernel32.lib user32.lib shell32.lib)
     set_target_properties(SendArc PROPERTIES
@@ -101,6 +115,17 @@ elseif(MINGW)
     # Export symbols using the .def file
     target_sources(SendArc PRIVATE mapi_exports.def)
 endif()
+
+# Multi-config generators normally append Debug/ or Release/ to runtime
+# output paths. Keep the installer contract identical across MSVC and MinGW:
+# build-<arch>/bin/SendArc.dll.
+foreach(SENDARC_CONFIG Debug Release RelWithDebInfo MinSizeRel)
+    string(TOUPPER "${SENDARC_CONFIG}" SENDARC_CONFIG_UPPER)
+    set_target_properties(SendArc PROPERTIES
+        "RUNTIME_OUTPUT_DIRECTORY_${SENDARC_CONFIG_UPPER}" "${CMAKE_BINARY_DIR}/bin"
+        "LIBRARY_OUTPUT_DIRECTORY_${SENDARC_CONFIG_UPPER}" "${CMAKE_BINARY_DIR}/bin"
+    )
+endforeach()
 
 # Add the test harness and the doctest-based unit tests (CPPTEST-01).
 if(BUILD_TESTS)

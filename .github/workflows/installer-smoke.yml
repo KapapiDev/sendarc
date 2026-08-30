@@ -79,13 +79,15 @@ jobs:
         run: |
           wails build -v 0 -platform windows/amd64 -ldflags "-X main.aumidOverride=app.sendarc.desktop -X main.oauthClientID=ci-placeholder.apps.googleusercontent.com -X main.oauthClientSecret=ci-placeholder"
 
-      - name: Install NSIS via scoop (extras bucket)
+      - name: Install pinned NSIS via Chocolatey
         shell: pwsh
         run: |
-          scoop bucket add extras
-          scoop install nsis
-          if ($LASTEXITCODE -ne 0) { throw "scoop install nsis failed (exit $LASTEXITCODE)" }
-          $nsisVersion = (makensis /VERSION).Trim()
+          choco install nsis --version=3.12.0 --yes --no-progress --limit-output
+          if ($LASTEXITCODE -ne 0) { throw "choco install nsis failed (exit $LASTEXITCODE)" }
+          $nsisExe = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
+          if (-not (Test-Path -LiteralPath $nsisExe)) { throw "Pinned NSIS executable not found: $nsisExe" }
+          Split-Path -Parent $nsisExe | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $nsisVersion = (& $nsisExe /VERSION).Trim()
           if ($nsisVersion -ne 'v3.12') { throw "Expected NSIS v3.12, got $nsisVersion; refresh the audited installer inventory before upgrading" }
 
       - name: Compile installer

@@ -52,7 +52,7 @@ ULONG STDAPICALLTYPE MAPILogoff(
     return go_mapi::MapiImpl::MAPILogoff(lhSession, ulUIParam, flFlags, ulReserved);
 }
 
-ULONG STDAPICALLTYPE MAPIFreeBuffer(LPVOID pv) SENDARC_MAPI_NOEXCEPT {
+ULONG STDAPICALLTYPE MAPIFreeBuffer(LPVOID pv) {
     return go_mapi::MapiImpl::MAPIFreeBuffer(pv);
 }
 
@@ -62,7 +62,7 @@ ULONG STDAPICALLTYPE MAPISendDocuments(
     LPSTR lpszFilePaths,
     LPSTR lpszFileNames,
     ULONG ulReserved
-) SENDARC_MAPI_NOEXCEPT {
+) {
     return go_mapi::MapiImpl::MAPISendDocuments(ulUIParam, lpszDelimChar, lpszFilePaths, lpszFileNames, ulReserved);
 }
 

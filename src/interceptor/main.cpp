@@ -1,7 +1,6 @@
 #include <windows.h>
 #include "mapi_impl.h"
 #include "mapi_types.h"
-#include "fs_utils.h"
 
 #ifdef _MSC_VER
 #define SENDARC_MAPI_NOEXCEPT WIN_NOEXCEPT
@@ -167,13 +166,16 @@ __declspec(noinline) ULONG InvokeGuardMetadataAnchor(LONG selector) {
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
     switch (ul_reason_for_call) {
     case DLL_PROCESS_ATTACH:
+        DisableThreadLibraryCalls(hModule);
 #if defined(_MSC_VER) && defined(_M_X64)
         if (g_guardMetadataSelector != 0) {
             InvokeGuardMetadataAnchor(g_guardMetadataSelector);
         }
 #endif
-        // Initialize on DLL load
-        go_mapi::FsUtils::EnsureOutputDirectory();
+        // Do not create queue directories here. Windows MAPI loads providers
+        // while the loader lock is held; shell directory helpers can enter COM
+        // cleanup and fail-fast in that context. The send paths create the
+        // queue lazily after LoadLibrary has completed.
         break;
     case DLL_PROCESS_DETACH:
         // Cleanup on DLL unload

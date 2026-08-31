@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-08-29
+Last updated: 2026-09-01
 
 ## Completed
 
@@ -25,15 +25,18 @@ Last updated: 2026-08-29
 - Local production website captured and compared with the supplied reference; no desktop-width overflow or missing primary imagery was observed.
 - Cloudflare Pages production deployment is live at `https://sendarc.pages.dev`; all 20 deployed desktop/tablet/mobile/landscape Playwright and axe scenarios pass.
 - Production Pages Functions and D1 were verified end to end: Business Beta returned 201 and persisted its declared fields, the allowlisted event endpoint returned 204, invalid events returned 400, and all synthetic verification rows were deleted afterward.
-- Clean GitHub Actions at commit `2be8d82` passed the Wails app, x64/x86 Debug/Release interceptors, installer Pester round-trip, website, and security/policy jobs.
+- Clean GitHub Actions at commit `d7f6086` passed the Wails app, x64/x86 Debug/Release interceptors, 31-case installer Pester round-trip, website, and security/policy jobs.
 - Google Authentication Platform is configured for SendArc with external Testing audience, the controlled test account, deployed policy URLs, authorized `sendarc.pages.dev` domain, and exactly the `gmail.send` scope.
 - The enabled `SendArc Windows Desktop` OAuth client is injected only through the gitignored local environment file and protected GitHub Actions secrets; no credential values were committed.
-- Protected installer release dry-run [33126115747](https://github.com/maxtop9843-byte/sendarc/actions/runs/33126115747) built the OAuth-injected Wails app, both interceptor DLLs, unsigned beta installer, and checksum successfully without publishing a tag or release; neither OAuth value appeared in the workflow log.
+- Protected installer release dry-run [33413608181](https://github.com/kapapi-dev/sendarc/actions/runs/33413608181) built the OAuth-injected Wails app, both interceptor DLLs, unsigned beta installer, and checksum from `d7f6086` without publishing a tag or release. The exact final installer passed all 31 release Pester cases, including installed x64/x86 ANSI and Unicode system-MAPI routing; neither OAuth value appeared in the workflow log.
+- The downloaded dry-run `SendArc-Setup-0.1.0-beta.exe` independently matched `SHA256SUMS.txt` (`09d19ca5d0161cdff9f9525c899f92ef1ef21cbf15b50b7aa137cd2557106a2c`) and was confirmed unsigned as authorized.
 - The local Windows app reached Google's account chooser with an ephemeral loopback redirect, S256 PKCE, offline access, SendArc policy links, and exactly the `gmail.send` scope.
 - OAuth preflight copy now tells users to stop on an unverified/unsafe warning instead of instructing them to bypass it, and credential-bearing Wails builds run quietly so ldflags are not printed.
 - Active rebrand audit completed and documented in `docs/REBRAND_AUDIT.md`; obsolete pre-SendArc sandbox/Azure/installer tooling and the disabled silent binary-replacement experiment were removed rather than left as misleading or risky paths.
 - The Windows Status screen now reads real Gmail/MAPI state, 32-bit and 64-bit bridge presence, default-handler registration, and privacy-safe last-intercept/last-send timestamps; its Gmail connection test calls Google's token introspection endpoint without reading or sending mail.
 - Broken MAPI registration now has a guarded administrator repair path that preserves the installer's prior-handler backup and refuses to run when installed bridge files are incomplete. The non-elevated boundary, backend logic, small-window layout, keyboard focus, and Escape/focus-return behavior are tested; final installed UAC repair remains an acceptance check.
+- Windows Server 2025 installed-provider acceptance now covers x64 and x86 `MAPISendMail` plus `MAPISendMailW`. A loader-lock fail-fast was traced to shell directory creation in `DllMain`; queue creation is now lazy at the first mail call, and the final installer round-trip passes 31/31.
+- The deployed Cloudflare site was rechecked on 2026-09-01 across desktop, tablet, mobile, small-mobile, and mobile-landscape: all 20 Playwright/axe scenarios passed without creating production form data.
 
 ## Not yet complete
 

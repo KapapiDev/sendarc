@@ -1,6 +1,7 @@
 # Website visual QA
 
-Date: 2026-08-28
+Initial capture: 2026-08-28
+Production recheck: 2026-09-01
 
 ## Evidence
 
@@ -28,4 +29,4 @@ Intentional product-truth changes from the reference:
 
 ## Result
 
-The local production build is visually coherent with the supplied direction and has no observed desktop-width overflow or missing primary imagery. The production deployment at `https://sendarc.pages.dev` was then verified at desktop, tablet, mobile, small-mobile, and mobile-landscape sizes: all 20 Playwright scenarios passed, including axe accessibility, responsive overflow, navigation/legal routes, FAQ interaction, and the declared-field form contract.
+The local production build is visually coherent with the supplied direction and has no observed desktop-width overflow or missing primary imagery. The production deployment at `https://sendarc.pages.dev` was rechecked on 2026-09-01 at desktop, tablet, mobile, small-mobile, and mobile-landscape sizes: all 20 Playwright scenarios passed, including axe accessibility, responsive overflow, navigation/legal routes, FAQ interaction, and the declared-field form contract. The form request was intercepted, so this visual/interaction check created no production submission.

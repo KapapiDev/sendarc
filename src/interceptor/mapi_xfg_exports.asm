@@ -16,37 +16,46 @@ EXTERN SendArc_MAPISendDocuments_Impl:PROC
 
 .code
 
-ALIGN 8
+; XFG dispatch rejects targets whose low nibble is non-zero before comparing
+; the hash at target-8. Keep one padding qword before each hash so the public
+; entry itself, rather than the hash, begins on a 16-byte boundary.
+ALIGN 16
+DQ 0
 DQ 0A255A7A23CD2DB71h
 MAPISendMail PROC
     jmp SendArc_MAPISendMail_Impl
 MAPISendMail ENDP
 
-ALIGN 8
+ALIGN 16
+DQ 0
 DQ 0D8D0BEE67A5D3271h
 MAPISendMailW PROC
     jmp SendArc_MAPISendMailW_Impl
 MAPISendMailW ENDP
 
-ALIGN 8
+ALIGN 16
+DQ 0
 DQ 0E755B7C63ED19871h
 MAPILogon PROC
     jmp SendArc_MAPILogon_Impl
 MAPILogon ENDP
 
-ALIGN 8
+ALIGN 16
+DQ 0
 DQ 081F0A751725AF871h
 MAPILogoff PROC
     jmp SendArc_MAPILogoff_Impl
 MAPILogoff ENDP
 
-ALIGN 8
+ALIGN 16
+DQ 0
 DQ 0B099976A12DCA271h
 MAPIFreeBuffer PROC
     jmp SendArc_MAPIFreeBuffer_Impl
 MAPIFreeBuffer ENDP
 
-ALIGN 8
+ALIGN 16
+DQ 0
 DQ 0A738177716D2C171h
 MAPISendDocuments PROC
     jmp SendArc_MAPISendDocuments_Impl

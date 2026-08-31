@@ -10,19 +10,20 @@
 #endif
 
 // Current x64 Windows mapi32.dll validates Simple MAPI providers through XFG.
-// The companion MASM file owns the public x64 entry points and their canonical
-// hashes, then tail-jumps to these implementation names. x86 and portable
-// builds keep exporting the C++ definitions directly.
+// Let MSVC own the public definitions so /guard:cf /guard:xfg emits both the
+// prototype hash and IMAGE_GUARD_FLAG_FID_XFG metadata for each call target.
+// The .def file keeps the stable undecorated names; dllexport makes the same
+// ownership explicit to the compiler and linker.
 #if defined(_MSC_VER) && defined(_M_X64)
-#define SENDARC_MAPI_ENTRY(name) SendArc_##name##_Impl
+#define SENDARC_MAPI_EXPORT __declspec(dllexport)
 #else
-#define SENDARC_MAPI_ENTRY(name) name
+#define SENDARC_MAPI_EXPORT
 #endif
 
 // Forward exports - these will be called through the .def file
 extern "C" {
 
-ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPISendMail)(
+SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPISendMail(
     LHANDLE lhSession,
     ULONG_PTR ulUIParam,
     LPMapiMessage lpMessage,
@@ -32,7 +33,7 @@ ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPISendMail)(
     return go_mapi::MapiImpl::MAPISendMailA(lhSession, ulUIParam, lpMessage, flFlags, ulReserved);
 }
 
-ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPISendMailW)(
+SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPISendMailW(
     LHANDLE lhSession,
     ULONG_PTR ulUIParam,
     LPMapiMessageW lpMessage,
@@ -42,7 +43,7 @@ ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPISendMailW)(
     return go_mapi::MapiImpl::MAPISendMailW(lhSession, ulUIParam, lpMessage, flFlags, ulReserved);
 }
 
-ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPILogon)(
+SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPILogon(
     ULONG_PTR ulUIParam,
     LPSTR lpszProfileName,
     LPSTR lpszPassword,
@@ -53,7 +54,7 @@ ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPILogon)(
     return go_mapi::MapiImpl::MAPILogon(ulUIParam, lpszProfileName, lpszPassword, flFlags, ulReserved, lphSession);
 }
 
-ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPILogoff)(
+SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPILogoff(
     LHANDLE lhSession,
     ULONG_PTR ulUIParam,
     FLAGS flFlags,
@@ -62,11 +63,11 @@ ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPILogoff)(
     return go_mapi::MapiImpl::MAPILogoff(lhSession, ulUIParam, flFlags, ulReserved);
 }
 
-ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPIFreeBuffer)(LPVOID pv) {
+SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPIFreeBuffer(LPVOID pv) {
     return go_mapi::MapiImpl::MAPIFreeBuffer(pv);
 }
 
-ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPISendDocuments)(
+SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPISendDocuments(
     ULONG_PTR ulUIParam,
     LPSTR lpszDelimChar,
     LPSTR lpszFilePaths,
@@ -79,56 +80,6 @@ ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPISendDocuments)(
 }  // extern "C"
 
 #if defined(_MSC_VER) && defined(_M_X64)
-// The public x64 names are implemented by mapi_xfg_exports.asm. Declare and
-// take their addresses in guarded C++ code so the MSVC toolchain records the
-// assembly landing pads as valid CFG targets. XFG validates the hash at
-// target-8, but the underlying CFG gate must also accept the target RVA.
-extern "C" {
-
-ULONG STDAPICALLTYPE MAPISendMail(
-    LHANDLE lhSession,
-    ULONG_PTR ulUIParam,
-    LPMapiMessage lpMessage,
-    FLAGS flFlags,
-    ULONG ulReserved
-) SENDARC_MAPI_NOEXCEPT;
-
-ULONG STDAPICALLTYPE MAPISendMailW(
-    LHANDLE lhSession,
-    ULONG_PTR ulUIParam,
-    LPMapiMessageW lpMessage,
-    FLAGS flFlags,
-    ULONG ulReserved
-) SENDARC_MAPI_NOEXCEPT;
-
-ULONG STDAPICALLTYPE MAPILogon(
-    ULONG_PTR ulUIParam,
-    LPSTR lpszProfileName,
-    LPSTR lpszPassword,
-    FLAGS flFlags,
-    ULONG ulReserved,
-    LPLHANDLE lphSession
-) SENDARC_MAPI_NOEXCEPT;
-
-ULONG STDAPICALLTYPE MAPILogoff(
-    LHANDLE lhSession,
-    ULONG_PTR ulUIParam,
-    FLAGS flFlags,
-    ULONG ulReserved
-) SENDARC_MAPI_NOEXCEPT;
-
-ULONG STDAPICALLTYPE MAPIFreeBuffer(LPVOID pv);
-
-ULONG STDAPICALLTYPE MAPISendDocuments(
-    ULONG_PTR ulUIParam,
-    LPSTR lpszDelimChar,
-    LPSTR lpszFilePaths,
-    LPSTR lpszFileNames,
-    ULONG ulReserved
-);
-
-}  // extern "C"
-
 namespace {
 
 volatile LONG g_guardMetadataSelector = 0;
@@ -162,7 +113,7 @@ __declspec(noinline) ULONG InvokeGuardMetadataAnchor(LONG selector) {
 #endif
 
 #undef SENDARC_MAPI_NOEXCEPT
-#undef SENDARC_MAPI_ENTRY
+#undef SENDARC_MAPI_EXPORT
 
 // DLL Entry Point
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {

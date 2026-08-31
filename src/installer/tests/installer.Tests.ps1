@@ -84,6 +84,7 @@ public static class SendArcVersionResource
         '0.1.0.0'
     }
     $script:SystemMapiProbe = Join-Path $PSScriptRoot '..\..\interceptor\build-x64\bin\SendArc-test-harness.exe' | Resolve-Path -ErrorAction Stop | ForEach-Object Path
+    $script:SystemMapiProbe32 = Join-Path $PSScriptRoot '..\..\interceptor\build-x86\bin\SendArc-test-harness.exe' | Resolve-Path -ErrorAction Stop | ForEach-Object Path
     $script:InstallDir   = "$env:ProgramFiles\SendArc"
     $script:ProgramData  = "$env:ProgramData\SendArc"
     $script:BackupJson   = "$script:ProgramData\uninst\previous-mail-client.json"
@@ -237,19 +238,7 @@ Describe "SendArc installer round-trip" {
                 ForEach-Object FullName)
             $created = @()
             try {
-                if ($env:SENDARC_PROCDUMP_PATH -and $env:SENDARC_DUMP_FOLDER) {
-                    $proc = Start-Process -FilePath $env:SENDARC_PROCDUMP_PATH -ArgumentList @(
-                        '-accepteula',
-                        '-mm',
-                        '-e', '1',
-                        '-n', '1',
-                        '-x', $env:SENDARC_DUMP_FOLDER,
-                        $script:SystemMapiProbe,
-                        '--emit-system-mapi-ansi'
-                    ) -Wait -PassThru -NoNewWindow
-                } else {
-                    $proc = Start-Process -FilePath $script:SystemMapiProbe -ArgumentList '--emit-system-mapi-ansi' -Wait -PassThru -NoNewWindow
-                }
+                $proc = Start-Process -FilePath $script:SystemMapiProbe -ArgumentList '--emit-system-mapi-ansi' -Wait -PassThru -NoNewWindow
                 $proc.ExitCode | Should -Be 0
 
                 $created = @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File -ErrorAction Stop |
@@ -295,6 +284,67 @@ Describe "SendArc installer round-trip" {
                 $message.recipients.to[0].address | Should -Be 'SMTP:alice@example.com'
                 $message.recipients.cc[0].address | Should -Be 'SMTP:carlos@example.com'
                 $message.recipients.bcc[0].address | Should -Be 'SMTP:bea@example.com'
+                @($message.attachments).Count | Should -Be 1
+                $message.attachments[0].filename | Should -Be '네이티브-증빙.txt'
+                $message.originApp | Should -Be 'SendArc-test-harness.exe'
+                Test-Path -LiteralPath $message.attachments[0].path | Should -BeTrue
+            } finally {
+                foreach ($item in $created) {
+                    $attachmentDir = Join-Path $queueDir $item.BaseName
+                    if (Test-Path -LiteralPath $attachmentDir) {
+                        Remove-Item -LiteralPath $attachmentDir -Recurse -Force
+                    }
+                    Remove-Item -LiteralPath $item.FullName -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+
+        It "3c. 32-bit Windows MAPI32 routes a legacy ANSI call into the installed x86 handler" {
+            $queueDir = Join-Path $env:LOCALAPPDATA 'SendArc\queue'
+            New-Item -ItemType Directory -Path $queueDir -Force | Out-Null
+            $before = @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File -ErrorAction SilentlyContinue |
+                ForEach-Object FullName)
+            $created = @()
+            try {
+                $proc = Start-Process -FilePath $script:SystemMapiProbe32 -ArgumentList '--emit-system-mapi-ansi' -Wait -PassThru -NoNewWindow
+                $proc.ExitCode | Should -Be 0
+
+                $created = @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File -ErrorAction Stop |
+                    Where-Object FullName -NotIn $before)
+                $created.Count | Should -Be 1 -Because 'one x86 ANSI system MAPI call must create exactly one queue item'
+
+                $message = Get-Content -LiteralPath $created[0].FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+                $message.subject | Should -Be 'Native ANSI MAPI routing proof'
+                @($message.recipients.to).Count | Should -Be 1
+                $message.recipients.to[0].address | Should -Be 'SMTP:alice@example.com'
+                @($message.attachments).Count | Should -Be 0
+                $message.originApp | Should -Be 'SendArc-test-harness.exe'
+            } finally {
+                foreach ($item in $created) {
+                    Remove-Item -LiteralPath $item.FullName -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+
+        It "3d. 32-bit Windows MAPI32 routes a Unicode call with attachment into the installed x86 handler" {
+            $queueDir = Join-Path $env:LOCALAPPDATA 'SendArc\queue'
+            New-Item -ItemType Directory -Path $queueDir -Force | Out-Null
+            $before = @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File -ErrorAction SilentlyContinue |
+                ForEach-Object FullName)
+            $created = @()
+            try {
+                $proc = Start-Process -FilePath $script:SystemMapiProbe32 -ArgumentList '--emit-system-mapi' -Wait -PassThru -NoNewWindow
+                $proc.ExitCode | Should -Be 0
+
+                $created = @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File -ErrorAction Stop |
+                    Where-Object FullName -NotIn $before)
+                $created.Count | Should -Be 1 -Because 'one x86 Unicode system MAPI call must create exactly one queue item'
+
+                $message = Get-Content -LiteralPath $created[0].FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+                $message.subject | Should -Be 'Native MAPI preview proof'
+                @($message.recipients.to).Count | Should -Be 1
+                @($message.recipients.cc).Count | Should -Be 1
+                @($message.recipients.bcc).Count | Should -Be 1
                 @($message.attachments).Count | Should -Be 1
                 $message.attachments[0].filename | Should -Be '네이티브-증빙.txt'
                 $message.originApp | Should -Be 'SendArc-test-harness.exe'

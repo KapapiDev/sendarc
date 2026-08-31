@@ -129,6 +129,17 @@ jobs:
           New-Item -Path $dumpKey -Force | Out-Null
           New-ItemProperty -Path $dumpKey -Name DumpFolder -PropertyType ExpandString -Value $dumpFolder -Force | Out-Null
           New-ItemProperty -Path $dumpKey -Name DumpType -PropertyType DWord -Value 1 -Force | Out-Null
+          $procDumpRoot = Join-Path $env:RUNNER_TEMP 'ProcDump'
+          $procDumpZip = Join-Path $env:RUNNER_TEMP 'Procdump.zip'
+          Invoke-WebRequest -Uri 'https://download.sysinternals.com/files/Procdump.zip' -OutFile $procDumpZip
+          Expand-Archive -LiteralPath $procDumpZip -DestinationPath $procDumpRoot -Force
+          $procDump = Join-Path $procDumpRoot 'procdump64.exe'
+          $signature = Get-AuthenticodeSignature -LiteralPath $procDump
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+            throw "ProcDump signature verification failed: $($signature.Status) $($signature.SignerCertificate.Subject)"
+          }
+          & $procDump -accepteula -i $dumpFolder -mp
+          if ($LASTEXITCODE -ne 0) { throw "ProcDump postmortem registration failed (exit $LASTEXITCODE)" }
 
       - name: Run Pester smoke tests
         shell: pwsh
@@ -168,6 +179,16 @@ jobs:
           path: ${{ runner.temp }}/SendArcDiagnostics
           if-no-files-found: warn
           retention-days: 1
+
+      - name: Remove temporary crash-dump registration
+        if: always()
+        shell: pwsh
+        run: |
+          $procDump = Join-Path $env:RUNNER_TEMP 'ProcDump\procdump64.exe'
+          if (Test-Path -LiteralPath $procDump) {
+            & $procDump -u
+          }
+          Remove-Item -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\SendArc-test-harness.exe' -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Upload installer as workflow artifact (for debugging failed runs)
         if: always()

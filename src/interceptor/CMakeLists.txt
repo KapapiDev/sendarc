@@ -24,6 +24,12 @@ endif()
 option(BUILD_TESTS "Build test harness" ON)
 option(SENDARC_E2E "Enable test-only queue redirection for hermetic E2E" OFF)
 
+set(SENDARC_XFG_EXPORT_SOURCE "")
+if(MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+    enable_language(ASM_MASM)
+    set(SENDARC_XFG_EXPORT_SOURCE mapi_xfg_exports.asm)
+endif()
+
 # CPPTEST-01: enable CTest so add_subdirectory(tests) can register the
 # doctest message_converter_tests target with `ctest --output-on-failure`.
 enable_testing()
@@ -72,6 +78,7 @@ add_library(SendArc SHARED
     mapi_impl.cpp
     json_writer.cpp
     fs_utils.cpp
+    ${SENDARC_XFG_EXPORT_SOURCE}
     $<TARGET_OBJECTS:message_converter_obj>
 )
 

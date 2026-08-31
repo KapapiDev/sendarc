@@ -9,20 +9,20 @@
 #define SENDARC_MAPI_NOEXCEPT
 #endif
 
-// The .def file preserves the stable Simple MAPI names. On x64, dllexport also
-// makes the compiler own each public entry point so /guard:xfg emits the type
-// hash immediately before the address returned by GetProcAddress. This is the
-// address current Windows mapi32.dll validates before its indirect call.
+// Current x64 Windows mapi32.dll validates Simple MAPI providers through XFG.
+// The companion MASM file owns the public x64 entry points and their canonical
+// hashes, then tail-jumps to these implementation names. x86 and portable
+// builds keep exporting the C++ definitions directly.
 #if defined(_MSC_VER) && defined(_M_X64)
-#define SENDARC_MAPI_EXPORT __declspec(dllexport)
+#define SENDARC_MAPI_ENTRY(name) SendArc_##name##_Impl
 #else
-#define SENDARC_MAPI_EXPORT
+#define SENDARC_MAPI_ENTRY(name) name
 #endif
 
 // Forward exports - these will be called through the .def file
 extern "C" {
 
-SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPISendMail(
+ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPISendMail)(
     LHANDLE lhSession,
     ULONG_PTR ulUIParam,
     LPMapiMessage lpMessage,
@@ -32,7 +32,7 @@ SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPISendMail(
     return go_mapi::MapiImpl::MAPISendMailA(lhSession, ulUIParam, lpMessage, flFlags, ulReserved);
 }
 
-SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPISendMailW(
+ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPISendMailW)(
     LHANDLE lhSession,
     ULONG_PTR ulUIParam,
     LPMapiMessageW lpMessage,
@@ -42,7 +42,7 @@ SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPISendMailW(
     return go_mapi::MapiImpl::MAPISendMailW(lhSession, ulUIParam, lpMessage, flFlags, ulReserved);
 }
 
-SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPILogon(
+ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPILogon)(
     ULONG_PTR ulUIParam,
     LPSTR lpszProfileName,
     LPSTR lpszPassword,
@@ -53,7 +53,7 @@ SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPILogon(
     return go_mapi::MapiImpl::MAPILogon(ulUIParam, lpszProfileName, lpszPassword, flFlags, ulReserved, lphSession);
 }
 
-SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPILogoff(
+ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPILogoff)(
     LHANDLE lhSession,
     ULONG_PTR ulUIParam,
     FLAGS flFlags,
@@ -62,11 +62,11 @@ SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPILogoff(
     return go_mapi::MapiImpl::MAPILogoff(lhSession, ulUIParam, flFlags, ulReserved);
 }
 
-SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPIFreeBuffer(LPVOID pv) {
+ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPIFreeBuffer)(LPVOID pv) {
     return go_mapi::MapiImpl::MAPIFreeBuffer(pv);
 }
 
-SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPISendDocuments(
+ULONG STDAPICALLTYPE SENDARC_MAPI_ENTRY(MAPISendDocuments)(
     ULONG_PTR ulUIParam,
     LPSTR lpszDelimChar,
     LPSTR lpszFilePaths,
@@ -79,55 +79,12 @@ SENDARC_MAPI_EXPORT ULONG STDAPICALLTYPE MAPISendDocuments(
 }  // extern "C"
 
 #undef SENDARC_MAPI_NOEXCEPT
-#undef SENDARC_MAPI_EXPORT
-
-#if defined(_MSC_VER) && defined(_M_X64)
-namespace {
-
-// MSVC emits a gxfg prototype record only when a function is a possible
-// target of an instrumented indirect call. DLL exports alone receive CFG
-// metadata but no XFG type hash. Keep a disabled, volatile dispatch anchor so
-// every Simple MAPI export is compiled as a genuine XFG call target. The
-// selector is initialized before DllMain and is never changed by SendArc.
-volatile LONG g_xfgMetadataSelector = 0;
-decltype(&MAPISendMail) volatile g_xfgMapiSendMail = &MAPISendMail;
-decltype(&MAPISendMailW) volatile g_xfgMapiSendMailW = &MAPISendMailW;
-decltype(&MAPILogon) volatile g_xfgMapiLogon = &MAPILogon;
-decltype(&MAPILogoff) volatile g_xfgMapiLogoff = &MAPILogoff;
-decltype(&MAPIFreeBuffer) volatile g_xfgMapiFreeBuffer = &MAPIFreeBuffer;
-decltype(&MAPISendDocuments) volatile g_xfgMapiSendDocuments = &MAPISendDocuments;
-
-__declspec(noinline) ULONG InvokeXfgMetadataAnchor(LONG selector) {
-    switch (selector) {
-    case 1:
-        return g_xfgMapiSendMail(0, 0, nullptr, 0, 0);
-    case 2:
-        return g_xfgMapiSendMailW(0, 0, nullptr, 0, 0);
-    case 3:
-        return g_xfgMapiLogon(0, nullptr, nullptr, 0, 0, nullptr);
-    case 4:
-        return g_xfgMapiLogoff(0, 0, 0, 0);
-    case 5:
-        return g_xfgMapiFreeBuffer(nullptr);
-    case 6:
-        return g_xfgMapiSendDocuments(0, nullptr, nullptr, nullptr, 0);
-    default:
-        return SUCCESS_SUCCESS;
-    }
-}
-
-}  // namespace
-#endif
+#undef SENDARC_MAPI_ENTRY
 
 // DLL Entry Point
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
     switch (ul_reason_for_call) {
     case DLL_PROCESS_ATTACH:
-#if defined(_MSC_VER) && defined(_M_X64)
-        if (g_xfgMetadataSelector != 0) {
-            InvokeXfgMetadataAnchor(g_xfgMetadataSelector);
-        }
-#endif
         // Initialize on DLL load
         go_mapi::FsUtils::EnsureOutputDirectory();
         break;

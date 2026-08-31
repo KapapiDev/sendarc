@@ -5,7 +5,7 @@
 .DESCRIPTION
   Phase 11 plan 06 CI guard. The e2e harness relies on two knobs:
 
-    1. The `-tags e2e` build tag, which compiles src/app/auth_e2e.go —
+    1. The `-tags e2e` build tag, which compiles src/app/auth_e2e.go -
        that file swaps the Windows Credential Manager keyring for an
        in-memory fake populated from SENDARC_E2E_FAKE_TOKEN_JSON.
     2. The GOMAPI_DEBUG_BROWSER_ARGS env var, honored by our vendored
@@ -68,21 +68,21 @@ $workflowCode = $codeLines -join "`n"
 
 # 1. The release workflow must not pass -tags e2e to the Go build.
 if ($workflowCode -match '-tags\s+[^\s]*e2e') {
-  Fail "installer-release workflow contains '-tags e2e' — this would ship test hooks in production"
+  Fail "installer-release workflow contains '-tags e2e' - this would ship test hooks in production"
 } else {
   Pass "no '-tags e2e' in installer-release workflow"
 }
 
 # 2. The release workflow must not export GOMAPI_DEBUG_BROWSER_ARGS.
 if ($workflowCode -match 'GOMAPI_DEBUG_BROWSER_ARGS') {
-  Fail "installer-release workflow references GOMAPI_DEBUG_BROWSER_ARGS — this would expose WebView2 CDP in release builds"
+  Fail "installer-release workflow references GOMAPI_DEBUG_BROWSER_ARGS - this would expose WebView2 CDP in release builds"
 } else {
   Pass "no GOMAPI_DEBUG_BROWSER_ARGS in installer-release workflow"
 }
 
 # 3. Likewise for SENDARC_E2E_* overrides.
 if ($workflowCode -match 'SENDARC_E2E_') {
-  Fail "installer-release workflow references SENDARC_E2E_* — e2e fakes must never reach release builds"
+  Fail "installer-release workflow references SENDARC_E2E_* - e2e fakes must never reach release builds"
 } else {
   Pass "no SENDARC_E2E_* env vars in installer-release workflow"
 }
@@ -101,7 +101,7 @@ if ($BuildEnvDump -and (Test-Path $BuildEnvDump)) {
     Pass "build env dump has no SENDARC_E2E_* vars"
   }
 } else {
-  Write-Host "[release-hygiene] INFO: no BuildEnvDump provided — skipping env dump scan" -ForegroundColor Yellow
+  Write-Host "[release-hygiene] INFO: no BuildEnvDump provided - skipping env dump scan" -ForegroundColor Yellow
 }
 
 # 5. Scan compiled release artifacts. E2E-only variables are isolated behind
@@ -129,7 +129,7 @@ foreach ($artifact in $ArtifactPaths) {
 }
 
 if ($ArtifactPaths.Count -eq 0) {
-  Write-Host "[release-hygiene] INFO: no ArtifactPaths provided — skipping compiled-byte scan" -ForegroundColor Yellow
+  Write-Host "[release-hygiene] INFO: no ArtifactPaths provided - skipping compiled-byte scan" -ForegroundColor Yellow
 }
 
 if ($failed) {

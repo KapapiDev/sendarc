@@ -120,6 +120,16 @@ jobs:
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
 
+      - name: Enable isolated MAPI harness crash dumps
+        shell: pwsh
+        run: |
+          $dumpFolder = Join-Path $env:RUNNER_TEMP 'SendArcDumps'
+          New-Item -ItemType Directory -Force -Path $dumpFolder | Out-Null
+          $dumpKey = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\SendArc-test-harness.exe'
+          New-Item -Path $dumpKey -Force | Out-Null
+          New-ItemProperty -Path $dumpKey -Name DumpFolder -PropertyType ExpandString -Value $dumpFolder -Force | Out-Null
+          New-ItemProperty -Path $dumpKey -Name DumpType -PropertyType DWord -Value 1 -Force | Out-Null
+
       - name: Run Pester smoke tests
         shell: pwsh
         env:
@@ -131,6 +141,33 @@ jobs:
           $config.Run.Exit         = $true
           $config.Output.Verbosity = 'Detailed'
           Invoke-Pester -Configuration $config
+
+      - name: Capture MAPI failure diagnostics
+        if: failure()
+        shell: pwsh
+        run: |
+          $diagnosticRoot = Join-Path $env:RUNNER_TEMP 'SendArcDiagnostics'
+          New-Item -ItemType Directory -Force -Path $diagnosticRoot | Out-Null
+          $events = Get-WinEvent -FilterHashtable @{
+            LogName = 'Application'
+            StartTime = (Get-Date).AddMinutes(-15)
+          } -ErrorAction SilentlyContinue | Where-Object {
+            $_.Message -match 'SendArc-test-harness'
+          }
+          $events | Format-List TimeCreated, Id, ProviderName, LevelDisplayName, Message |
+            Out-File -FilePath (Join-Path $diagnosticRoot 'application-events.txt') -Encoding utf8
+          Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'SendArcDumps') -File -ErrorAction SilentlyContinue |
+            ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $diagnosticRoot -Force }
+          Get-ChildItem -LiteralPath $diagnosticRoot -File | Select-Object Name, Length
+
+      - name: Upload MAPI failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: sendarc-mapi-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/SendArcDiagnostics
+          if-no-files-found: warn
+          retention-days: 1
 
       - name: Upload installer as workflow artifact (for debugging failed runs)
         if: always()

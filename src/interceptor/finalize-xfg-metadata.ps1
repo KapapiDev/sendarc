@@ -3,7 +3,8 @@
 # MSVC 14.51 accepts /guard:xfg and advertises XFG at image level, but does
 # not emit IMAGE_GUARD_FLAG_FID_XFG on MASM-defined functions. The six public
 # landing pads carry canonical type hashes in mapi_xfg_exports.asm; this script
-# marks only those verified GFID entries as XFG targets before code signing.
+# marks only those verified GFID entries as XFG targets that participate in
+# export suppression, matching the metadata used by the Windows MAPI shim.
 
 param(
     [Parameter(Mandatory = $true)]
@@ -124,7 +125,7 @@ $guardTableVa = Read-U64 ($loadConfigOffset + 128)
 $guardFunctionCount = Read-U64 ($loadConfigOffset + 136)
 $guardFlags = Read-U32 ($loadConfigOffset + 144)
 
-$requiredImageFlags = [uint32]0x00800500
+$requiredImageFlags = [uint32]0x00804500
 if (($guardFlags -band $requiredImageFlags) -ne $requiredImageFlags) {
     throw "The provider is missing required CFG/XFG image flags (0x$($guardFlags.ToString('X8')))."
 }
@@ -180,7 +181,10 @@ foreach ($entry in $expectedHashes.GetEnumerator()) {
     }
 
     $metadataOffset = $gfidOffset + 4
-    $bytes[$metadataOffset] = [byte]($bytes[$metadataOffset] -bor 0x08)
+    # IMAGE_GUARD_FLAG_EXPORT_SUPPRESSED (0x02) lets GetProcAddress enable the
+    # exported target, while IMAGE_GUARD_FLAG_FID_XFG (0x08) makes the XFG
+    # dispatcher validate the canonical type hash stored at target - 8.
+    $bytes[$metadataOffset] = [byte]($bytes[$metadataOffset] -bor 0x0A)
     Write-Host "XFG target verified: $name RVA=0x$($targetRva.ToString('X8')) hash=0x$($actualHash.ToString('X16')) flags=0x$($bytes[$metadataOffset].ToString('X2'))"
 }
 

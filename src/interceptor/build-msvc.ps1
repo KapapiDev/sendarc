@@ -119,6 +119,10 @@ $provider = Join-Path $buildDir "bin\SendArc.dll"
 if (-not (Test-Path -LiteralPath $provider)) {
     throw "MSVC build did not produce $provider."
 }
+if ($Arch -eq "x64") {
+    $xfgFinalizer = Join-Path $interceptorRoot "finalize-xfg-metadata.ps1"
+    & $xfgFinalizer -Path $provider
+}
 if ($Tests) {
     $harness = Join-Path $buildDir "bin\SendArc-test-harness.exe"
     if (-not (Test-Path -LiteralPath $harness)) {

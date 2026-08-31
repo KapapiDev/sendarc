@@ -104,7 +104,7 @@ jobs:
           INTERCEPTOR_VERSION: ${{ steps.version.outputs.version }}
         run: |
           .\src\interceptor\build-msvc.ps1 -Arch x64 -Config Release -Version $env:INTERCEPTOR_VERSION -Tests -Clean
-          .\src\interceptor\build-msvc.ps1 -Arch x86 -Config Release -Version $env:INTERCEPTOR_VERSION -Clean
+          .\src\interceptor\build-msvc.ps1 -Arch x86 -Config Release -Version $env:INTERCEPTOR_VERSION -Tests -Clean
 
       # PATTERNS.md §Shared Pattern 4: all four injectable vars are in `package main`
       # at src/app/. Use -X main.<var>=<value>. CONTEXT D-15's `github.com/marcfargas/go-mapi/src/app`

@@ -107,11 +107,20 @@ endif()
 # Platform-specific settings
 if(MSVC)
     # MSVC specific options
-    target_compile_options(SendArc PRIVATE /W4 /WX-)
+    # The x64 target also contains a MASM source file for the canonical XFG
+    # export landing pads. Keep C/C++-only switches away from ml64.exe.
+    target_compile_options(SendArc PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:/W4>
+        $<$<COMPILE_LANGUAGE:CXX>:/WX->
+    )
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        target_compile_options(SendArc PRIVATE /guard:xfg)
+        target_compile_options(SendArc PRIVATE
+            $<$<COMPILE_LANGUAGE:CXX>:/guard:xfg>
+        )
     else()
-        target_compile_options(SendArc PRIVATE /guard:cf)
+        target_compile_options(SendArc PRIVATE
+            $<$<COMPILE_LANGUAGE:CXX>:/guard:cf>
+        )
     endif()
     # XFG must be selected for both compilation and linking. Compiling with
     # /guard:xfg alone emits intermediate gxfg records, but a plain CFG link

@@ -120,7 +120,7 @@ jobs:
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
 
-      - name: Enable isolated MAPI harness crash dumps
+      - name: Prepare isolated MAPI harness crash dumps
         shell: pwsh
         run: |
           $dumpFolder = Join-Path $env:RUNNER_TEMP 'SendArcDumps'
@@ -138,8 +138,8 @@ jobs:
           if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
             throw "ProcDump signature verification failed: $($signature.Status) $($signature.SignerCertificate.Subject)"
           }
-          & $procDump -accepteula -i $dumpFolder -mp
-          if ($LASTEXITCODE -ne 0) { throw "ProcDump postmortem registration failed (exit $LASTEXITCODE)" }
+          "SENDARC_PROCDUMP_PATH=$procDump" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SENDARC_DUMP_FOLDER=$dumpFolder" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Run Pester smoke tests
         shell: pwsh
@@ -184,10 +184,6 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          $procDump = Join-Path $env:RUNNER_TEMP 'ProcDump\procdump64.exe'
-          if (Test-Path -LiteralPath $procDump) {
-            & $procDump -u
-          }
           Remove-Item -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\SendArc-test-harness.exe' -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Upload installer as workflow artifact (for debugging failed runs)

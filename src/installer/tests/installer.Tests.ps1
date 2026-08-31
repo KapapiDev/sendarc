@@ -237,7 +237,19 @@ Describe "SendArc installer round-trip" {
                 ForEach-Object FullName)
             $created = @()
             try {
-                $proc = Start-Process -FilePath $script:SystemMapiProbe -ArgumentList '--emit-system-mapi-ansi' -Wait -PassThru -NoNewWindow
+                if ($env:SENDARC_PROCDUMP_PATH -and $env:SENDARC_DUMP_FOLDER) {
+                    $proc = Start-Process -FilePath $env:SENDARC_PROCDUMP_PATH -ArgumentList @(
+                        '-accepteula',
+                        '-mm',
+                        '-e', '1',
+                        '-n', '1',
+                        '-x', $env:SENDARC_DUMP_FOLDER,
+                        $script:SystemMapiProbe,
+                        '--emit-system-mapi-ansi'
+                    ) -Wait -PassThru -NoNewWindow
+                } else {
+                    $proc = Start-Process -FilePath $script:SystemMapiProbe -ArgumentList '--emit-system-mapi-ansi' -Wait -PassThru -NoNewWindow
+                }
                 $proc.ExitCode | Should -Be 0
 
                 $created = @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File -ErrorAction Stop |

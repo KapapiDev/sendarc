@@ -79,8 +79,8 @@ describe('settings.ts', () => {
     const sampleState: UpdateState = {
       currentVersion: '0.1.0-beta',
       latestVersion: '0.1.1-beta',
-      latestReleaseUrl: 'https://github.com/kapapi-dev/sendarc/releases/tag/v0.1.1-beta',
-      installerUrl: 'https://github.com/kapapi-dev/sendarc/releases/download/v0.1.1-beta/SendArc-Setup-0.1.1-beta.exe',
+      latestReleaseUrl: 'https://github.com/KapapiDev/sendarc/releases/tag/v0.1.1-beta',
+      installerUrl: 'https://github.com/KapapiDev/sendarc/releases/download/v0.1.1-beta/SendArc-Setup-0.1.1-beta.exe',
       updateAvailable: true,
       lastCheckedAt: '2026-08-27T12:00:00Z',
       enabled: true,

@@ -11,7 +11,7 @@ SendArc connects Simple MAPI email actions in legacy Windows applications to Gma
 3. Run the installer and approve the elevation request needed for machine-wide MAPI registration.
 4. Start SendArc and connect a Gmail or Google Workspace account.
 
-Supported target: Windows 10 22H2 and Windows 11. Compatibility depends on how each application implements Simple MAPI; report sanitized results with the [compatibility form](https://github.com/kapapi-dev/sendarc/issues/new?template=compatibility_report.yml).
+Supported target: Windows 10 22H2 and Windows 11. Compatibility depends on how each application implements Simple MAPI; report sanitized results with the [compatibility form](https://github.com/KapapiDev/sendarc/issues/new?template=compatibility_report.yml).
 
 ### Signing and Windows warning
 
@@ -43,11 +43,11 @@ Run the newer verified installer to upgrade. Uninstall through **Settings → Ap
 
 ### Source, license, and independence
 
-Source for this release is the `v0.1.0-beta` tag in [kapapi-dev/sendarc](https://github.com/kapapi-dev/sendarc/tree/v0.1.0-beta).
+Source for this release is the `v0.1.0-beta` tag in [KapapiDev/sendarc](https://github.com/KapapiDev/sendarc/tree/v0.1.0-beta).
 
-SendArc incorporates and modifies [go-mapi](https://github.com/marcfargas/go-mapi) by Marc Fargas, starting from upstream commit `b90fcb08754f910fc318cbc922cbf24702582463`. Covered source is provided under LGPL-3.0-or-later; see [LICENSE](https://github.com/kapapi-dev/sendarc/blob/v0.1.0-beta/LICENSE) and [THIRD_PARTY_NOTICES.md](https://github.com/kapapi-dev/sendarc/blob/v0.1.0-beta/THIRD_PARTY_NOTICES.md).
+SendArc incorporates and modifies [go-mapi](https://github.com/marcfargas/go-mapi) by Marc Fargas, starting from upstream commit `b90fcb08754f910fc318cbc922cbf24702582463`. Covered source is provided under LGPL-3.0-or-later; see [LICENSE](https://github.com/KapapiDev/sendarc/blob/v0.1.0-beta/LICENSE) and [THIRD_PARTY_NOTICES.md](https://github.com/KapapiDev/sendarc/blob/v0.1.0-beta/THIRD_PARTY_NOTICES.md).
 
 SendArc is independent and is not affiliated with Google, Affixa, Notably Good Ltd., or the original go-mapi author.
 
-Security reports: [private advisory](https://github.com/kapapi-dev/sendarc/security/advisories/new)
-General/compatibility reports: [GitHub Issues](https://github.com/kapapi-dev/sendarc/issues)
+Security reports: [private advisory](https://github.com/KapapiDev/sendarc/security/advisories/new)
+General/compatibility reports: [GitHub Issues](https://github.com/KapapiDev/sendarc/issues)

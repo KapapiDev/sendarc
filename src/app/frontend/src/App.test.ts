@@ -30,7 +30,7 @@ vi.mock('../wailsjs/go/main/App', () => ({
     currentVersion: '3.0.0',
     latestVersion: '',
     latestReleaseUrl: '',
-    installerUrl: 'https://github.com/kapapi-dev/sendarc/releases/latest/download/SendArc-Setup.exe',
+    installerUrl: 'https://github.com/KapapiDev/sendarc/releases/latest/download/SendArc-Setup.exe',
     updateAvailable: false,
     lastCheckedAt: '',
     enabled: true,
@@ -70,7 +70,7 @@ vi.mock('./lib/settings', () => ({
     currentVersion: '3.0.0',
     latestVersion: '',
     latestReleaseUrl: '',
-    installerUrl: 'https://github.com/kapapi-dev/sendarc/releases/latest/download/SendArc-Setup.exe',
+    installerUrl: 'https://github.com/KapapiDev/sendarc/releases/latest/download/SendArc-Setup.exe',
     updateAvailable: false,
     lastCheckedAt: '',
     enabled: true,
@@ -255,9 +255,9 @@ describe('App.svelte — update UX (Phase 11-03)', () => {
   const availableState = {
     currentVersion: '3.0.0',
     latestVersion: '3.0.1',
-    latestReleaseUrl: 'https://github.com/kapapi-dev/sendarc/releases/tag/v3.0.1',
+    latestReleaseUrl: 'https://github.com/KapapiDev/sendarc/releases/tag/v3.0.1',
     installerUrl:
-      'https://github.com/kapapi-dev/sendarc/releases/latest/download/SendArc-Setup.exe',
+      'https://github.com/KapapiDev/sendarc/releases/latest/download/SendArc-Setup.exe',
     updateAvailable: true,
     lastCheckedAt: '2026-04-21T12:00:00Z',
     enabled: true,
@@ -266,9 +266,9 @@ describe('App.svelte — update UX (Phase 11-03)', () => {
   const noUpdateState = {
     currentVersion: '3.0.0',
     latestVersion: '3.0.0',
-    latestReleaseUrl: 'https://github.com/kapapi-dev/sendarc/releases/tag/v3.0.0',
+    latestReleaseUrl: 'https://github.com/KapapiDev/sendarc/releases/tag/v3.0.0',
     installerUrl:
-      'https://github.com/kapapi-dev/sendarc/releases/latest/download/SendArc-Setup.exe',
+      'https://github.com/KapapiDev/sendarc/releases/latest/download/SendArc-Setup.exe',
     updateAvailable: false,
     lastCheckedAt: '2026-04-21T12:00:00Z',
     enabled: true,

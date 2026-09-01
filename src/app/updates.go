@@ -41,7 +41,7 @@ const (
 	// gitHubOwner / gitHubRepo are hardcoded to the repo slug so no user
 	// input or settings file can redirect update checks to a different
 	// origin (threat T-11-01-01 partial mitigation + Pitfall-4 guard).
-	gitHubOwner      = "kapapi-dev"
+	gitHubOwner      = "KapapiDev"
 	gitHubRepo       = "sendarc"
 	gitHubAPIVersion = "2026-03-10"
 

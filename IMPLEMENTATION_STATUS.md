@@ -4,7 +4,7 @@ Last updated: 2026-09-01
 
 ## Completed
 
-- Canonical repository is `kapapi-dev/sendarc` (moved from `maxtop9843-byte/sendarc`); upstream remote and LGPL history are preserved.
+- Canonical repository is `KapapiDev/sendarc` (moved from `maxtop9843-byte/sendarc`); upstream remote and LGPL history are preserved.
 - Unmodified baseline built and tested on GitHub Actions from commit `b90fcb08754f910fc318cbc922cbf24702582463`.
 - Local Go 1.25 toolchain installed without updating Windows; baseline Go and frontend tests passed.
 - Gmail user-facing transport changed from draft creation to explicit `users.messages.send`.
@@ -28,7 +28,7 @@ Last updated: 2026-09-01
 - Clean GitHub Actions at commit `4c8fce2` passed the Wails app, x64/x86 Debug/Release interceptors, 31-case installer Pester round-trip, website, and security/policy jobs.
 - Google Authentication Platform is configured for SendArc with external Testing audience, the controlled test account, deployed policy URLs, authorized `sendarc.pages.dev` domain, and exactly the `gmail.send` scope.
 - The enabled `SendArc Windows Desktop` OAuth client is injected only through the gitignored local environment file and protected GitHub Actions secrets; no credential values were committed.
-- Protected installer release dry-run [33499799776](https://github.com/kapapi-dev/sendarc/actions/runs/33499799776) built the OAuth-injected Wails app, both interceptor DLLs, unsigned beta installer, and checksum from `4c8fce2` without publishing a tag or release. The exact final installer passed all 31 release Pester cases, including installed x64/x86 ANSI and Unicode system-MAPI routing; neither OAuth value appeared in the workflow log.
+- Protected installer release dry-run [33499799776](https://github.com/KapapiDev/sendarc/actions/runs/33499799776) built the OAuth-injected Wails app, both interceptor DLLs, unsigned beta installer, and checksum from `4c8fce2` without publishing a tag or release. The exact final installer passed all 31 release Pester cases, including installed x64/x86 ANSI and Unicode system-MAPI routing; neither OAuth value appeared in the workflow log.
 - The downloaded dry-run `SendArc-Setup-0.1.0-beta.exe` independently matched `SHA256SUMS.txt` (`018debc44975d4e4a08b60c3441b754c9bfe4b0c135baa7968267a2320558df6`) and was confirmed unsigned as authorized.
 - The local production-mode Windows app completed real Google OAuth on 2026-09-01 with an ephemeral loopback redirect, S256 PKCE, offline access, SendArc branding/policy links, and exactly the `gmail.send` scope. Tokens were stored in Windows Credential Manager, survived an app restart, and passed the app's live Google token-introspection connection test.
 - After the original access token expired, a real connection test on 2026-09-02 refreshed it through Google, persisted the new expiry in Windows Credential Manager, and restored the refreshed signed-in state after another app restart without exposing token values.

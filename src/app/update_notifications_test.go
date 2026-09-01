@@ -33,7 +33,7 @@ func TestUpdateNotificationDownloadActionOpensReleasePage(t *testing.T) {
 	state := UpdateState{
 		CurrentVersion:   "3.0.0",
 		LatestVersion:    "3.0.1",
-		LatestReleaseURL: "https://github.com/kapapi-dev/sendarc/releases/tag/v3.0.1",
+		LatestReleaseURL: "https://github.com/KapapiDev/sendarc/releases/tag/v3.0.1",
 		InstallerURL:     installerDownloadURL,
 		UpdateAvailable:  true,
 	}
@@ -89,7 +89,7 @@ func TestUpdateNotificationFallsBackToReleasesLandingPage(t *testing.T) {
 	if url == installerDownloadURL {
 		t.Error("fallback must not point at the installer URL")
 	}
-	if !strings.Contains(url, "github.com/kapapi-dev/sendarc/releases") {
+	if !strings.Contains(url, "github.com/KapapiDev/sendarc/releases") {
 		t.Errorf("fallback URL should point at the repo releases page; got %q", url)
 	}
 }
@@ -100,7 +100,7 @@ func TestNoSelfUpdateSurface(t *testing.T) {
 	state := UpdateState{
 		CurrentVersion:   "3.0.0",
 		LatestVersion:    "3.0.1",
-		LatestReleaseURL: "https://github.com/kapapi-dev/sendarc/releases/tag/v3.0.1",
+		LatestReleaseURL: "https://github.com/KapapiDev/sendarc/releases/tag/v3.0.1",
 		InstallerURL:     installerDownloadURL,
 		UpdateAvailable:  true,
 	}

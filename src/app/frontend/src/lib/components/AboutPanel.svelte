@@ -12,7 +12,7 @@
   let panel: HTMLDivElement;
 
   const links = [
-    { label: 'Source code', url: 'https://github.com/kapapi-dev/sendarc' },
+    { label: 'Source code', url: 'https://github.com/KapapiDev/sendarc' },
     { label: 'Privacy policy', url: 'https://sendarc.pages.dev/privacy/' },
     { label: 'Licenses & notices', url: 'https://sendarc.pages.dev/licenses/' },
     { label: 'Support', url: 'https://sendarc.pages.dev/support/' },

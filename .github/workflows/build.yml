@@ -129,6 +129,30 @@ jobs:
       - name: Build frontend (produces src/app/frontend/dist for go:embed)
         run: npm --workspace src/app/frontend run build
 
+      - name: Verify manual queue helper attachment contract
+        shell: pwsh
+        run: |
+          $sandbox = Join-Path $env:RUNNER_TEMP 'sendarc-drop-email-contract'
+          New-Item -ItemType Directory -Path $sandbox -Force | Out-Null
+          $env:LOCALAPPDATA = $sandbox
+          $source = Join-Path $sandbox 'unicode-첨부.txt'
+          [IO.File]::WriteAllText($source, 'safe attachment payload')
+
+          & .\scripts\test-drop-email.ps1 -Subject 'queue contract' -Body 'sanitized' -To 'test@example.com' -WithAttachment -AttachmentPath $source
+          if (-not $?) { throw 'test-drop-email.ps1 failed' }
+
+          $queue = Join-Path $sandbox 'SendArc\queue'
+          $jsonFiles = @(Get-ChildItem -LiteralPath $queue -Filter '*.json' -File)
+          if ($jsonFiles.Count -ne 1) { throw "Expected one queue JSON, got $($jsonFiles.Count)" }
+          $mail = Get-Content -Raw -LiteralPath $jsonFiles[0].FullName | ConvertFrom-Json
+          if (@($mail.attachments).Count -ne 1) { throw 'Expected one queued attachment' }
+          $attachment = $mail.attachments[0]
+          $expected = [IO.Path]::GetFullPath((Join-Path (Join-Path $queue $jsonFiles[0].BaseName) $attachment.filename))
+          $actual = [IO.Path]::GetFullPath($attachment.path)
+          if ($actual -ne $expected) { throw "Attachment is outside its queue-owned sibling directory" }
+          $info = Get-Item -LiteralPath $actual
+          if ($info.Length -ne $attachment.size) { throw 'Queued attachment size mismatch' }
+
       - name: go vet
         run: go vet ./internal/mapi/... ./src/app/...
 

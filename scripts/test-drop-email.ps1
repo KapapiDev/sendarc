@@ -29,6 +29,15 @@ if (-not (Test-Path -LiteralPath $sendArcQueueDir)) {
     New-Item -ItemType Directory -Path $sendArcQueueDir -Force | Out-Null
 }
 
+# Generate the queue stem before copying attachments. The production watcher
+# intentionally accepts attachments only from the sibling directory whose name
+# matches the JSON stem: <queue>\<stem>.json and <queue>\<stem>\<file>.
+$ts = (Get-Date).ToString("yyyyMMdd_HHmmss")
+$rand = -join ((0..5) | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) })
+$stem = "msg_${ts}_${rand}"
+$filename = "$stem.json"
+$filePath = Join-Path $sendArcQueueDir $filename
+
 # Build recipients
 $toRecipients = @(@{ name = $ToName; address = $To })
 $ccRecipients = @()
@@ -44,25 +53,48 @@ if ($BCC) {
 # Build attachments
 $attachments = @()
 if ($WithAttachment) {
+    $createdTestSource = $false
     if (-not $AttachmentPath) {
         # Create a small test file
-        $testFile = Join-Path $env:TEMP "SendArc-test-attachment.txt"
+        $testFile = Join-Path $env:TEMP "SendArc-test-attachment-$rand.txt"
         "This is a test attachment created by test-drop-email.ps1." | Out-File -FilePath $testFile -Encoding UTF8
         $AttachmentPath = $testFile
+        $createdTestSource = $true
         Write-Host "Created test attachment: $testFile"
     }
 
-    if (-not (Test-Path $AttachmentPath)) {
+    if (-not (Test-Path -LiteralPath $AttachmentPath -PathType Leaf)) {
         Write-Error "Attachment file not found: $AttachmentPath"
         exit 1
     }
 
-    $fileInfo = Get-Item $AttachmentPath
-    $attachments = @(@{
-        filename = $fileInfo.Name
-        path     = $fileInfo.FullName
-        size     = $fileInfo.Length
-    })
+    $fileInfo = Get-Item -LiteralPath $AttachmentPath
+    $attachmentDir = Join-Path $sendArcQueueDir $stem
+    New-Item -ItemType Directory -Path $attachmentDir | Out-Null
+    $queuedAttachmentPath = $null
+
+    try {
+        $queuedAttachmentPath = Join-Path $attachmentDir $fileInfo.Name
+        Copy-Item -LiteralPath $fileInfo.FullName -Destination $queuedAttachmentPath
+        $queuedFileInfo = Get-Item -LiteralPath $queuedAttachmentPath
+        $attachments = @(@{
+            filename = $queuedFileInfo.Name
+            path     = $queuedFileInfo.FullName
+            size     = $queuedFileInfo.Length
+        })
+    }
+    catch {
+        if ($queuedAttachmentPath) {
+            Remove-Item -LiteralPath $queuedAttachmentPath -Force -ErrorAction SilentlyContinue
+        }
+        Remove-Item -LiteralPath $attachmentDir -Force -ErrorAction SilentlyContinue
+        throw
+    }
+    finally {
+        if ($createdTestSource) {
+            Remove-Item -LiteralPath $fileInfo.FullName -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 # Build the email JSON
@@ -86,14 +118,19 @@ $email = @{
 
 $json = $email | ConvertTo-Json -Depth 5
 
-# Generate unique filename
-$ts = (Get-Date).ToString("yyyyMMdd_HHmmss")
-$rand = -join ((0..5) | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) })
-$filename = "msg_${ts}_${rand}.json"
-$filePath = Join-Path $sendArcQueueDir $filename
-
 # Write the file
-$json | Out-File -FilePath $filePath -Encoding UTF8 -NoNewline
+try {
+    $json | Out-File -LiteralPath $filePath -Encoding UTF8 -NoNewline
+}
+catch {
+    if ($WithAttachment -and $attachmentDir) {
+        if ($queuedAttachmentPath) {
+            Remove-Item -LiteralPath $queuedAttachmentPath -Force -ErrorAction SilentlyContinue
+        }
+        Remove-Item -LiteralPath $attachmentDir -Force -ErrorAction SilentlyContinue
+    }
+    throw
+}
 Write-Host ""
 Write-Host "Dropped test email:" -ForegroundColor Green
 Write-Host "  File:    $filePath"

@@ -20,7 +20,9 @@ package main
 
 import (
 	"bytes"
+	"encoding/xml"
 	"fmt"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -243,11 +245,61 @@ func buildToastXML(n toast.Notification) (string, error) {
 	if n.Audio == "" {
 		n.Audio = toast.Default
 	}
+	n = sanitizeToastXML(n)
 	var buf bytes.Buffer
 	if err := toasttmpl.XMLTemplate.Execute(&buf, n); err != nil {
 		return "", fmt.Errorf("toast xml template: %w", err)
 	}
 	return buf.String(), nil
+}
+
+// sanitizeToastXML compensates for go-toast's text/template-based XML
+// renderer. The upstream template interpolates attribute values verbatim, so
+// activation arguments such as "action=open&emailId=..." otherwise produce
+// malformed XML and Windows rejects every actionable toast at LoadXml.
+// Title and body live inside CDATA nodes: preserve their visible text while
+// splitting the only sequence that can terminate CDATA early.
+func sanitizeToastXML(n toast.Notification) toast.Notification {
+	n.Title = escapeToastCDATA(n.Title)
+	n.Body = escapeToastCDATA(n.Body)
+	n.Icon = escapeToastXMLAttribute(n.Icon)
+	n.IconCrop = escapeToastXMLAttribute(n.IconCrop)
+	n.HeroIcon = escapeToastXMLAttribute(n.HeroIcon)
+	n.Audio = escapeToastXMLAttribute(n.Audio)
+	n.Duration = escapeToastXMLAttribute(n.Duration)
+	n.ActivationType = escapeToastXMLAttribute(n.ActivationType)
+	n.ActivationArguments = escapeToastXMLAttribute(n.ActivationArguments)
+
+	n.Inputs = append([]toast.Input(nil), n.Inputs...)
+	for i := range n.Inputs {
+		n.Inputs[i].ID = escapeToastXMLAttribute(n.Inputs[i].ID)
+		n.Inputs[i].Title = escapeToastXMLAttribute(n.Inputs[i].Title)
+		n.Inputs[i].Placeholder = escapeToastXMLAttribute(n.Inputs[i].Placeholder)
+		n.Inputs[i].Selections = append([]toast.InputSelection(nil), n.Inputs[i].Selections...)
+		for j := range n.Inputs[i].Selections {
+			n.Inputs[i].Selections[j].ID = escapeToastXMLAttribute(n.Inputs[i].Selections[j].ID)
+			n.Inputs[i].Selections[j].Content = escapeToastXMLAttribute(n.Inputs[i].Selections[j].Content)
+		}
+	}
+
+	n.Actions = append([]toast.Action(nil), n.Actions...)
+	for i := range n.Actions {
+		n.Actions[i].Type = escapeToastXMLAttribute(n.Actions[i].Type)
+		n.Actions[i].Content = escapeToastXMLAttribute(n.Actions[i].Content)
+		n.Actions[i].Arguments = escapeToastXMLAttribute(n.Actions[i].Arguments)
+		n.Actions[i].InputID = escapeToastXMLAttribute(n.Actions[i].InputID)
+	}
+	return n
+}
+
+func escapeToastXMLAttribute(value string) string {
+	var buf bytes.Buffer
+	_ = xml.EscapeText(&buf, []byte(value))
+	return buf.String()
+}
+
+func escapeToastCDATA(value string) string {
+	return strings.ReplaceAll(value, "]]>", "]]]]><![CDATA[>")
 }
 
 // IXmlDocumentIO is the Windows.Data.Xml.Dom.IXmlDocumentIO interface.

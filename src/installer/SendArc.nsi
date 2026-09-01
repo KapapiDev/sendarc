@@ -35,7 +35,7 @@ Unicode True
 !define PRODUCT_NAME      "SendArc"
 !define PRODUCT_VERSION   "${SENDARC_VERSION}"
 !define PRODUCT_PUBLISHER "장형진"
-!define PRODUCT_WEB_SITE  "https://github.com/maxtop9843-byte/sendarc"
+!define PRODUCT_WEB_SITE  "https://github.com/kapapi-dev/sendarc"
 !define AUMID             "app.sendarc.desktop"
 
 ;------------------------------------------------------------------------------

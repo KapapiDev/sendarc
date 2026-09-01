@@ -2,7 +2,7 @@
 
 ## Report a vulnerability privately
 
-Use GitHub's private [security advisory form](https://github.com/maxtop9843-byte/sendarc/security/advisories/new) or email `maxtop9843@gmail.com`. SendArc is operated by 장형진.
+Use GitHub's private [security advisory form](https://github.com/kapapi-dev/sendarc/security/advisories/new) or email `maxtop9843@gmail.com`. SendArc is operated by 장형진.
 
 Do not open a public issue for a vulnerability and do not send live OAuth tokens, passwords, private attachments, email bodies, recipient lists, Gmail response bodies, or confidential client data. A sanitized reproduction, affected SendArc version, Windows version, calling application/architecture, and non-sensitive diagnostic excerpt are enough to begin triage.
 

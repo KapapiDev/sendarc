@@ -8,7 +8,7 @@ SendArc is an independent open-source project. It is not affiliated with Google,
 
 ## Beta status
 
-The repository is preparing `v0.1.0-beta`. Install only a tagged SendArc release that contains both a versioned installer and its checksum manifest. If the [latest release page](https://github.com/maxtop9843-byte/sendarc/releases/latest) does not contain `SendArc-Setup-0.1.0-beta.exe`, the public beta is not yet available.
+The repository is preparing `v0.1.0-beta`. Install only a tagged SendArc release that contains both a versioned installer and its checksum manifest. If the [latest release page](https://github.com/kapapi-dev/sendarc/releases/latest) does not contain `SendArc-Setup-0.1.0-beta.exe`, the public beta is not yet available.
 
 The initial beta is deliberately narrow:
 
@@ -25,7 +25,7 @@ See [Implementation status](IMPLEMENTATION_STATUS.md) and the [requirements matr
 
 After a tagged beta is published:
 
-1. Download `SendArc-Setup-0.1.0-beta.exe` and `SHA256SUMS.txt` from the same [GitHub release](https://github.com/maxtop9843-byte/sendarc/releases).
+1. Download `SendArc-Setup-0.1.0-beta.exe` and `SHA256SUMS.txt` from the same [GitHub release](https://github.com/kapapi-dev/sendarc/releases).
 2. Verify the installer's SHA-256 value against `SHA256SUMS.txt`.
 3. Run the installer and approve the Windows elevation request needed to register a machine-wide mail handler.
 4. Start SendArc and connect a Gmail or Google Workspace account in the system browser.
@@ -39,7 +39,7 @@ The no-payment beta may be unsigned. Windows SmartScreen or an organization poli
 3. Click **Send** to transmit directly to Gmail, or cancel without transmitting. Discard removes the queued local item.
 4. Wait for SendArc's success or failure result. The originating application only knows that SendArc accepted the local MAPI request; it does not know whether Gmail accepted the final send.
 
-Compatibility varies because some applications do not implement Simple MAPI consistently. Please use the [compatibility report](https://github.com/maxtop9843-byte/sendarc/issues/new?template=compatibility_report.yml) with sanitized test data.
+Compatibility varies because some applications do not implement Simple MAPI consistently. Please use the [compatibility report](https://github.com/kapapi-dev/sendarc/issues/new?template=compatibility_report.yml) with sanitized test data.
 
 ## Gmail permission and privacy
 

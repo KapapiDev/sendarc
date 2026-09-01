@@ -156,7 +156,7 @@ func TestUpdateServiceStaleCheckTriggersFetch(t *testing.T) {
 	stub := &stubReleaseFetcher{
 		release: &latestRelease{
 			Version:    "3.0.0",
-			ReleaseURL: "https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.0.0",
+			ReleaseURL: "https://github.com/kapapi-dev/sendarc/releases/tag/v3.0.0",
 		},
 	}
 	svc := newUpdateService("0.0.0-dev", stub, nopLogger)
@@ -187,7 +187,7 @@ func TestUpdateServiceDetectsAvailableUpdate(t *testing.T) {
 	stub := &stubReleaseFetcher{
 		release: &latestRelease{
 			Version:    "3.0.0",
-			ReleaseURL: "https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.0.0",
+			ReleaseURL: "https://github.com/kapapi-dev/sendarc/releases/tag/v3.0.0",
 		},
 	}
 	svc := newUpdateService("2.1.0", stub, nopLogger)
@@ -202,10 +202,10 @@ func TestUpdateServiceDetectsAvailableUpdate(t *testing.T) {
 	if state.LatestVersion != "3.0.0" {
 		t.Errorf("expected LatestVersion=3.0.0, got %q", state.LatestVersion)
 	}
-	if state.LatestReleaseURL != "https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.0.0" {
+	if state.LatestReleaseURL != "https://github.com/kapapi-dev/sendarc/releases/tag/v3.0.0" {
 		t.Errorf("unexpected LatestReleaseURL: %q", state.LatestReleaseURL)
 	}
-	if state.InstallerURL != "https://github.com/maxtop9843-byte/sendarc/releases/latest" {
+	if state.InstallerURL != "https://github.com/kapapi-dev/sendarc/releases/latest" {
 		t.Errorf("InstallerURL must be the manual release page URL, got %q", state.InstallerURL)
 	}
 	if state.CurrentVersion != "2.1.0" {
@@ -225,7 +225,7 @@ func TestUpdateServiceNoUpdateWhenCurrentIsLatest(t *testing.T) {
 	stub := &stubReleaseFetcher{
 		release: &latestRelease{
 			Version:    "3.0.0",
-			ReleaseURL: "https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.0.0",
+			ReleaseURL: "https://github.com/kapapi-dev/sendarc/releases/tag/v3.0.0",
 		},
 	}
 	svc := newUpdateService("3.0.0", stub, nopLogger)
@@ -362,7 +362,7 @@ func TestGitHubReleaseFetcherReturnsStableMetadata(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("method = %q, want GET", r.Method)
 		}
-		if r.URL.Path != "/repos/maxtop9843-byte/sendarc/releases/latest" {
+		if r.URL.Path != "/repos/kapapi-dev/sendarc/releases/latest" {
 			t.Errorf("path = %q, want latest-release endpoint", r.URL.Path)
 		}
 		if got := r.Header.Get("Accept"); got != "application/vnd.github+json" {
@@ -377,14 +377,14 @@ func TestGitHubReleaseFetcherReturnsStableMetadata(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"tag_name":" v3.1.0 ",
-			"html_url":"https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.1.0",
+			"html_url":"https://github.com/kapapi-dev/sendarc/releases/tag/v3.1.0",
 			"draft":false,
 			"prerelease":false
 		}`))
 	}))
 	t.Cleanup(server.Close)
 
-	fetcher := &gitHubReleaseFetcher{client: server.Client(), endpoint: server.URL + "/repos/maxtop9843-byte/sendarc/releases/latest"}
+	fetcher := &gitHubReleaseFetcher{client: server.Client(), endpoint: server.URL + "/repos/kapapi-dev/sendarc/releases/latest"}
 	release, err := fetcher.FetchLatestRelease(context.Background())
 	if err != nil {
 		t.Fatalf("FetchLatestRelease: %v", err)
@@ -395,7 +395,7 @@ func TestGitHubReleaseFetcherReturnsStableMetadata(t *testing.T) {
 	if release.Version != "3.1.0" {
 		t.Errorf("Version = %q, want 3.1.0", release.Version)
 	}
-	if release.ReleaseURL != "https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.1.0" {
+	if release.ReleaseURL != "https://github.com/kapapi-dev/sendarc/releases/tag/v3.1.0" {
 		t.Errorf("ReleaseURL = %q", release.ReleaseURL)
 	}
 }
@@ -439,7 +439,7 @@ func TestGitHubReleaseFetcherIgnoresPrerelease(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"tag_name":"v3.1.0-beta.1",
-			"html_url":"https://github.com/maxtop9843-byte/sendarc/releases/tag/v3.1.0-beta.1",
+			"html_url":"https://github.com/kapapi-dev/sendarc/releases/tag/v3.1.0-beta.1",
 			"prerelease":true
 		}`))
 	}))

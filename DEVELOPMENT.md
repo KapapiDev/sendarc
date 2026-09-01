@@ -51,7 +51,7 @@ Do not use `@latest` in a reproducible build.
 ## Clone and remotes
 
 ```powershell
-git clone https://github.com/maxtop9843-byte/sendarc.git
+git clone https://github.com/kapapi-dev/sendarc.git
 Set-Location sendarc
 git remote add upstream https://github.com/marcfargas/go-mapi.git
 git remote -v

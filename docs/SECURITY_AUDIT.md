@@ -1,6 +1,6 @@
 # SendArc security audit
 
-Last audited: 2026-09-01
+Last audited: 2026-09-02
 
 This is a reproducible engineering audit of the current beta candidate. It is
 not a penetration-test certificate and does not replace the immutable release
@@ -20,7 +20,7 @@ Both Go scans reported one advisory in an imported package that the compiled
 SendArc paths do not call. `govulncheck` reported zero affected symbols and
 zero vulnerable required modules.
 
-The latest-head [security and repository policy run 33413612307](https://github.com/KapapiDev/sendarc/actions/runs/33413612307) reproduced the dependency inventories and passed the secret/history and policy gates at `d7f6086`. The no-publish [release run 33413608181](https://github.com/KapapiDev/sendarc/actions/runs/33413608181) also passed release-hygiene checks before and after compilation.
+The latest-head [security and repository policy run 33531293973](https://github.com/KapapiDev/sendarc/actions/runs/33531293973) reproduced the dependency inventories and passed the secret/history and policy gates at `5e526bc`. The no-publish [release run 33532008202](https://github.com/KapapiDev/sendarc/actions/runs/33532008202) also passed release-hygiene checks before and after compilation at the same functional commit.
 
 The audit initially found reachable OpenPGP and SSH advisories introduced by
 `github.com/creativeprojects/go-selfupdate`. SendArc never applied updates, so

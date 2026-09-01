@@ -2,7 +2,7 @@
 
 The first public target is `v0.1.0-beta`. Releases are built from an immutable Git tag on GitHub Actions `windows-2025`, never from an unverified developer-machine binary.
 
-As of 2026-09-01, no SendArc GitHub release has been published. The latest no-publish dry-run is [33499799776](https://github.com/KapapiDev/sendarc/actions/runs/33499799776) at `4c8fce2`: its exact unsigned installer passed all 31 release acceptance cases, and the downloaded asset independently matched `SHA256SUMS.txt` (`018debc44975d4e4a08b60c3441b754c9bfe4b0c135baa7968267a2320558df6`). Do not turn that dry-run into a launch claim; use [REQUIREMENTS_MATRIX.md](REQUIREMENTS_MATRIX.md) for the remaining real-account and public-release gates.
+As of 2026-09-02, no SendArc GitHub release has been published. The latest no-publish dry-run is [33532008202](https://github.com/KapapiDev/sendarc/actions/runs/33532008202) at `5e526bc`: its exact unsigned installer passed all 31 release acceptance cases, and the downloaded two-file artifact independently matched `SHA256SUMS.txt` (`7c9a974f4c71a0af1185c9e594856cc34c8529ce6faa8a8fd5cffe3f5ce69a9d`). Do not turn that dry-run into a launch claim; use [REQUIREMENTS_MATRIX.md](REQUIREMENTS_MATRIX.md) for the remaining real-account and public-release gates.
 
 ## Required preconditions
 

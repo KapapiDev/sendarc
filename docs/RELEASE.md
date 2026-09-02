@@ -2,7 +2,7 @@
 
 The first public target is `v0.1.0-beta`. Releases are built from an immutable Git tag on GitHub Actions `windows-2025`, never from an unverified developer-machine binary.
 
-As of 2026-09-02, no SendArc GitHub release has been published. The latest no-publish dry-run is [33532008202](https://github.com/KapapiDev/sendarc/actions/runs/33532008202) at `5e526bc`: its exact unsigned installer passed all 31 release acceptance cases, and the downloaded two-file artifact independently matched `SHA256SUMS.txt` (`7c9a974f4c71a0af1185c9e594856cc34c8529ce6faa8a8fd5cffe3f5ce69a9d`). Do not turn that dry-run into a launch claim; use [REQUIREMENTS_MATRIX.md](REQUIREMENTS_MATRIX.md) for the remaining real-account and public-release gates.
+As of 2026-09-02, no SendArc GitHub release has been published. The latest no-publish dry-run is [33628247764](https://github.com/KapapiDev/sendarc/actions/runs/33628247764) at `7840d89`: its exact unsigned installer passed all 31 release acceptance cases, and the downloaded two-file artifact independently matched `SHA256SUMS.txt` (`9c1e8ffe91a59f80c719f9fb39af0e18e3d571d13af5d873c4a2b3195c3eb1de`). Do not turn that dry-run into a launch claim; use [REQUIREMENTS_MATRIX.md](REQUIREMENTS_MATRIX.md) for the remaining real-account and public-release gates.
 
 ## Required preconditions
 
@@ -11,6 +11,7 @@ As of 2026-09-02, no SendArc GitHub release has been published. The latest no-pu
 - The harness fails when no expected queue output is produced; `continue-on-error` cannot mask a functional failure.
 - OAuth values come only from protected release secrets and are absent from source, history, logs, summaries, and public debug artifacts.
 - User-facing and machine-facing active identifiers use SendArc: EXE/DLL, installer, app paths, registry keys, AUMID, uninstall entry, updater repository, and release assets.
+- KaPaPi is identified only as the parent developer brand; `kapapi.dev/sendarc/` and the full SendArc site link to each other without renaming the SendArc product or its machine-facing identifiers.
 - Installer coexistence, previous-handler backup/restoration, and non-removal of unrelated mail clients are verified.
 - `LICENSE`, matching source history/tag, upstream baseline, and `THIRD_PARTY_NOTICES.md` are present.
 - Website download/legal/support routes are ready but do not point to an asset until it exists.

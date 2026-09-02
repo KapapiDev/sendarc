@@ -20,7 +20,7 @@ Both Go scans reported one advisory in an imported package that the compiled
 SendArc paths do not call. `govulncheck` reported zero affected symbols and
 zero vulnerable required modules.
 
-The latest-head [security and repository policy run 33531293973](https://github.com/KapapiDev/sendarc/actions/runs/33531293973) reproduced the dependency inventories and passed the secret/history and policy gates at `5e526bc`. The no-publish [release run 33532008202](https://github.com/KapapiDev/sendarc/actions/runs/33532008202) also passed release-hygiene checks before and after compilation at the same functional commit.
+The latest-head [security and repository policy run 33627281229](https://github.com/KapapiDev/sendarc/actions/runs/33627281229) reproduced the dependency inventories and passed the secret/history and policy gates at `7840d89`. The no-publish [release run 33628247764](https://github.com/KapapiDev/sendarc/actions/runs/33628247764) also passed release-hygiene checks before and after compilation at the same functional commit; its downloaded two-file artifact independently matched `SHA256SUMS.txt` at `9c1e8ffe91a59f80c719f9fb39af0e18e3d571d13af5d873c4a2b3195c3eb1de` and was confirmed unsigned.
 
 The audit initially found reachable OpenPGP and SSH advisories introduced by
 `github.com/creativeprojects/go-selfupdate`. SendArc never applied updates, so

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { buildCanonical, DOWNLOAD_ROUTE, SUPPORT_EMAIL } from "../../src/lib/site";
+import { buildCanonical, DOWNLOAD_ROUTE, KAPAPI_SENDARC_URL, KAPAPI_URL, SUPPORT_EMAIL } from "../../src/lib/site";
 import { json, text, visitorHash } from "../../functions/api/_shared";
 import { onRequestPost as submitBeta } from "../../functions/api/business-beta";
 
@@ -10,6 +10,8 @@ describe("site configuration", () => {
     expect(buildCanonical(new URL("https://example.com/base/"), "/privacy/")).toBe("https://example.com/privacy/");
     expect(DOWNLOAD_ROUTE).toBe("/download/");
     expect(SUPPORT_EMAIL).toBe("maxtop9843@gmail.com");
+    expect(KAPAPI_URL).toBe("https://kapapi.dev/");
+    expect(KAPAPI_SENDARC_URL).toBe("https://kapapi.dev/sendarc/");
   });
 
   it("bounds submitted text", () => expect(text("  abcdef  ", 4)).toBe("abcd"));

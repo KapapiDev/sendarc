@@ -5,6 +5,7 @@ This log records decisions that future maintainers and autonomous agents must pr
 ## Product and ownership
 
 - Product name: **SendArc**. The user explicitly chose to retain this name after a preliminary collision review.
+- Parent developer brand: **KaPaPi**. SendArc remains the product name and is presented as **“A KaPaPi product”**; the product-family path is `https://kapapi.dev/sendarc/`.
 - Operator: **장형진**.
 - Current support contact: `maxtop9843@gmail.com`. A role address such as `support@sendarc.app` may replace it after the domain is purchased.
 - The public beta is Gmail-only. Do not claim Microsoft 365 support until it is implemented and verified.
@@ -24,7 +25,8 @@ This log records decisions that future maintainers and autonomous agents must pr
 - The no-payment beta may be unsigned. Every unsigned artifact and download surface must say so plainly; never advise users to disable Windows security controls.
 - Updates are notify-only for the beta. The app may open the official GitHub release page but must not silently replace EXE/DLL files or create an automatic-update Scheduled Task.
 - No payment may be made and no domain may be purchased autonomously.
-- `SendArc.app` purchase and custom-domain connection are deferred. Site work and deployment must continue on a generated Cloudflare URL.
+- The owner has purchased and operates `kapapi.dev` for the KaPaPi developer brand. Its existing GitHub Pages product-family structure uses `/cleanpaste/`, `/sortdoc/`, and now reserves `/sendarc/` for SendArc.
+- `SendArc.app` purchase and connection remain deferred. The full SendArc application/legal site continues on the generated Cloudflare URL until a path-aware migration is explicitly verified; the KaPaPi path may act as the product-family entry page without duplicating the full site.
 - Hosting target is Cloudflare, replacing the original prompt's Vercel default.
 - The planned site uses Cloudflare Pages/Pages Functions and a D1 binding named `SENDARC_DB`. Lead retention is at most 12 months after last contact; abuse hashes are at most 24 hours. Collection remains inactive until a real deployment/binding exists.
 

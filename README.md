@@ -4,7 +4,7 @@
 
 SendArc is a Windows Simple MAPI bridge for Gmail and Google Workspace. A legacy Windows application hands an outgoing message to SendArc, SendArc shows the message locally for review, and nothing is transmitted until the user clicks **Send**. The desktop app then sends the message directly to the Gmail API.
 
-SendArc is an independent open-source project. It is not affiliated with Google, Affixa, Notably Good Ltd., or the original go-mapi author.
+SendArc is a **KaPaPi product** and independent open-source project. The KaPaPi product directory is `https://kapapi.dev/sendarc/`. SendArc is not affiliated with Google, Affixa, Notably Good Ltd., or the original go-mapi author.
 
 ## Beta status
 

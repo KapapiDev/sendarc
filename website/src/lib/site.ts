@@ -2,6 +2,8 @@ export const SITE_NAME = "SendArc";
 export const SITE_DESCRIPTION =
   "Send email from legacy Windows applications through Gmail without replacing the software your team already depends on.";
 export const SUPPORT_EMAIL = "maxtop9843@gmail.com";
+export const KAPAPI_URL = "https://kapapi.dev/";
+export const KAPAPI_SENDARC_URL = "https://kapapi.dev/sendarc/";
 export const REPOSITORY_URL = "https://github.com/KapapiDev/sendarc";
 export const RELEASES_URL = `${REPOSITORY_URL}/releases`;
 export const BUG_REPORT_URL = `${REPOSITORY_URL}/issues/new?template=bug_report.yml`;

@@ -1,5 +1,11 @@
 # SendArc brand assets
 
+SendArc is a product brand under the **KaPaPi** developer brand. Keep the
+shipping product name, logo, executable identifiers, and user-facing primary
+wordmark as **SendArc**. Use the relationship line **“A KaPaPi product”** in
+about, footer, directory, and publisher contexts; do not rename the product to
+KaPaPi SendArc.
+
 The clean vector sources are:
 
 - `website/public/logo.svg` — primary horizontal wordmark

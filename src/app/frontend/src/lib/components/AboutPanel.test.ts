@@ -18,6 +18,8 @@ describe('AboutPanel', () => {
     expect(getByText('Version 0.1.0-beta')).toBeInTheDocument();
     expect(getByText(/no inbox access/i)).toBeInTheDocument();
     expect(getByText(/derived from go-mapi/i)).toBeInTheDocument();
+    expect(getByText(/a kapapi product/i)).toBeInTheDocument();
+    expect(getByRole('button', { name: /kapapi product family/i })).toBeInTheDocument();
     expect(getByRole('button', { name: /source code/i })).toBeInTheDocument();
     expect(getByRole('button', { name: /licenses & notices/i })).toBeInTheDocument();
   });
@@ -29,6 +31,9 @@ describe('AboutPanel', () => {
 
     await fireEvent.click(getByRole('button', { name: /privacy policy/i }));
     expect(browserOpenURL).toHaveBeenCalledWith('https://sendarc.pages.dev/privacy/');
+
+    await fireEvent.click(getByRole('button', { name: /kapapi product family/i }));
+    expect(browserOpenURL).toHaveBeenCalledWith('https://kapapi.dev/');
   });
 
   it('runs diagnostics and close actions', async () => {

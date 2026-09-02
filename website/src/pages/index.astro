@@ -4,7 +4,7 @@ import DownloadLink from "../components/DownloadLink.astro";
 import Faq from "../components/Faq.astro";
 import Icon from "../components/Icon.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { SITE_DESCRIPTION } from "../lib/site";
+import { KAPAPI_URL, SITE_DESCRIPTION } from "../lib/site";
 
 const faqItems = [
   {
@@ -68,6 +68,15 @@ const structuredData = {
   description: SITE_DESCRIPTION,
   url: new URL("/", Astro.site).toString(),
   codeRepository: "https://github.com/KapapiDev/sendarc",
+  brand: {
+    "@type": "Brand",
+    name: "SendArc",
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "KaPaPi",
+    url: KAPAPI_URL,
+  },
 };
 ---
 

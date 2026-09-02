@@ -12,6 +12,7 @@
   let panel: HTMLDivElement;
 
   const links = [
+    { label: 'KaPaPi product family', url: 'https://kapapi.dev/' },
     { label: 'Source code', url: 'https://github.com/KapapiDev/sendarc' },
     { label: 'Privacy policy', url: 'https://sendarc.pages.dev/privacy/' },
     { label: 'Licenses & notices', url: 'https://sendarc.pages.dev/licenses/' },
@@ -46,8 +47,8 @@
     <section class="body">
       <p class="version">Version {version || 'unknown'}</p>
       <p class="lede">
-        A focused Windows bridge for reviewing legacy-app email locally and sending it
-        through Gmail only after you click Send.
+        A KaPaPi product and focused Windows bridge for reviewing legacy-app email locally
+        and sending it through Gmail only after you click Send.
       </p>
 
       <div class="facts">

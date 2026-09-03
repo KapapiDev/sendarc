@@ -3,8 +3,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import DownloadLink from "../components/DownloadLink.astro";
 import { AFFIXA_RETIREMENT_URL } from "../lib/site";
 ---
-<BaseLayout title="Affixa alternative" description="An independent open-source Simple MAPI to Gmail bridge for Windows." path="/affixa-alternative/">
-  <script is:inline>document.body.dataset.pageEvent="affixa_view";</script>
+<BaseLayout title="Affixa alternative" description="An independent open-source Simple MAPI to Gmail bridge for Windows." path="/affixa-alternative/" pageEvent="affixa_view">
   <section class="page-hero"><div class="shell page-hero-inner"><p class="eyebrow">Independent project</p><h1>Looking for an Affixa alternative?</h1><p>SendArc is a focused Windows bridge for applications that use Simple MAPI and teams that send through Gmail or Google Workspace.</p><DownloadLink /></div></section>
   <section class="section"><div class="shell"><div class="card-grid"><article class="card"><h2>What carries over</h2><p>Your line-of-business Windows app can continue starting outgoing messages through Simple MAPI.</p></article><article class="card"><h2>What changes</h2><p>SendArc shows a full local preview and requires an explicit Send action. The beta currently targets Google accounts only.</p></article><article class="card"><h2>What is not claimed</h2><p>Compatibility is tested application by application. SendArc does not claim feature parity, affiliation, or endorsement.</p></article><article class="card"><h2>Why this exists</h2><p>Affixa's own help center documents its retirement. <a href={AFFIXA_RETIREMENT_URL}>Read the source notice.</a></p></article></div></div></section>
 </BaseLayout>

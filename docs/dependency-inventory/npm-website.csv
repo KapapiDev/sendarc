@@ -37,12 +37,12 @@ package,version,license,source
 @clack/prompts,1.7.0,MIT,website/package-lock.json
 @cloudflare/kv-asset-handler,0.5.0,MIT OR Apache-2.0,website/package-lock.json
 @cloudflare/unenv-preset,2.16.1,MIT OR Apache-2.0,website/package-lock.json
-@cloudflare/workerd-darwin-64,1.20260826.1,Apache-2.0,website/package-lock.json
-@cloudflare/workerd-darwin-arm64,1.20260826.1,Apache-2.0,website/package-lock.json
-@cloudflare/workerd-linux-64,1.20260826.1,Apache-2.0,website/package-lock.json
-@cloudflare/workerd-linux-arm64,1.20260826.1,Apache-2.0,website/package-lock.json
-@cloudflare/workerd-windows-64,1.20260826.1,Apache-2.0,website/package-lock.json
-@cloudflare/workers-types,5.20260827.1,MIT OR Apache-2.0,website/package-lock.json
+@cloudflare/workerd-darwin-64,1.20260831.1,Apache-2.0,website/package-lock.json
+@cloudflare/workerd-darwin-arm64,1.20260831.1,Apache-2.0,website/package-lock.json
+@cloudflare/workerd-linux-64,1.20260831.1,Apache-2.0,website/package-lock.json
+@cloudflare/workerd-linux-arm64,1.20260831.1,Apache-2.0,website/package-lock.json
+@cloudflare/workerd-windows-64,1.20260831.1,Apache-2.0,website/package-lock.json
+@cloudflare/workers-types,5.20260903.1,MIT OR Apache-2.0,website/package-lock.json
 @cspotcode/source-map-support,0.8.1,MIT,website/package-lock.json
 @emmetio/abbreviation,2.3.3,MIT,website/package-lock.json
 @emmetio/css-abbreviation,2.1.8,MIT,website/package-lock.json
@@ -407,7 +407,7 @@ micromark-util-encode,2.0.1,MIT,website/package-lock.json
 micromark-util-sanitize-uri,2.0.1,MIT,website/package-lock.json
 micromark-util-symbol,2.0.1,MIT,website/package-lock.json
 micromark-util-types,2.0.2,MIT,website/package-lock.json
-miniflare,5.20260826.0-alpha,MIT,website/package-lock.json
+miniflare,5.20260831.0-alpha,MIT,website/package-lock.json
 minimatch,10.2.6,BlueOak-1.0.0,website/package-lock.json
 mrmime,2.0.1,MIT,website/package-lock.json
 ms,2.1.3,MIT,website/package-lock.json
@@ -544,8 +544,8 @@ vscode-uri,3.2.0,MIT,website/package-lock.json
 which,2.0.2,ISC,website/package-lock.json
 why-is-node-running,2.3.0,MIT,website/package-lock.json
 word-wrap,1.2.5,MIT,website/package-lock.json
-workerd,1.20260826.1,Apache-2.0,website/package-lock.json
-wrangler,4.127.0,MIT OR Apache-2.0,website/package-lock.json
+workerd,1.20260831.1,Apache-2.0,website/package-lock.json
+wrangler,4.128.0,MIT OR Apache-2.0,website/package-lock.json
 wrap-ansi,9.0.2,MIT,website/package-lock.json
 ws,8.21.0,MIT,website/package-lock.json
 xxhash-wasm,1.1.0,MIT,website/package-lock.json

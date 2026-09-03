@@ -11,6 +11,7 @@ interface Props {
   image?: string | null;
   noindex?: boolean;
   structuredData?: Record<string, unknown> | null;
+  pageEvent?: "landing_view" | "affixa_view";
 }
 
 const {
@@ -20,6 +21,7 @@ const {
   image = "/logo.svg",
   noindex = false,
   structuredData = null,
+  pageEvent,
 } = Astro.props;
 
 const fullTitle = title === SITE_NAME ? SITE_NAME : `${title} — ${SITE_NAME}`;
@@ -54,7 +56,7 @@ const socialImage = image ? buildCanonical(Astro.site, image) : null;
     <title>{fullTitle}</title>
     {structuredData && <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />}
   </head>
-  <body>
+  <body data-page-event={pageEvent}>
     <a class="skip-link" href="#main-content">Skip to content</a>
     <Header />
     <main id="main-content">

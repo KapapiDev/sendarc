@@ -44,15 +44,30 @@ test("Business Beta form posts only declared fields", async ({ page }) => {
 
 test("analytics strips private campaign values and referrer URLs before sending", async ({ page }) => {
   const events: Record<string, unknown>[] = [];
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
   await page.route("**/api/events", async (route) => {
     events.push(route.request().postDataJSON() as Record<string, unknown>);
     await route.fulfill({ status: 204 });
   });
-  await page.goto("/?utm_source=search&utm_campaign=person%40example.com", { referer: "https://search.example.com/private?token=secret" });
+  const response = await page.goto("/?utm_source=search&utm_campaign=person%40example.com", { referer: "https://search.example.com/private?token=secret" });
+  expect(response?.headers()["content-security-policy"]).toContain("script-src 'self'");
   await expect.poll(() => events.length).toBeGreaterThan(0);
   expect(events[0]).toEqual({ event: "landing_view", pathname: "/", referrerHost: "search.example.com", utmSource: "search", utmCampaign: "" });
   await page.getByRole("button", { name: "Join Business Beta" }).click();
   await expect.poll(() => events.some((event) => event.event === "business_beta_cta")).toBe(true);
   expect(events.some((event) => event.event === "business_beta_submit")).toBe(false);
   expect(JSON.stringify(events)).not.toMatch(/person@|private|token|secret/);
+  await page.goto("/affixa-alternative/");
+  await expect.poll(() => events.some((event) => event.event === "affixa_view")).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("privacy notice stays readable and accessible", async ({ page }, testInfo) => {
+  await page.goto("/privacy/");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Privacy notice");
+  await expect(page.locator("main")).toContainText("every 15 minutes");
+  await expect(page.locator("body")).toHaveJSProperty("scrollWidth", await page.locator("body").evaluate((body) => body.clientWidth));
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath("privacy.png"), fullPage: true });
 });

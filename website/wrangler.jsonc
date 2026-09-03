@@ -9,8 +9,5 @@
       "database_name": "sendarc-leads",
       "database_id": "246981a9-e731-4fc0-ac07-9377ad61c54f"
     }
-  ],
-  "vars": {
-    "LEAD_RETENTION_MONTHS": "12"
-  }
+  ]
 }

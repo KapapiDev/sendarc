@@ -1,20 +1,13 @@
-import { json, rateLimited, text, visitorHash, type Env, type PagesFunction } from "./_shared";
-
-const EVENTS = new Set(["landing_view", "affixa_view", "download_cta", "business_beta_cta", "business_beta_submit", "release_download"]);
+import { json, rateLimited, readObject, type Env, type PagesFunction } from "./_shared";
+import { campaignLabel, referrerHost, validEvent } from "../../src/lib/analytics";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  if (!env.SENDARC_DB) return new Response(null, { status: 204 });
-  let body: Record<string, unknown>;
-  try { body = await request.json() as Record<string, unknown>; } catch { return json({ message: "Invalid event." }, 400); }
-  const event = text(body.event, 40);
-  const pathname = text(body.pathname, 160);
-  if (!EVENTS.has(event) || !pathname.startsWith("/")) return json({ message: "Invalid event." }, 400);
-  const hash = await visitorHash(request, env.ABUSE_HASH_SALT);
-  if (await rateLimited(env.SENDARC_DB, hash, "events", 180)) return new Response(null, { status: 204 });
-  let referrerHost: string;
-  try { referrerHost = body.referrer ? new URL(text(body.referrer, 300)).hostname.slice(0, 120) : ""; } catch { referrerHost = ""; }
-  await env.SENDARC_DB.prepare("INSERT INTO site_events(event_name,pathname,referrer_host,utm_source,utm_campaign,visitor_hash) VALUES(?,?,?,?,?,?)")
-    .bind(event, pathname, referrerHost, text(body.utmSource, 100), text(body.utmCampaign, 100), hash).run();
+  if (!env.SENDARC_DB || !env.ABUSE_HASH_SALT) return new Response(null, { status: 204 });
+  const body = await readObject(request, 2048);
+  if (!body || !validEvent(body.event, body.pathname)) return json({ message: "Invalid event." }, 400);
+  if (await rateLimited(env.SENDARC_DB, request, env.ABUSE_HASH_SALT, "events", 180)) return new Response(null, { status: 204 });
+  await env.SENDARC_DB.prepare("INSERT INTO site_events(event_name,pathname,referrer_host,utm_source,utm_campaign) VALUES(?,?,?,?,?)")
+    .bind(body.event, body.pathname, referrerHost(body.referrerHost), campaignLabel(body.utmSource), campaignLabel(body.utmCampaign)).run();
   return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
 };
 

@@ -1,3 +1,5 @@
+import { campaignLabel, referrerFromURL, validEvent } from "../lib/analytics";
+
 const qs = <T extends Element>(selector: string, root: ParentNode = document): T | null =>
   root.querySelector<T>(selector);
 
@@ -40,29 +42,20 @@ qsa<HTMLDetailsElement>("[data-faq-list] details").forEach((detail) => {
   });
 });
 
-const ALLOWED_EVENTS = new Set([
-  "landing_view",
-  "affixa_view",
-  "download_cta",
-  "business_beta_cta",
-  "business_beta_submit",
-  "release_download",
-]);
-
 const currentCampaign = (): { utmSource: string; utmCampaign: string } => {
   const params = new URLSearchParams(window.location.search);
   return {
-    utmSource: (params.get("utm_source") ?? "").slice(0, 100),
-    utmCampaign: (params.get("utm_campaign") ?? "").slice(0, 100),
+    utmSource: campaignLabel(params.get("utm_source")),
+    utmCampaign: campaignLabel(params.get("utm_campaign")),
   };
 };
 
 const track = (event: string): void => {
-  if (!ALLOWED_EVENTS.has(event)) return;
+  if (!validEvent(event, window.location.pathname)) return;
   const payload = {
     event,
-    pathname: window.location.pathname.slice(0, 160),
-    referrer: document.referrer.slice(0, 300),
+    pathname: window.location.pathname,
+    referrerHost: referrerFromURL(document.referrer),
     ...currentCampaign(),
   };
   const body = new Blob([JSON.stringify(payload)], { type: "text/plain;charset=UTF-8" });

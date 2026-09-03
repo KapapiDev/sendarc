@@ -41,3 +41,18 @@ test("Business Beta form posts only declared fields", async ({ page }) => {
   await expect(page.getByRole("status")).toContainText("recorded");
   expect(payload).toMatchObject({ email: "person@example.com", company: "Example Co", seats: "2-5", workflow: "affixa" });
 });
+
+test("analytics strips private campaign values and referrer URLs before sending", async ({ page }) => {
+  const events: Record<string, unknown>[] = [];
+  await page.route("**/api/events", async (route) => {
+    events.push(route.request().postDataJSON() as Record<string, unknown>);
+    await route.fulfill({ status: 204 });
+  });
+  await page.goto("/?utm_source=search&utm_campaign=person%40example.com", { referer: "https://search.example.com/private?token=secret" });
+  await expect.poll(() => events.length).toBeGreaterThan(0);
+  expect(events[0]).toEqual({ event: "landing_view", pathname: "/", referrerHost: "search.example.com", utmSource: "search", utmCampaign: "" });
+  await page.getByRole("button", { name: "Join Business Beta" }).click();
+  await expect.poll(() => events.some((event) => event.event === "business_beta_cta")).toBe(true);
+  expect(events.some((event) => event.event === "business_beta_submit")).toBe(false);
+  expect(JSON.stringify(events)).not.toMatch(/person@|private|token|secret/);
+});

@@ -34,7 +34,7 @@ The Cloudflare D1 binding is `SENDARC_DB`; the intended database is `sendarc-lea
 
 The live Business Beta endpoint returned 201 and the submitted declared fields were retrieved from D1 on 2026-08-28. The synthetic lead was deleted immediately after verification, and a follow-up query confirmed zero matching lead and event rows.
 
-An IP + user-agent SHA-256 hash may be retained for abuse throttling for at most 24 hours; raw IP/user-agent values are not copied into the lead record. Lead data is deleted at the earlier of a valid deletion request or 12 months after the last product/beta contact.
+Rate limiting uses an hourly, endpoint-specific, secret-keyed IP hash in `abuse_windows` only. It is never stored with events or leads. Abuse windows expire after 24 hours, events after 90 days, and leads after 12 months from their latest submission (or earlier on a verified deletion request). The independent `sendarc-retention` Worker removes expired rows every 15 minutes, even without website traffic. Cloudflare recovery copies follow the separately disclosed backup period.
 
 Retrieve records without building an admin dashboard:
 
@@ -50,7 +50,7 @@ Set-Location website
 npx wrangler d1 execute sendarc-leads --remote --command "DELETE FROM business_leads WHERE lower(email)=lower('requester@example.com')"
 ```
 
-Run the retention cleanup documented with the deployed migration/Function on a regular operational schedule; a policy statement without deletion execution is not compliance.
+Use [DATA_RETENTION.md](DATA_RETENTION.md) for deployment, aggregate verification and failed-cleanup recovery. The API records `business_beta_submit` only after a successful transactional save; `business_beta_cta` measures the submit-button attempt, including attempts that fail validation. Duplicate submissions count as attempts but update one lead row; neither count represents unique people.
 
 ## Safe signals
 

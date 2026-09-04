@@ -1,7 +1,7 @@
 # SendArc OAuth verification package
 
 Prepared 2026-09-04. This is a submission preparation packet, **not evidence of
-approval or a completed Gmail send**. Keep [REQUIREMENTS_MATRIX.md](REQUIREMENTS_MATRIX.md)
+Google approval or a completed verification submission**. Keep [REQUIREMENTS_MATRIX.md](REQUIREMENTS_MATRIX.md)
 as the release gate. Never include OAuth client secrets, access/refresh tokens,
 private mailbox contents or real customer attachments in the submission media.
 
@@ -27,11 +27,16 @@ and links to the matching privacy notice. The separate full product site remains
 at `sendarc.pages.dev` pending consolidation under the owner's chosen path.
 The root/other product pages must not be changed to impersonate SendArc.
 
-Last authenticated console inspection (2026-09-02) showed External / Testing,
-one test user, the dedicated Windows Desktop client and exactly `gmail.send`.
-Branding still used `sendarc.pages.dev` homepage/policy URLs and did not have an
-uploaded logo. Those observations must be revalidated before editing or submitting.
-No transition to Production or verification submission is recorded as complete.
+The authenticated 2026-09-04 inspection showed External / Testing, the dedicated
+Windows Desktop client and exactly `gmail.send`. Branding still used the
+`sendarc.pages.dev` homepage/policy/terms URLs, listed only `sendarc.pages.dev` as
+an authorized domain, and did not have an uploaded logo. No transition to
+Production or verification submission is recorded as complete.
+
+Google Search Console independently showed `kapapi.dev` as an active Domain
+property, 장형진 as the current account, and “You are a verified owner.” The
+ownership gate is therefore complete; do not add or replace a DNS record merely
+to repeat it.
 
 ## Scope justification (prepared text)
 
@@ -48,13 +53,12 @@ content is sent directly to Google, never through a KaPaPi or SendArc server.
 
 ## Domain ownership gate
 
-Use Google Search Console under an account that owns the SendArc Cloud project.
-Check for an existing verified **Domain property** for `kapapi.dev` first. If
-absent, obtain the actual DNS verification value from Search Console, add that
-exact TXT record through the authorized DNS account and verify it. Never invent
-the record, replace unrelated DNS entries or infer verification from a working
-website alone. Google's current guidance calls for DNS-level Domain-property
-verification, not merely a URL-prefix property. [Google domain verification guidance](https://support.google.com/cloud/answer/13804266?hl=en)
+Google Search Console under the SendArc project-owner account already exposes a
+verified **Domain property** for `kapapi.dev`. Preserve it and recheck the owner
+label immediately before submission. If Google later reports that ownership is
+lost, obtain the actual DNS verification value from Search Console and repair
+only that exact TXT record through the authorized DNS account. Never invent a
+record or replace unrelated DNS entries. [Google domain verification guidance](https://support.google.com/cloud/answer/13804266?hl=en)
 
 After verified ownership and required action-time authority, save the matching
 homepage/privacy/terms URLs and logo in the SendArc project's Branding screen.
@@ -89,12 +93,27 @@ Publish the recording only to a reviewer-accessible, authorized location and
 check its access before including its link. A script or local screenshot is not
 a substitute for the recording. [Google demo-video requirements](https://support.google.com/cloud/answer/13804565?hl=en)
 
+## Completed runtime evidence
+
+On 2026-09-04, the authenticated Windows app displayed the prepared self-addressed
+synthetic message in its local preview and sent it only after the separate Send
+action. The queue then became empty and the app recorded a new
+`lastSuccessfulSend`. Gmail's `in:sent` search showed the matching subject,
+sanitized body, recipient, and one harmless text attachment. No mailbox-reading
+scope was added. A later real sign-out returned the app to its signed-out screen
+and cleared and revoked the stored credential.
+
+The reconnect attempt selected the controlled project-owner account and then
+reached Google's unverified-app warning. It was intentionally stopped there;
+the warning was not bypassed. This is evidence for the safe stop behavior, not
+a completed reconnect or verification demonstration.
+
 ## Before submission
 
 - Revalidate the actual console state and all four public URLs.
-- Verify domain ownership with the project-owner account.
+- Recheck the already-verified `kapapi.dev` Domain-property owner label.
 - Confirm the branding is saved and the consent screen matches it.
-- Complete real Gmail send/Sent and disconnect/reconnect evidence.
+- Repeat reconnect/consent after the unverified warning is removed.
 - Create and check the real demonstration recording.
 - Use Google's current verification workflow; do not report approval from the
   Testing-mode message that verification is not yet required.

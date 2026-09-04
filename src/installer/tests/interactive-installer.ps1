@@ -201,7 +201,6 @@ try {
     $null = Start-Process -FilePath $setupPath -PassThru
     Invoke-SendArcButton -Names @('Next >', 'Next')
     Invoke-SendArcButton -Names @('I Agree')
-    Invoke-SendArcButton -Names @('Next >', 'Next')
     Invoke-SendArcButton -Names @('Install')
     Invoke-SendArcButton -Names @('Finish') -TimeoutSeconds $UiTimeoutSeconds
 

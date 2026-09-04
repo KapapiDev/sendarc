@@ -12,11 +12,11 @@
   let panel: HTMLDivElement;
 
   const links = [
-    { label: 'KaPaPi product family', url: 'https://kapapi.dev/' },
+    { label: 'SendArc on KaPaPi', url: 'https://kapapi.dev/sendarc/' },
     { label: 'Source code', url: 'https://github.com/KapapiDev/sendarc' },
-    { label: 'Privacy policy', url: 'https://sendarc.pages.dev/privacy/' },
+    { label: 'Privacy policy', url: 'https://kapapi.dev/sendarc/privacy.html' },
     { label: 'Licenses & notices', url: 'https://sendarc.pages.dev/licenses/' },
-    { label: 'Support', url: 'https://sendarc.pages.dev/support/' },
+    { label: 'Support', url: 'https://kapapi.dev/sendarc/support.html' },
   ];
 
   onMount(() => activateModal(panel));

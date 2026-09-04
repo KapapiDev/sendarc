@@ -189,7 +189,10 @@ Describe "SendArc installer round-trip" {
             [SendArcVersionResource]::ReadString($appExe, 'ProductVersion') | Should -Be $script:ExpectedProductVersion
         }
 
-        It "2b. installed license and dependency inventory bundle is complete" {
+        It "2b. installed product URL, license, and dependency inventory bundle are complete" {
+            (Get-ItemProperty -LiteralPath $script:UninstallKey).URLInfoAbout |
+                Should -Be 'https://kapapi.dev/sendarc/'
+
             $licenseDir = Join-Path $script:InstallDir 'licenses'
             foreach ($name in @(
                 'LICENSE.txt',

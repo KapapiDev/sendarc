@@ -19,8 +19,8 @@
 ;   T-10-01-01 — ordering invariant enforced below (Call BackupPreviousMailClient
 ;                precedes WriteRegStr HKLM "SOFTWARE\Clients\Mail" "" "SendArc")
 ;   QUICK-260423-msq — DLL queue relocated from %TEMP%\SendArc\ to
-;                %LOCALAPPDATA%\SendArc\queue\ (DLL creates it at DllMain; installer does not
-;                pre-create it — no install-time action required for the path itself).
+;                %LOCALAPPDATA%\SendArc\queue\ (the DLL creates it lazily on the first
+;                mail call; the installer does not pre-create it).
 
 Unicode True
 
@@ -35,7 +35,7 @@ Unicode True
 !define PRODUCT_NAME      "SendArc"
 !define PRODUCT_VERSION   "${SENDARC_VERSION}"
 !define PRODUCT_PUBLISHER "장형진"
-!define PRODUCT_WEB_SITE  "https://github.com/KapapiDev/sendarc"
+!define PRODUCT_WEB_SITE  "https://kapapi.dev/sendarc/"
 !define AUMID             "app.sendarc.desktop"
 
 ;------------------------------------------------------------------------------

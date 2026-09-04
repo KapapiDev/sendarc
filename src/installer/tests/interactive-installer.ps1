@@ -55,6 +55,7 @@ function Find-SendArcButton {
         [datetime]$Deadline
     )
 
+    $normalizedNames = @($Names | ForEach-Object { ($_ -replace '&', '').Trim() })
     do {
         $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
             [System.Windows.Automation.TreeScope]::Children,
@@ -71,7 +72,8 @@ function Find-SendArcButton {
             )
             for ($buttonIndex = 0; $buttonIndex -lt $buttons.Count; $buttonIndex++) {
                 $button = $buttons.Item($buttonIndex)
-                if ($Names -contains $button.Current.Name -and $button.Current.IsEnabled) {
+                $normalizedButtonName = ($button.Current.Name -replace '&', '').Trim()
+                if ($normalizedNames -contains $normalizedButtonName -and $button.Current.IsEnabled) {
                     return [pscustomobject]@{
                         Button = $button
                         ButtonName = $button.Current.Name
@@ -84,6 +86,7 @@ function Find-SendArcButton {
     } while ((Get-Date) -lt $Deadline)
 
     $visibleTitles = @()
+    $visibleButtons = @()
     $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
         [System.Windows.Automation.TreeScope]::Children,
         [System.Windows.Automation.Condition]::TrueCondition
@@ -91,8 +94,18 @@ function Find-SendArcButton {
     for ($index = 0; $index -lt $windows.Count; $index++) {
         $title = $windows.Item($index).Current.Name
         if ($title) { $visibleTitles += $title }
+        if ($title -match 'SendArc') {
+            $buttons = $windows.Item($index).FindAll(
+                [System.Windows.Automation.TreeScope]::Subtree,
+                $script:buttonCondition
+            )
+            for ($buttonIndex = 0; $buttonIndex -lt $buttons.Count; $buttonIndex++) {
+                $button = $buttons.Item($buttonIndex)
+                $visibleButtons += "'$($button.Current.Name)' (enabled=$($button.Current.IsEnabled))"
+            }
+        }
     }
-    throw "Timed out waiting for SendArc UI button [$($Names -join ', ')]. Visible windows: $($visibleTitles -join ' | ')"
+    throw "Timed out waiting for SendArc UI button [$($Names -join ', ')]. Visible windows: $($visibleTitles -join ' | '). SendArc buttons: $($visibleButtons -join ' | ')"
 }
 
 function Invoke-SendArcButton {
@@ -186,9 +199,9 @@ try {
 
     Write-Host "[interactive-installer] Starting visible installer: $setupPath"
     $null = Start-Process -FilePath $setupPath -PassThru
-    Invoke-SendArcButton -Names @('Next >')
+    Invoke-SendArcButton -Names @('Next >', 'Next')
     Invoke-SendArcButton -Names @('I Agree')
-    Invoke-SendArcButton -Names @('Next >')
+    Invoke-SendArcButton -Names @('Next >', 'Next')
     Invoke-SendArcButton -Names @('Install')
     Invoke-SendArcButton -Names @('Finish') -TimeoutSeconds $UiTimeoutSeconds
 

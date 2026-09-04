@@ -272,6 +272,11 @@ jobs:
           $config.Output.Verbosity = 'Detailed'
           Invoke-Pester -Configuration $config
 
+      - name: Run visible installer and uninstaller against exact release artifact
+        shell: pwsh
+        run: |
+          ./src/installer/tests/interactive-installer.ps1 -SetupExe ./SendArc-Setup.exe
+
       - name: Generate SHA256SUMS.txt
         shell: pwsh
         run: |

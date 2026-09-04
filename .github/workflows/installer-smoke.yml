@@ -135,6 +135,11 @@ jobs:
           $config.Output.Verbosity = 'Detailed'
           Invoke-Pester -Configuration $config
 
+      - name: Run visible installer and uninstaller acceptance
+        shell: pwsh
+        run: |
+          ./src/installer/tests/interactive-installer.ps1 -SetupExe ./SendArc-Setup.exe
+
       - name: Upload installer as workflow artifact (for debugging failed runs)
         if: always()
         uses: actions/upload-artifact@v6

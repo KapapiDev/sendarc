@@ -16,15 +16,15 @@ import (
 	"time"
 
 	"github.com/pkg/browser"
+	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // Keyring service+user coordinates per CONTEXT D-11.
 const (
-	keyringService = "go-mapi"
+	keyringService = "SendArc"
 	keyringUser    = "oauth-tokens"
 )
 
@@ -54,13 +54,11 @@ func (realKeyringStore) Delete(service, user string) error {
 	return keyring.Delete(service, user)
 }
 
-// OAuth scopes (D-17 userinfo + AUTH-01 gmail).
+// OAuth scope: SendArc requests only the permission needed for the explicit
+// send action. Account identity/profile access is intentionally not requested.
 const (
-	scopeGmailCompose    = "https://www.googleapis.com/auth/gmail.compose"
-	scopeGmailSend       = "https://www.googleapis.com/auth/gmail.send"
-	scopeUserinfoEmail   = "https://www.googleapis.com/auth/userinfo.email"
-	scopeUserinfoProfile = "https://www.googleapis.com/auth/userinfo.profile"
-	loopbackFlowTimeout  = 5 * time.Minute // Claude discretion per CONTEXT
+	scopeGmailSend      = "https://www.googleapis.com/auth/gmail.send"
+	loopbackFlowTimeout = 5 * time.Minute // Claude discretion per CONTEXT
 )
 
 // userinfoEndpointOverride is empty in production (the real Google endpoint is
@@ -105,7 +103,7 @@ type AuthStatus struct {
 // AuthManager owns the OAuth token lifecycle. Ref held on *App.
 type AuthManager struct {
 	// refresh serializes token refresh (D-13) AND sign-in (a user-initiated
-	// sign-in with no token cannot race a refresh — draft buttons are
+	// sign-in with no token cannot race a refresh — send buttons are
 	// disabled per D-07, so contention is impossible in practice).
 	refresh sync.Mutex
 
@@ -130,7 +128,7 @@ type AuthManager struct {
 // keyringStoreFactory is the seam for build-tag injection. Production code
 // leaves it pointing at realKeyringStore (Windows Credential Manager via
 // zalando/go-keyring); the //go:build e2e shim in auth_e2e.go swaps it for a
-// fake populated from GOMAPI_E2E_FAKE_TOKEN_JSON so the Playwright harness can
+// fake populated from SENDARC_E2E_FAKE_TOKEN_JSON so the Playwright harness can
 // boot the app pre-authenticated without touching the real credential store.
 var keyringStoreFactory func() KeyringStore = func() KeyringStore { return realKeyringStore{} }
 
@@ -233,7 +231,7 @@ func (am *AuthManager) ClearTokens() error {
 	return am.clearTokensLocked()
 }
 
-// newOAuthConfig builds a *oauth2.Config with the four required scopes and the
+// newOAuthConfig builds a *oauth2.Config with the minimum required scopes and the
 // Google endpoint. redirectURL must include the loopback port (e.g.,
 // "http://127.0.0.1:12345/callback").
 func newOAuthConfig(redirectURL string) *oauth2.Config {
@@ -241,13 +239,8 @@ func newOAuthConfig(redirectURL string) *oauth2.Config {
 		ClientID:     oauthClientID,
 		ClientSecret: oauthClientSecret,
 		RedirectURL:  redirectURL,
-		Scopes: []string{
-			scopeGmailCompose,
-			scopeGmailSend,
-			scopeUserinfoEmail,
-			scopeUserinfoProfile,
-		},
-		Endpoint: google.Endpoint,
+		Scopes:       []string{scopeGmailSend},
+		Endpoint:     google.Endpoint,
 	}
 }
 
@@ -296,8 +289,8 @@ func (am *AuthManager) prepareLoopback(ctx context.Context, expectedState string
 		})
 	}
 
-	const successHTML = `<!doctype html><html><head><meta charset="utf-8"><title>go-mapi</title></head><body style="font-family:sans-serif;padding:2em"><h2>Signed in to go-mapi</h2><p>You can close this tab and return to the app.</p></body></html>`
-	const failureHTML = `<!doctype html><html><head><meta charset="utf-8"><title>go-mapi</title></head><body style="font-family:sans-serif;padding:2em"><h2>Sign-in failed</h2><p>Return to go-mapi to try again.</p></body></html>`
+	const successHTML = `<!doctype html><html><head><meta charset="utf-8"><title>SendArc</title></head><body style="font-family:sans-serif;padding:2em"><h2>Signed in to SendArc</h2><p>You can close this tab and return to the app.</p></body></html>`
+	const failureHTML = `<!doctype html><html><head><meta charset="utf-8"><title>SendArc</title></head><body style="font-family:sans-serif;padding:2em"><h2>Sign-in failed</h2><p>Return to SendArc to try again.</p></body></html>`
 
 	srv := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -390,7 +383,7 @@ func (am *AuthManager) fetchUserInfoLocked(ctx context.Context) {
 	}
 	am.email = u.Email
 	am.name = u.Name
-	logInfo("oauth: signed in as %s", am.email)
+	logInfo("oauth: user profile loaded")
 }
 
 // signInLocked drives the full loopback + PKCE flow. Caller holds am.refresh.
@@ -448,9 +441,6 @@ func (am *AuthManager) signInLocked(parent context.Context) error {
 		am.tokens = nil
 		return fmt.Errorf("keyring save: %w", err)
 	}
-
-	// Userinfo is non-fatal — log if it fails, user is still signed in.
-	am.fetchUserInfoLocked(flowCtx)
 
 	logInfo("oauth: sign-in complete, token expires %s", token.Expiry.Format(time.RFC3339))
 	return nil
@@ -526,6 +516,7 @@ func (am *AuthManager) refreshIfNeededLocked(ctx context.Context) error {
 		return nil
 	}
 	if am.tokens.RefreshToken == "" {
+		_ = am.clearTokensLocked()
 		return ErrInvalidGrant
 	}
 
@@ -633,7 +624,7 @@ func (am *AuthManager) revokeRefreshToken(parent context.Context) {
 	logError("oauth revoke: status %d", resp.StatusCode)
 }
 
-// GmailCall is the signature Phase 9's draft-creation code will satisfy.
+// GmailCall is the signature used by authenticated Gmail operations.
 // The statusCode return is ONLY inspected for 401 — it is the caller's signal
 // that the access token was rejected and a refresh + retry should be attempted.
 // Any other status with a non-nil err is bubbled up verbatim (no retry).
@@ -722,8 +713,8 @@ func (a *App) emitAuthChanged() {
 // Does NOT quit the app (D-16) — watcher keeps running, tray stays.
 //
 // The revoke HTTP call is made under a.auth.refresh with a 5s bound
-// (see revokeRefreshToken). Intentional: per D-07 UI disables draft-
-// creating buttons while signing out, so no other caller can contend for
+// (see revokeRefreshToken). Intentional: per D-07 UI disables send controls
+// while signing out, so no other caller can contend for
 // this mutex; holding it across revoke prevents any partial-state window.
 func (a *App) SignOut() error {
 	if a.auth == nil {
@@ -784,8 +775,14 @@ func (a *App) bootstrapAuth() <-chan struct{} {
 		return done
 	}
 	// Proactive refresh if within 5 minutes of expiry.
+	ctx := a.ctx
+	if ctx == nil {
+		// Binding/unit tests can construct App without running Wails startup.
+		// Keep refresh request construction valid in that supported state.
+		ctx = context.Background()
+	}
 	a.auth.refresh.Lock()
-	err := a.auth.refreshIfNeededLocked(a.ctx)
+	err := a.auth.refreshIfNeededLocked(ctx)
 	a.auth.refresh.Unlock()
 	if errors.Is(err, ErrInvalidGrant) {
 		logInfo("oauth bootstrap: invalid_grant — prompting re-sign-in")
@@ -799,23 +796,11 @@ func (a *App) bootstrapAuth() <-chan struct{} {
 		// surface as signed-in with a warning log. First Gmail call will retry.
 		logError("oauth bootstrap: refresh deferred: %v", err)
 	}
-	// Tokens present and valid (or transient-error kept) — tray should show idle
-	// regardless of the async userinfo fetch outcome.
+	// Tokens present and valid (or transient-error kept) — tray should show idle.
 	a.SetTrayIdle("watching for emails")
 	logInfo("oauth bootstrap: signed in, token expires %s", a.auth.tokens.Expiry.Format(time.RFC3339))
-	// Kick off async userinfo fetch and emit auth-changed ONCE after it settles.
-	// We deliberately do NOT emit synchronously here — a pre-userinfo emission
-	// would flash an authenticated header with empty email/name. The Svelte
-	// frontend renders the queue view from the initial GetAuthStatus() pull
-	// on mount, and updates email/name via this single async emit.
-	// The returned done channel is closed when the goroutine completes (WR-02).
-	go func() {
-		defer close(done)
-		a.auth.refresh.Lock()
-		a.auth.fetchUserInfoLocked(a.ctx)
-		a.auth.refresh.Unlock()
-		a.emitAuthChanged()    // single emission, email/name populated
-		a.signalTrayRefresh() // tray reads SignedIn from auth.Status() — refresh after auth settles
-	}()
+	a.emitAuthChanged()
+	a.signalTrayRefresh()
+	close(done)
 	return done
 }

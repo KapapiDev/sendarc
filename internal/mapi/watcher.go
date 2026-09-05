@@ -358,6 +358,19 @@ func (ew *EmailWatcher) processFile(filename string) {
 	if err := ValidateMailMessage(&mail); err != nil {
 		validErr := fmt.Errorf("invalid email in %s: %w", filename, err)
 		ew.moveToErrors(filename, fmt.Sprintf("validation error: %v", err))
+		ew.removeAttachmentsDir(filename)
+		ew.dispatchError(validErr)
+		return
+	}
+	// Queue JSON is writable by the current user, so never trust an attachment
+	// path merely because it parsed. The interceptor copies every attachment to
+	// the sibling <stem> directory before publishing the JSON; enforcing that
+	// invariant prevents a tampered queue file from exfiltrating arbitrary local
+	// files through a user-approved send.
+	if err := validateQueuedAttachments(ew.watchDir, filename, &mail); err != nil {
+		validErr := fmt.Errorf("invalid email in %s: %w", filename, err)
+		ew.moveToErrors(filename, "validation error: unsafe attachment path")
+		ew.removeAttachmentsDir(filename)
 		ew.dispatchError(validErr)
 		return
 	}
@@ -379,6 +392,58 @@ func (ew *EmailWatcher) processFile(filename string) {
 	ew.mu.Unlock()
 
 	ew.dispatchQueueChanged(snap)
+}
+
+// validateQueuedAttachments verifies the interceptor's queue-ownership
+// invariant. Each attachment must be a regular, non-symlink file directly in
+// <watchDir>/<json-stem>/, and its basename must match the validated display
+// filename. Error strings intentionally omit paths and filenames so callers
+// can safely surface or persist the reason without leaking message metadata.
+func validateQueuedAttachments(watchDir, filename string, mail *MailMessage) error {
+	if len(mail.Attachments) == 0 {
+		return nil
+	}
+	if !strings.HasSuffix(filename, ".json") {
+		return fmt.Errorf("attachment queue filename is invalid")
+	}
+	stem := strings.TrimSuffix(filename, ".json")
+	if stem == "" || filepath.Base(stem) != stem {
+		return fmt.Errorf("attachment queue filename is invalid")
+	}
+	expectedDir, err := filepath.Abs(filepath.Join(watchDir, stem))
+	if err != nil {
+		return fmt.Errorf("attachment directory is invalid")
+	}
+	expectedDir = filepath.Clean(expectedDir)
+
+	for i, attachment := range mail.Attachments {
+		if !filepath.IsAbs(attachment.Path) {
+			return fmt.Errorf("attachment[%d] path is not absolute", i)
+		}
+		candidate, err := filepath.Abs(attachment.Path)
+		if err != nil {
+			return fmt.Errorf("attachment[%d] path is invalid", i)
+		}
+		candidate = filepath.Clean(candidate)
+		rel, err := filepath.Rel(expectedDir, candidate)
+		if err != nil || rel == "." || filepath.IsAbs(rel) || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || rel == ".." || filepath.Dir(rel) != "." {
+			return fmt.Errorf("attachment[%d] is outside the queue", i)
+		}
+		if !strings.EqualFold(filepath.Base(candidate), attachment.Filename) {
+			return fmt.Errorf("attachment[%d] filename does not match", i)
+		}
+		info, err := os.Lstat(candidate)
+		if err != nil {
+			return fmt.Errorf("attachment[%d] is unavailable", i)
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return fmt.Errorf("attachment[%d] is not a regular file", i)
+		}
+		if attachment.Size >= 0 && info.Size() != attachment.Size {
+			return fmt.Errorf("attachment[%d] size does not match", i)
+		}
+	}
+	return nil
 }
 
 func (ew *EmailWatcher) handleRemove(filename string) {

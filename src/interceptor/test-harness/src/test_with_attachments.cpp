@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <filesystem>
+#include <fstream>
 #include "../test_utils.h"
 
 using namespace mapi_test;
@@ -10,9 +11,8 @@ int test_with_attachments() {
     std::cout << "\nTest: With Attachments" << std::endl;
 
     // Load the DLL
-    HMODULE hDll = LoadLibraryA("go-mapi.dll");
+    HMODULE hDll = TestUtilities::LoadInterceptorDll();
     if (!hDll) {
-        std::cerr << "Failed to load go-mapi.dll" << std::endl;
         return 1;
     }
 
@@ -32,13 +32,26 @@ int test_with_attachments() {
     char toAddress[] = "test@example.com";
     char toName[] = "Test User";
 
-    // Create dummy attachment
-    char filePath[] = "C:\\test.txt";
+    // Create a real temporary attachment. The interceptor copies attachments
+    // synchronously before returning, so a nonexistent placeholder path makes
+    // this an attachment-failure test instead of a send test.
+    std::filesystem::path sourcePath = std::filesystem::temp_directory_path() /
+        ("SendArc-harness-" + std::to_string(GetCurrentProcessId()) + "-test.txt");
+    {
+        std::ofstream source(sourcePath, std::ios::binary | std::ios::trunc);
+        source << "test attachment";
+        if (!source) {
+            std::cerr << "Failed to create temporary attachment" << std::endl;
+            FreeLibrary(hDll);
+            return 1;
+        }
+    }
+    std::string filePath = sourcePath.u8string();
     char fileName[] = "test.txt";
 
     MapiFileDesc attachment = {};
     attachment.nPosition = 0;
-    attachment.lpszPathName = filePath;
+    attachment.lpszPathName = filePath.data();
     attachment.lpszFileName = fileName;
 
     MapiRecipDesc recipient = {};
@@ -60,20 +73,17 @@ int test_with_attachments() {
     std::cout << "MAPISendMail returned: " << result << std::endl;
 
     // Verify JSON file was created
-    std::string tempDir = TestUtilities::GetGoMapiTempDir();
-    bool success = TestUtilities::VerifyJsonFileCreated(tempDir);
+    std::string tempDir = TestUtilities::GetSendArcQueueDir();
+    bool success = result == SUCCESS_SUCCESS &&
+        TestUtilities::VerifyJsonFileCreated(tempDir);
 
     if (success) {
-        // Find and validate the JSON file
-        for (const auto& entry : std::filesystem::directory_iterator(tempDir)) {
-            if (entry.path().extension() == ".json") {
-                // Check that it contains attachment info
-                success = TestUtilities::ValidateJsonFile(entry.path().string());
-                break;
-            }
-        }
+        std::string jsonPath = TestUtilities::GetNewestJsonPath(tempDir);
+        success = !jsonPath.empty() && TestUtilities::ValidateJsonFile(jsonPath);
     }
 
+    std::error_code removeError;
+    std::filesystem::remove(sourcePath, removeError);
     FreeLibrary(hDll);
     return success ? 0 : 1;
 }

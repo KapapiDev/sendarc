@@ -16,6 +16,7 @@
   .msg { font-weight: 500; }
   button {
     background: white; color: var(--c-destructive); border: 0;
-    padding: 0.35rem 0.75rem; border-radius: 4px; font-weight: 600; cursor: pointer;
+    min-height: 40px; padding: 0.35rem 0.75rem; border-radius: 4px; font-weight: 600; cursor: pointer;
   }
+  button:focus-visible { outline: 3px solid white; outline-offset: 2px; }
 </style>

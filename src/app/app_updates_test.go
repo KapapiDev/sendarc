@@ -19,7 +19,7 @@ import (
 func tempSettingsEnv(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	t.Setenv("GOMAPI_APPDATA_DIR", dir)
+	t.Setenv("SENDARC_APPDATA_DIR", dir)
 	return dir
 }
 
@@ -69,6 +69,7 @@ func (c *countingFetcher) callCount() int {
 //   - points settings at the given tempDir
 //   - has a fake updater service running against the supplied fetcher
 //   - does NOT start the tray / watcher / automode
+//
 // Caller is responsible for driving startup-update / manual-check /
 // scheduler paths directly via exported App hooks.
 func newAppForUpdateTests(t *testing.T, fetcher releaseFetcher, version string) *App {

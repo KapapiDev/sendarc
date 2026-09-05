@@ -1,0 +1,32 @@
+name: Security and repository policy
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Required legal and policy files
+        run: test -f LICENSE && test -f THIRD_PARTY_NOTICES.md && test -f SECURITY.md && test -f PRIVACY.md && test -f docs/dependency-inventory/go-runtime.csv && test -f docs/dependency-inventory/installer-payloads.csv
+      - name: Setup Node 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Reproduce dependency license inventories
+        run: |
+          npm run licenses:inventory
+          git diff --exit-code -- docs/dependency-inventory/npm-workspace.csv docs/dependency-inventory/npm-website.csv
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

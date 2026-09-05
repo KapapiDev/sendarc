@@ -11,9 +11,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// AppSettings is the persisted per-user settings for go-mapi. Phase 9 ships
+// AppSettings is the persisted per-user settings for SendArc. Phase 9 ships
 // `Mode`; Phase 11 adds the flat update-check fields. Future phases may add
-// flat fields — do NOT nest. Marshaled to %APPDATA%\go-mapi\settings.json
+// flat fields — do NOT nest. Marshaled to %APPDATA%\SendArc\settings.json
 // via saveSettings (atomic, crash-safe).
 //
 // Pause state is INTENTIONALLY not persisted (D-15) — resets on every app
@@ -29,9 +29,9 @@ import (
 //     persistence is routed through an App-owned guarded writer (Task 2)
 //     that preserves the single-writer atomic-save invariant.
 type AppSettings struct {
-	Mode                string `json:"mode"`                         // "manual" | "auto-draft"
-	UpdateChecksEnabled bool   `json:"update_checks_enabled"`        // D-08 default enabled
-	LastUpdateCheck     string `json:"last_update_check,omitempty"`  // RFC3339, "" = never checked
+	Mode                string `json:"mode"`                        // "manual" | "auto-draft"
+	UpdateChecksEnabled bool   `json:"update_checks_enabled"`       // D-08 default enabled
+	LastUpdateCheck     string `json:"last_update_check,omitempty"` // RFC3339, "" = never checked
 }
 
 const defaultMode = "manual"
@@ -52,7 +52,7 @@ func settingsPath() string {
 	return filepath.Join(appDataDir(), "settings.json")
 }
 
-// loadSettings reads %APPDATA%\go-mapi\settings.json. Returns defaults on
+// loadSettings reads %APPDATA%\SendArc\settings.json. Returns defaults on
 // any read/parse error (first-run missing file, corrupt file, unknown Mode
 // value). Corrupt files are NOT moved aside in Phase 9 — D-15 scope means
 // the only persisted field is Mode, and resetting to "manual" on a corrupt
@@ -78,10 +78,9 @@ func loadSettings() AppSettings {
 		return defaultAppSettings()
 	}
 	out := defaultAppSettings()
-	if raw.Mode == "manual" || raw.Mode == "auto-draft" {
-		out.Mode = raw.Mode
-	}
-	// raw.Mode ∉ {"manual","auto-draft"}: keep defaultAppSettings().Mode.
+	// SendArc intentionally migrates every legacy mode to manual. A message may
+	// only leave the machine after its preview is opened and Send is clicked.
+	out.Mode = defaultMode
 	if raw.UpdateChecksEnabled != nil {
 		out.UpdateChecksEnabled = *raw.UpdateChecksEnabled
 	}

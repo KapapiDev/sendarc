@@ -32,6 +32,82 @@ export namespace main {
 	        this.name = source["name"];
 	    }
 	}
+	export class ConnectionTestResult {
+	    connected: boolean;
+	    checkedAt: string;
+	    message: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ConnectionTestResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.connected = source["connected"];
+	        this.checkedAt = source["checkedAt"];
+	        this.message = source["message"];
+	    }
+	}
+	export class MAPIStatus {
+	    registered: boolean;
+	    default: boolean;
+	    dll64Present: boolean;
+	    dll32Present: boolean;
+	    healthy: boolean;
+	    canRepair: boolean;
+	    detail: string;
+
+	    static createFrom(source: any = {}) {
+	        return new MAPIStatus(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.registered = source["registered"];
+	        this.default = source["default"];
+	        this.dll64Present = source["dll64Present"];
+	        this.dll32Present = source["dll32Present"];
+	        this.healthy = source["healthy"];
+	        this.canRepair = source["canRepair"];
+	        this.detail = source["detail"];
+	    }
+	}
+	export class ProductStatus {
+	    gmail: AuthStatus;
+	    mapi: MAPIStatus;
+	    lastInterceptedAt?: string;
+	    lastSuccessfulSend?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ProductStatus(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.gmail = this.convertValues(source["gmail"], AuthStatus);
+	        this.mapi = this.convertValues(source["mapi"], MAPIStatus);
+	        this.lastInterceptedAt = source["lastInterceptedAt"];
+	        this.lastSuccessfulSend = source["lastSuccessfulSend"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class UpdateState {
 	    currentVersion: string;
 	    latestVersion: string;
@@ -209,4 +285,3 @@ export namespace mapi {
 	
 
 }
-

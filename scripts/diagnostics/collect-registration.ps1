@@ -1,14 +1,14 @@
 <#
 .SYNOPSIS
-  Collect go-mapi MAPI registration + DLL diagnostics into a timestamped text file.
+  Collect SendArc MAPI registration + DLL diagnostics into a timestamped text file.
 
 .DESCRIPTION
-  Produces a single text report at $OutputDir\go-mapi-registration-<yyyyMMdd-HHmmss>.txt
+  Produces a single text report at $OutputDir\SendArc-registration-<yyyyMMdd-HHmmss>.txt
   covering:
     1. Header (host, user, OS bitness, process bitness)
     2. HKLM mail clients (native view)
     3. HKLM mail clients (WOW6432 view)
-    4. HKLM go-mapi registration (both views)
+    4. HKLM SendArc registration (both views)
     5. DLL presence, size, SHA256, PE bitness (32 vs 64)
     6. DLL export probe via LoadLibraryEx + GetProcAddress
     7. Footer
@@ -44,7 +44,7 @@ if (-not (Test-Path -LiteralPath $OutputDir)) {
     }
 }
 
-$out = Join-Path $OutputDir "go-mapi-registration-$timestamp.txt"
+$out = Join-Path $OutputDir "SendArc-registration-$timestamp.txt"
 
 function Append-Banner {
     param([string]$Title)
@@ -87,7 +87,7 @@ function Safe-Invoke {
 # Section 1: Header
 # -----------------------------------------------------------------------------
 Append-Banner 'Header'
-Append-Line "go-mapi registration report (script v$scriptVersion)"
+Append-Line "SendArc registration report (script v$scriptVersion)"
 Append-Line "Timestamp     : $(Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz')"
 Append-Line "Computer      : $env:COMPUTERNAME"
 Append-Line "User          : $env:USERNAME"
@@ -160,11 +160,11 @@ Safe-Invoke 'HKLM WOW6432 Mail clients' {
 }
 
 # -----------------------------------------------------------------------------
-# Section 4: HKLM go-mapi registration (native + WOW6432)
+# Section 4: HKLM SendArc registration (native + WOW6432)
 # -----------------------------------------------------------------------------
-Append-Banner 'HKLM go-mapi registration'
-foreach ($root in @('HKLM:\SOFTWARE\Clients\Mail\go-mapi',
-                    'HKLM:\SOFTWARE\WOW6432Node\Clients\Mail\go-mapi')) {
+Append-Banner 'HKLM SendArc registration'
+foreach ($root in @('HKLM:\SOFTWARE\Clients\Mail\SendArc',
+                    'HKLM:\SOFTWARE\WOW6432Node\Clients\Mail\SendArc')) {
     Append-Line ''
     Append-Line "Key: $root"
     Safe-Invoke "Dump $root" {
@@ -210,8 +210,8 @@ foreach ($root in @('HKLM:\SOFTWARE\Clients\Mail\go-mapi',
 Append-Banner 'DLL presence / PE bitness / SHA256'
 
 $dllCandidates = @(
-    "$env:ProgramFiles\go-mapi\go-mapi.dll",
-    "${env:ProgramFiles(x86)}\go-mapi\go-mapi.dll"
+    "$env:ProgramFiles\SendArc\SendArc.dll",
+    "${env:ProgramFiles(x86)}\SendArc\SendArc.dll"
 )
 
 function Get-PEBitness {
@@ -267,7 +267,7 @@ $csharp = @'
 using System;
 using System.Runtime.InteropServices;
 
-public static class GoMapiProbe
+public static class SendArcProbe
 {
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern IntPtr LoadLibraryExW(string lpFileName, IntPtr hFile, uint dwFlags);
@@ -310,24 +310,24 @@ foreach ($dll in $dllCandidates) {
         continue
     }
     # DONT_RESOLVE_DLL_REFERENCES lets us inspect exports without running DllMain.
-    $h = [GoMapiProbe]::LoadLibraryExW($dll, [IntPtr]::Zero, [GoMapiProbe]::DONT_RESOLVE_DLL_REFERENCES)
+    $h = [SendArcProbe]::LoadLibraryExW($dll, [IntPtr]::Zero, [SendArcProbe]::DONT_RESOLVE_DLL_REFERENCES)
     if ($h -eq [IntPtr]::Zero) {
-        $err = [GoMapiProbe]::GetLastError()
+        $err = [SendArcProbe]::GetLastError()
         Append-Line ('  LoadLibraryEx failed (GetLastError=0x{0:X8} / {1})' -f $err, $err)
         continue
     }
     try {
         foreach ($exp in $expectedExports) {
-            $addr = [GoMapiProbe]::GetProcAddress($h, $exp)
+            $addr = [SendArcProbe]::GetProcAddress($h, $exp)
             if ($addr -eq [IntPtr]::Zero) {
-                $err = [GoMapiProbe]::GetLastError()
+                $err = [SendArcProbe]::GetLastError()
                 Append-Line ('  {0,-20} NOT FOUND (GetLastError=0x{1:X8})' -f $exp, $err)
             } else {
                 Append-Line ('  {0,-20} found  at 0x{1:X}' -f $exp, $addr.ToInt64())
             }
         }
     } finally {
-        [void][GoMapiProbe]::FreeLibrary($h)
+        [void][SendArcProbe]::FreeLibrary($h)
     }
 }
 

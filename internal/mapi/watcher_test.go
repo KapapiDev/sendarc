@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -85,6 +86,111 @@ func writeFile(t *testing.T, path string, data []byte) {
 	t.Helper()
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		t.Fatalf("os.WriteFile(%s): %v", path, err)
+	}
+}
+
+func makeEmailWithAttachment(t *testing.T, path, filename string, size int64) []byte {
+	t.Helper()
+	msg := MailMessage{
+		Version:    1,
+		Timestamp:  "2024-01-01T00:00:00Z",
+		Subject:    "Attachment validation",
+		Body:       "test body",
+		BodyFormat: "plain",
+		Recipients: Recipients{To: []Recipient{{Address: "test@example.com"}}},
+		Attachments: []Attachment{{
+			Filename: filename,
+			Path:     path,
+			Size:     size,
+		}},
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	return data
+}
+
+func TestEmailWatcherAcceptsQueueOwnedAttachment(t *testing.T) {
+	watchDir := filepath.Join(t.TempDir(), "watch")
+	stem := "safe-attachment"
+	attachDir := filepath.Join(watchDir, stem)
+	if err := os.MkdirAll(attachDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	attachmentPath := filepath.Join(attachDir, "report.txt")
+	writeFile(t, attachmentPath, []byte("safe"))
+	writeFile(t, filepath.Join(watchDir, stem+".json"), makeEmailWithAttachment(t, attachmentPath, "report.txt", 4))
+
+	cb := newStubCallback()
+	ew, err := NewEmailWatcher(watchDir, cb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ew.Stop()
+	ew.processFile(stem + ".json")
+
+	snap := cb.waitSnapshot(t, time.Second)
+	if len(snap) != 1 || len(snap[0].Message.Attachments) != 1 {
+		t.Fatalf("expected one queued message with one attachment, got %#v", snap)
+	}
+}
+
+func TestEmailWatcherRejectsAttachmentOutsideQueueSibling(t *testing.T) {
+	root := t.TempDir()
+	watchDir := filepath.Join(root, "watch")
+	if err := os.MkdirAll(watchDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	outsidePath := filepath.Join(root, "private.txt")
+	writeFile(t, outsidePath, []byte("do not send"))
+	stem := "tampered"
+	writeFile(t, filepath.Join(watchDir, stem+".json"), makeEmailWithAttachment(t, outsidePath, "private.txt", 11))
+
+	cb := newStubCallback()
+	ew, err := NewEmailWatcher(watchDir, cb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ew.Stop()
+	ew.processFile(stem + ".json")
+
+	err = cb.waitError(t, time.Second)
+	if err == nil || !strings.Contains(err.Error(), "outside the queue") {
+		t.Fatalf("expected queue-boundary error, got %v", err)
+	}
+	if got := ew.Snapshot(); len(got) != 0 {
+		t.Fatalf("tampered message entered queue: %#v", got)
+	}
+	if _, statErr := os.Stat(filepath.Join(watchDir, "errors", stem+".json")); statErr != nil {
+		t.Fatalf("tampered JSON was not quarantined: %v", statErr)
+	}
+	if got, readErr := os.ReadFile(outsidePath); readErr != nil || string(got) != "do not send" {
+		t.Fatalf("outside file was modified: data=%q err=%v", got, readErr)
+	}
+}
+
+func TestEmailWatcherRejectsAttachmentFilenameMismatch(t *testing.T) {
+	watchDir := filepath.Join(t.TempDir(), "watch")
+	stem := "mismatch"
+	attachDir := filepath.Join(watchDir, stem)
+	if err := os.MkdirAll(attachDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	attachmentPath := filepath.Join(attachDir, "actual.txt")
+	writeFile(t, attachmentPath, []byte("safe"))
+	writeFile(t, filepath.Join(watchDir, stem+".json"), makeEmailWithAttachment(t, attachmentPath, "claimed.txt", 4))
+
+	cb := newStubCallback()
+	ew, err := NewEmailWatcher(watchDir, cb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ew.Stop()
+	ew.processFile(stem + ".json")
+
+	if got := cb.waitError(t, time.Second); !strings.Contains(got.Error(), "filename does not match") {
+		t.Fatalf("expected filename mismatch error, got %v", got)
 	}
 }
 

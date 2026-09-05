@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
-project(go-mapi-test-harness)
+project(SendArc-test-harness)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Create the test harness executable
-add_executable(go-mapi-test-harness
+add_executable(SendArc-test-harness
     test_utils.cpp
     src/main.cpp
     src/test_simple_send.cpp
@@ -15,24 +15,39 @@ add_executable(go-mapi-test-harness
     src/test_multiple_recipients.cpp
     src/test_ansi_encoding.cpp
     src/test_null_filename.cpp
+    src/emit_e2e_message.cpp
 )
 
 # Include directories (interceptor is now parent directory)
-target_include_directories(go-mapi-test-harness PRIVATE
+target_include_directories(SendArc-test-harness PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/.."
 )
 
 # Platform-specific settings
 if(MSVC)
-    target_compile_options(go-mapi-test-harness PRIVATE /W4 /WX-)
-    target_link_libraries(go-mapi-test-harness PRIVATE kernel32.lib user32.lib)
+    target_compile_options(SendArc-test-harness PRIVATE /W4 /WX-)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        target_compile_options(SendArc-test-harness PRIVATE /guard:xfg)
+        target_link_options(SendArc-test-harness PRIVATE /guard:xfg)
+    else()
+        target_compile_options(SendArc-test-harness PRIVATE /guard:cf)
+        target_link_options(SendArc-test-harness PRIVATE /guard:cf)
+    endif()
+    target_link_libraries(SendArc-test-harness PRIVATE kernel32.lib user32.lib shell32.lib)
 elseif(MINGW)
-    target_compile_options(go-mapi-test-harness PRIVATE -Wall -Wextra -Wno-unused-parameter)
-    target_link_libraries(go-mapi-test-harness PRIVATE kernel32 user32 -static-libgcc -static-libstdc++)
-    target_link_options(go-mapi-test-harness PRIVATE -static)
+    target_compile_options(SendArc-test-harness PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    target_link_libraries(SendArc-test-harness PRIVATE kernel32 user32 shell32 -static-libgcc -static-libstdc++)
+    target_link_options(SendArc-test-harness PRIVATE -static)
 endif()
 
 # Set output directory
-set_target_properties(go-mapi-test-harness PROPERTIES
+set_target_properties(SendArc-test-harness PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+
+foreach(SENDARC_CONFIG Debug Release RelWithDebInfo MinSizeRel)
+    string(TOUPPER "${SENDARC_CONFIG}" SENDARC_CONFIG_UPPER)
+    set_target_properties(SendArc-test-harness PROPERTIES
+        "RUNTIME_OUTPUT_DIRECTORY_${SENDARC_CONFIG_UPPER}" "${CMAKE_BINARY_DIR}/bin"
+    )
+endforeach()

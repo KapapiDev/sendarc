@@ -5,17 +5,16 @@
 .DESCRIPTION
   Phase 11 plan 06 CI guard. The e2e harness relies on two knobs:
 
-    1. The `-tags e2e` build tag, which compiles src/app/auth_e2e.go —
+    1. The `-tags e2e` build tag, which compiles src/app/auth_e2e.go -
        that file swaps the Windows Credential Manager keyring for an
-       in-memory fake populated from GOMAPI_E2E_FAKE_TOKEN_JSON.
+       in-memory fake populated from SENDARC_E2E_FAKE_TOKEN_JSON.
     2. The GOMAPI_DEBUG_BROWSER_ARGS env var, honored by our vendored
        go-webview2 fork (src/app/vendor/go-webview2-e2e) to forward
        --remote-debugging-port=... to WebView2.
 
-  Neither may appear in the release artifact. This script greps the
-  installer-release workflow for both markers and exits non-zero if
-  anything is found. It is meant to run as a workflow step on every
-  release-tag push before binaries are built.
+  Neither may appear in the release artifact. This script checks the release
+  workflow and, when artifact paths are supplied, scans the compiled bytes for
+  ASCII or UTF-16 E2E markers.
 
 .PARAMETER WorkflowPath
   Path to the release workflow YAML. Defaults to
@@ -25,11 +24,16 @@
   Optional path to a file containing a dump of `env` (or PowerShell
   Get-ChildItem Env:) captured during the build job. When provided, the
   script also asserts GOMAPI_DEBUG_BROWSER_ARGS is absent from the dump.
+
+.PARAMETER ArtifactPaths
+  Optional compiled EXE/DLL paths. Every file is checked for test-only browser,
+  OAuth, Gmail, and queue override markers without printing binary contents.
 #>
 [CmdletBinding()]
 param(
   [string]$WorkflowPath = ".github/workflows/installer-release.yml",
-  [string]$BuildEnvDump = ""
+  [string]$BuildEnvDump = "",
+  [string[]]$ArtifactPaths = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -64,23 +68,23 @@ $workflowCode = $codeLines -join "`n"
 
 # 1. The release workflow must not pass -tags e2e to the Go build.
 if ($workflowCode -match '-tags\s+[^\s]*e2e') {
-  Fail "installer-release workflow contains '-tags e2e' — this would ship test hooks in production"
+  Fail "installer-release workflow contains '-tags e2e' - this would ship test hooks in production"
 } else {
   Pass "no '-tags e2e' in installer-release workflow"
 }
 
 # 2. The release workflow must not export GOMAPI_DEBUG_BROWSER_ARGS.
 if ($workflowCode -match 'GOMAPI_DEBUG_BROWSER_ARGS') {
-  Fail "installer-release workflow references GOMAPI_DEBUG_BROWSER_ARGS — this would expose WebView2 CDP in release builds"
+  Fail "installer-release workflow references GOMAPI_DEBUG_BROWSER_ARGS - this would expose WebView2 CDP in release builds"
 } else {
   Pass "no GOMAPI_DEBUG_BROWSER_ARGS in installer-release workflow"
 }
 
-# 3. Likewise for GOMAPI_E2E_* overrides.
-if ($workflowCode -match 'GOMAPI_E2E_') {
-  Fail "installer-release workflow references GOMAPI_E2E_* — e2e fakes must never reach release builds"
+# 3. Likewise for SENDARC_E2E_* overrides.
+if ($workflowCode -match 'SENDARC_E2E_') {
+  Fail "installer-release workflow references SENDARC_E2E_* - e2e fakes must never reach release builds"
 } else {
-  Pass "no GOMAPI_E2E_* env vars in installer-release workflow"
+  Pass "no SENDARC_E2E_* env vars in installer-release workflow"
 }
 
 # 4. Optional: scan an env dump captured at build time.
@@ -91,13 +95,41 @@ if ($BuildEnvDump -and (Test-Path $BuildEnvDump)) {
   } else {
     Pass "build env dump has no GOMAPI_DEBUG_BROWSER_ARGS"
   }
-  if ($envContent -match 'GOMAPI_E2E_') {
-    Fail "build env dump ($BuildEnvDump) contains GOMAPI_E2E_*"
+  if ($envContent -match 'SENDARC_E2E_') {
+    Fail "build env dump ($BuildEnvDump) contains SENDARC_E2E_*"
   } else {
-    Pass "build env dump has no GOMAPI_E2E_* vars"
+    Pass "build env dump has no SENDARC_E2E_* vars"
   }
 } else {
-  Write-Host "[release-hygiene] INFO: no BuildEnvDump provided — skipping env dump scan" -ForegroundColor Yellow
+  Write-Host "[release-hygiene] INFO: no BuildEnvDump provided - skipping env dump scan" -ForegroundColor Yellow
+}
+
+# 5. Scan compiled release artifacts. E2E-only variables are isolated behind
+# build tags, so their names must be absent from both Go EXEs and native DLLs.
+foreach ($artifact in $ArtifactPaths) {
+  if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
+    Fail "compiled artifact not found: $artifact"
+    continue
+  }
+
+  $resolved = (Resolve-Path -LiteralPath $artifact).Path
+  $bytes = [IO.File]::ReadAllBytes($resolved)
+  $ascii = [Text.Encoding]::ASCII.GetString($bytes)
+  $unicode = [Text.Encoding]::Unicode.GetString($bytes)
+  $found = $false
+  foreach ($marker in @('GOMAPI_DEBUG_BROWSER_ARGS', 'SENDARC_E2E_')) {
+    if ($ascii.Contains($marker) -or $unicode.Contains($marker)) {
+      Fail "compiled artifact contains test-only marker '$marker': $artifact"
+      $found = $true
+    }
+  }
+  if (-not $found) {
+    Pass "compiled artifact contains no E2E override markers: $artifact"
+  }
+}
+
+if ($ArtifactPaths.Count -eq 0) {
+  Write-Host "[release-hygiene] INFO: no ArtifactPaths provided - skipping compiled-byte scan" -ForegroundColor Yellow
 }
 
 if ($failed) {

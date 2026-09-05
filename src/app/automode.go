@@ -1,3 +1,5 @@
+//go:build windows && legacy_automode
+
 package main
 
 import (
@@ -202,38 +204,3 @@ func (m *automode) draftOne(e mapi.EmailWithId) error {
 	})
 	return nil
 }
-
-// classifyAutomodeError maps errors to the three UI categories per D-09.
-// Precedence: invalid_grant / not-authenticated → "signed-out";
-// timeout / connection error → "network"; catchall → "gmail".
-func classifyAutomodeError(err error) string {
-	if err == nil {
-		return ""
-	}
-	if errors.Is(err, ErrInvalidGrant) || errors.Is(err, ErrNotAuthenticated) {
-		return "signed-out"
-	}
-	var netErr interface{ Timeout() bool }
-	if errors.As(err, &netErr) && netErr.Timeout() {
-		return "network"
-	}
-	// Context deadline exceeded or connection refused are network-level failures.
-	if errors.Is(err, context.DeadlineExceeded) {
-		return "network"
-	}
-	return "gmail"
-}
-
-// safeIDPrefix returns the first 8 chars of an id or the whole string if
-// shorter, for privacy-safe logging. Never logs the full 64-char hash (QUAL-03).
-func safeIDPrefix(id string) string {
-	if len(id) > 8 {
-		return id[:8]
-	}
-	return id
-}
-
-// gmailBaseURLOverride is a package-level var that tests can set to point
-// draftOne at a local httptest.Server. Production code leaves it empty
-// (NewGmailClientWithBase falls back to GmailAPIBase when empty).
-var gmailBaseURLOverride string

@@ -6,6 +6,52 @@
 // MAPI Types and Structures
 // Reference: https://learn.microsoft.com/en-us/windows/win32/api/mapi/ns-mapi-mapimessage
 
+// For production MSVC builds, use the Windows SDK's canonical Simple MAPI
+// declarations. Besides preventing ABI drift, this makes the compiler emit
+// the same XFG function-type hash that current Windows MAPI32 stubs expect for
+// MAPISendMail. The MinGW toolchain retains the local declarations because its
+// SDK/header coverage varies between host architectures.
+#ifdef _MSC_VER
+// Match Microsoft's MAPIStubLibrary ABI exactly. Its forwarding function
+// pointer types deliberately neutralize the modern SDK's noexcept macros
+// before including mapi.h. XFG includes the exception specification in the
+// function-type hash, so retaining WIN_NOEXCEPT_PFN here makes current
+// Windows MAPI32 reject the otherwise-correct ANSI provider entry point.
+#ifdef WIN_NOEXCEPT
+#undef WIN_NOEXCEPT
+#define WIN_NOEXCEPT
+#endif
+#ifdef WIN_NOEXCEPT_PFN
+#undef WIN_NOEXCEPT_PFN
+#define WIN_NOEXCEPT_PFN
+#endif
+
+// The SDK also declares the Simple MAPI entry points themselves. Rename only
+// those declarations while the header is parsed so main.cpp can provide
+// dllexport definitions. The SDK typedefs and structures keep their canonical
+// names, which preserves the exact ABI and XFG prototype used by mapi32.dll.
+#define MAPISendMail SendArcSdkDeclaration_MAPISendMail
+#define MAPISendMailW SendArcSdkDeclaration_MAPISendMailW
+#define MAPILogon SendArcSdkDeclaration_MAPILogon
+#define MAPILogoff SendArcSdkDeclaration_MAPILogoff
+#define MAPIFreeBuffer SendArcSdkDeclaration_MAPIFreeBuffer
+#define MAPISendDocuments SendArcSdkDeclaration_MAPISendDocuments
+#include <mapi.h>
+#undef MAPISendMail
+#undef MAPISendMailW
+#undef MAPILogon
+#undef MAPILogoff
+#undef MAPIFreeBuffer
+#undef MAPISendDocuments
+
+using LPMapiFileDesc = lpMapiFileDesc;
+using LPMapiRecipDesc = lpMapiRecipDesc;
+using LPMapiMessage = lpMapiMessage;
+using LPMapiFileDescW = lpMapiFileDescW;
+using LPMapiRecipDescW = lpMapiRecipDescW;
+using LPMapiMessageW = lpMapiMessageW;
+#else
+
 // MAPI handle types (not defined in MinGW headers)
 #ifndef LHANDLE
 typedef ULONG_PTR LHANDLE;
@@ -33,7 +79,7 @@ typedef ULONG FLAGS;
 #define MAPI_E_DISK_FULL     4
 #define MAPI_E_INSUFFICIENT_MEMORY 5
 #define MAPI_E_ACCESS_DENIED 6
-#define MAPI_E_INVALID_MESSAGE 7
+#define MAPI_E_INVALID_MESSAGE 17
 
 #ifdef __cplusplus
 extern "C" {
@@ -121,3 +167,5 @@ typedef struct
 #ifdef __cplusplus
 }
 #endif
+
+#endif  // _MSC_VER

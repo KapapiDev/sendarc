@@ -4,12 +4,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"time"
-
-	"github.com/creativeprojects/go-selfupdate"
 )
 
 // Phase 11 — notify-only update service (REL-03, REL-05).
@@ -32,27 +33,26 @@ import (
 //   - D-08: update checks default enabled. AppSettings handles the default;
 //     the service stays a pure consumer of the (already-defaulted) settings.
 //
-// Why not go-selfupdate's DetectLatest flow? The current release layout
-// publishes `go-mapi-setup.exe` only, and DetectLatest's asset matcher
-// expects `{cmd}_{goos}_{goarch}` or archived variants and reports
-// found=false when no matching asset exists (11-RESEARCH.md Pitfall 1). We
-// therefore use ListReleases as a GitHub client layer, do our own
-// metadata-only version compare, and hand the user the stable installer
-// URL to download manually.
+// We call GitHub's official latest-release metadata endpoint, do our own
+// version compare, and hand the user the release page to review and download
+// manually. The app never downloads or applies an update itself.
 
 const (
 	// gitHubOwner / gitHubRepo are hardcoded to the repo slug so no user
 	// input or settings file can redirect update checks to a different
 	// origin (threat T-11-01-01 partial mitigation + Pitfall-4 guard).
-	gitHubOwner = "marcfargas"
-	gitHubRepo  = "go-mapi"
+	gitHubOwner      = "KapapiDev"
+	gitHubRepo       = "sendarc"
+	gitHubAPIVersion = "2026-03-10"
 
-	// installerDownloadURL is the stable installer URL shown to users
-	// when an update is available (D-02, REL-02). Intentionally hardcoded;
-	// never constructed from release metadata so a tampered release name
-	// cannot redirect downloads (T-11-01-01).
-	installerDownloadURL = "https://github.com/" + gitHubOwner + "/" + gitHubRepo +
-		"/releases/latest/download/go-mapi-setup.exe"
+	// manualReleaseURL is the stable page shown to users when an update is
+	// available. SendArc intentionally uses notify-only updates until its
+	// Windows installer/update path has been independently verified.
+	manualReleaseURL = "https://github.com/" + gitHubOwner + "/" + gitHubRepo +
+		"/releases/latest"
+	// Kept as the existing frontend/test contract name. It deliberately points
+	// to the human-reviewed release page, not an executable download.
+	installerDownloadURL = manualReleaseURL
 
 	// updateCheckWindow is the cadence floor between background checks
 	// (REL-03: "every 24h").
@@ -77,10 +77,8 @@ type UpdateState struct {
 	// LatestVersion. Used for the "Release notes" affordance (D-02).
 	LatestReleaseURL string `json:"latestReleaseUrl"`
 
-	// InstallerURL is the stable download URL shown in the update panel
-	// (D-02). Kept constant because we only ship one Windows installer
-	// asset today; future platforms would extend this type, not mutate
-	// the constant.
+	// InstallerURL is retained for the frontend contract, but points to the
+	// manual GitHub release page rather than a direct-download executable.
 	InstallerURL string `json:"installerUrl"`
 
 	// UpdateAvailable is true iff LatestVersion > CurrentVersion. Pure
@@ -100,9 +98,8 @@ type UpdateState struct {
 }
 
 // latestRelease is the subset of release metadata the service needs.
-// Keeping this as our own type (rather than leaking go-selfupdate's
-// Release struct) means tests can stub without pulling any third-party
-// type into the service contract.
+// Keeping this as our own type means tests can stub without pulling any
+// transport-specific type into the service contract.
 type latestRelease struct {
 	Version    string
 	ReleaseURL string
@@ -110,10 +107,8 @@ type latestRelease struct {
 
 // releaseFetcher abstracts "ask GitHub for the newest stable release"
 // so tests can inject a stub without a real HTTP call. The production
-// implementation (gitHubReleaseFetcher) uses go-selfupdate's
-// GitHubSource.ListReleases and picks the highest-versioned non-draft,
-// non-prerelease tag ourselves — matching GitHub's "latest release"
-// semantics without relying on DetectLatest's asset matcher.
+// implementation calls GitHub's official latest-release REST endpoint and
+// consumes metadata only. No release asset is downloaded by this service.
 type releaseFetcher interface {
 	FetchLatestRelease(ctx context.Context) (*latestRelease, error)
 }
@@ -173,7 +168,7 @@ func (s *updateService) MaybeCheck(ctx context.Context, settings updateSettings)
 	// callers have a valid snapshot even on the opt-out path.
 	state := UpdateState{
 		CurrentVersion: s.currentVersion,
-		InstallerURL:   installerDownloadURL,
+		InstallerURL:   manualReleaseURL,
 		Enabled:        settings.Enabled,
 		LastCheckedAt:  settings.LastUpdateCheck,
 	}
@@ -214,7 +209,7 @@ func (s *updateService) CheckNow(ctx context.Context) (UpdateState, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	state := UpdateState{
 		CurrentVersion: s.currentVersion,
-		InstallerURL:   installerDownloadURL,
+		InstallerURL:   manualReleaseURL,
 		LastCheckedAt:  now,
 		Enabled:        true, // caller may overwrite; CheckNow semantically assumes the user asked for a check
 	}
@@ -269,13 +264,8 @@ func isNewerVersion(current, latest string) bool {
 	return selfupdateGreaterThan(latest, current)
 }
 
-// selfupdateGreaterThan is a thin wrapper so we have one place to
-// stub out the comparison in case the library API changes. We cannot
-// instantiate selfupdate.Release directly (unexported fields control
-// comparison), so we fall back to a minimal hand-rolled semver compare
-// that handles the shapes this project uses ("v3.0.0", "3.0.0",
-// "3.0.0-rc1"). The full spec is not needed — we only care about
-// strict greater-than for notify-only.
+// selfupdateGreaterThan retains its historical name for test compatibility.
+// It is now a local semver comparison with no self-update dependency.
 func selfupdateGreaterThan(latest, current string) bool {
 	l := trimVersion(latest)
 	c := trimVersion(current)
@@ -382,58 +372,74 @@ func isDevVersion(v string) bool {
 
 // --- Production release fetcher ---------------------------------------
 
-// gitHubReleaseFetcher is the production implementation that uses
-// go-selfupdate.GitHubSource.ListReleases to enumerate releases for
-// our repo, filter out drafts and prereleases, and return the
-// highest-versioned stable release. No asset matching — that is the
-// path this phase intentionally avoids.
+// gitHubReleaseFetcher is a minimal metadata-only client for GitHub's official
+// latest-release endpoint. Keeping this on net/http avoids importing updater,
+// archive, OpenPGP, SSH, or binary-replacement code into the shipping app.
 type gitHubReleaseFetcher struct {
-	source *selfupdate.GitHubSource
+	client   *http.Client
+	endpoint string
 }
 
-// newGitHubReleaseFetcher builds a real GitHub-backed fetcher. The
-// returned fetcher is safe to share across goroutines (go-selfupdate's
-// source holds no mutable state beyond the HTTP client).
+var gitHubLatestReleaseEndpoint = "https://api.github.com/repos/" + gitHubOwner + "/" + gitHubRepo + "/releases/latest"
+
+// newGitHubReleaseFetcher builds a real GitHub-backed fetcher. The returned
+// fetcher is safe to share across goroutines.
 func newGitHubReleaseFetcher() (*gitHubReleaseFetcher, error) {
-	src, err := selfupdate.NewGitHubSource(selfupdate.GitHubConfig{})
-	if err != nil {
-		return nil, fmt.Errorf("updates: new GitHub source: %w", err)
-	}
-	return &gitHubReleaseFetcher{source: src}, nil
+	return &gitHubReleaseFetcher{
+		client:   &http.Client{Timeout: 12 * time.Second},
+		endpoint: gitHubLatestReleaseEndpoint,
+	}, nil
 }
 
-// FetchLatestRelease asks GitHub for the list of releases, filters
-// to stable non-draft entries, and returns the highest-versioned one.
-// Returns (nil, nil) if no stable release exists yet (legal during
-// pre-GA development).
+// FetchLatestRelease asks GitHub for the latest stable published release.
+// GitHub returns 404 before the repository has a stable release; that is a
+// normal pre-launch state and maps to (nil, nil).
 func (g *gitHubReleaseFetcher) FetchLatestRelease(ctx context.Context) (*latestRelease, error) {
-	if g == nil || g.source == nil {
-		return nil, errors.New("updates: github source not initialised")
+	if g == nil || g.client == nil || g.endpoint == "" {
+		return nil, errors.New("updates: GitHub client not initialised")
 	}
-	repo := selfupdate.NewRepositorySlug(gitHubOwner, gitHubRepo)
-	releases, err := g.source.ListReleases(ctx, repo)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.endpoint, nil)
 	if err != nil {
-		return nil, fmt.Errorf("updates: list releases: %w", err)
+		return nil, fmt.Errorf("updates: build GitHub request: %w", err)
 	}
-	var best *latestRelease
-	for _, r := range releases {
-		if r == nil {
-			continue
-		}
-		if r.GetDraft() || r.GetPrerelease() {
-			continue
-		}
-		tag := r.GetTagName()
-		if tag == "" {
-			continue
-		}
-		candidate := &latestRelease{
-			Version:    trimVersion(tag),
-			ReleaseURL: r.GetURL(),
-		}
-		if best == nil || compareSemver(candidate.Version, best.Version) > 0 {
-			best = candidate
-		}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", gitHubAPIVersion)
+	req.Header.Set("User-Agent", "SendArc/"+Version)
+
+	resp, err := g.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("updates: query GitHub: %w", err)
 	}
-	return best, nil
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("updates: GitHub returned status %d", resp.StatusCode)
+	}
+
+	var payload struct {
+		TagName    string `json:"tag_name"`
+		HTMLURL    string `json:"html_url"`
+		Draft      bool   `json:"draft"`
+		Prerelease bool   `json:"prerelease"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&payload); err != nil {
+		return nil, fmt.Errorf("updates: decode GitHub response: %w", err)
+	}
+	if payload.Draft || payload.Prerelease || strings.TrimSpace(payload.TagName) == "" {
+		return nil, nil
+	}
+	if !isTrustedReleasePage(payload.HTMLURL) {
+		return nil, errors.New("updates: GitHub returned an unexpected release URL")
+	}
+	return &latestRelease{
+		Version:    trimVersion(payload.TagName),
+		ReleaseURL: payload.HTMLURL,
+	}, nil
+}
+
+func isTrustedReleasePage(raw string) bool {
+	prefix := "https://github.com/" + gitHubOwner + "/" + gitHubRepo + "/releases/tag/"
+	return strings.HasPrefix(raw, prefix) && len(raw) > len(prefix)
 }

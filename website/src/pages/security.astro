@@ -1,0 +1,10 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import LegalShell from "../components/LegalShell.astro";
+import { SECURITY_ADVISORY_URL } from "../lib/site";
+---
+<BaseLayout title="Security" path="/security/"><LegalShell title="Security" description="Report vulnerabilities privately and understand the beta security model.">
+  <h2>Report privately</h2><p>Use a <a href={SECURITY_ADVISORY_URL}>private GitHub security advisory</a>. Do not publish exploit details, tokens, message content, or personal information in a public issue.</p>
+  <h2>Security model</h2><ul><li>Explicit local preview and confirmation before Gmail send.</li><li>Exact <code>gmail.send</code> OAuth scope; no inbox-read scope.</li><li>Tokens in Windows Credential Manager.</li><li>Queue attachment validation prevents path traversal and symbolic-link substitution.</li><li>No SendArc-operated email relay.</li></ul>
+  <h2>Unsigned beta</h2><p>Until sustainable code signing is available without a paid commitment, releases may be unsigned. Download only from the official repository and verify <code>SHA256SUMS.txt</code>.</p>
+</LegalShell></BaseLayout>

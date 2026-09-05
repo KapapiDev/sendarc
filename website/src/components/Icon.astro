@@ -1,0 +1,53 @@
+---
+type IconName =
+  | "app-window"
+  | "arrow-down"
+  | "check"
+  | "check-circle"
+  | "download"
+  | "external-link"
+  | "eye"
+  | "grid"
+  | "key"
+  | "link"
+  | "mail"
+  | "shield-check"
+  | "zap";
+
+interface Props {
+  name: IconName;
+  size?: number;
+  strokeWidth?: number;
+  class?: string;
+}
+
+const { name, size = 24, strokeWidth = 1.8, class: className = "" } = Astro.props;
+---
+
+<svg
+  class:list={["ui-icon", className]}
+  width={size}
+  height={size}
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width={strokeWidth}
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+  focusable="false"
+>
+  {name === "app-window" && <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 8h18M7 6h.01M10 6h.01" /></>}
+  {name === "arrow-down" && <><path d="M12 4v15" /><path d="m6 13 6 6 6-6" /></>}
+  {name === "check" && <path d="m5 12 4 4L19 6" />}
+  {name === "check-circle" && <><circle cx="12" cy="12" r="9" /><path d="m8 12 2.7 2.7L16.5 9" /></>}
+  {name === "download" && <><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" /></>}
+  {name === "external-link" && <><path d="M14 5h5v5" /><path d="m10 14 9-9" /><path d="M19 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" /></>}
+  {name === "eye" && <><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.5" /></>}
+  {name === "grid" && <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>}
+  {name === "key" && <><circle cx="8.5" cy="15.5" r="4.5" /><path d="m12 12 8-8M17 7l3 3M15 9l2 2" /></>}
+  {name === "link" && <><path d="M10 13a4 4 0 0 0 5.7.1l2.4-2.4a4 4 0 0 0-5.7-5.7L11 6.4" /><path d="M14 11a4 4 0 0 0-5.7-.1l-2.4 2.4A4 4 0 0 0 11.6 19l1.4-1.4" /></>}
+  {name === "mail" && <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></>}
+  {name === "shield-check" && <><path d="M12 3 5 6v5c0 4.6 2.7 7.8 7 10 4.3-2.2 7-5.4 7-10V6l-7-3Z" /><path d="m9 12 2 2 4-4" /></>}
+  {name === "zap" && <path d="M13 2 5 14h7l-1 8 8-12h-7l1-8Z" />}
+</svg>

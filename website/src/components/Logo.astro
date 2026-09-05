@@ -1,0 +1,16 @@
+---
+interface Props {
+  compact?: boolean;
+}
+
+const { compact = false } = Astro.props;
+---
+
+<img
+  class:list={["brand-logo", { "brand-logo--compact": compact }]}
+  src="/logo.svg"
+  alt="SendArc"
+  width="188"
+  height="48"
+  decoding="async"
+/>

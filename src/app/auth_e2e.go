@@ -11,16 +11,17 @@ package main
 // factory swap is in place before AuthManager is constructed. It reads four
 // optional env vars set by the Playwright fixture in tests/e2e/:
 //
-//   GOMAPI_E2E_FAKE_TOKEN_JSON  Whole OAuthTokens JSON blob to pre-populate
+//   SENDARC_E2E_FAKE_TOKEN_JSON Whole OAuthTokens JSON blob to pre-populate
 //                               the in-memory keyring with. When non-empty,
 //                               the AuthManager boots already-authenticated
 //                               with no need to drive the browser flow.
-//   GOMAPI_E2E_GMAIL_BASE_URL   Override for the Gmail API base (httptest /
+//   SENDARC_E2E_GMAIL_BASE_URL  Override for the Gmail API base (httptest /
 //                               fake-gmail.ts). Wires gmailBaseURLOverride.
-//   GOMAPI_E2E_TOKEN_ENDPOINT   Override for the OAuth token endpoint.
-//   GOMAPI_E2E_REVOKE_ENDPOINT  Override for the OAuth revoke endpoint.
+//   SENDARC_E2E_TOKEN_ENDPOINT  Override for the OAuth token endpoint.
+//   SENDARC_E2E_REVOKE_ENDPOINT Override for the OAuth revoke endpoint.
+//   SENDARC_E2E_USERINFO_ENDPOINT Override for the OAuth userinfo endpoint.
 //
-// All four are optional individually so tests can mix-and-match (e.g. a test
+// All endpoint/token overrides are optional individually so tests can mix-and-match (e.g. a test
 // that exercises sign-in flow may leave FAKE_TOKEN_JSON unset). Production
 // builds without -tags e2e get a no-op (init never runs because this file is
 // not compiled in); no stub file is needed because keyringStoreFactory has a
@@ -89,20 +90,23 @@ func init() {
 
 	// Pre-populate the keyring with the harness-supplied token JSON. The
 	// AuthManager.LoadFromKeyring path will pick this up on first read.
-	if blob := os.Getenv("GOMAPI_E2E_FAKE_TOKEN_JSON"); blob != "" {
+	if blob := os.Getenv("SENDARC_E2E_FAKE_TOKEN_JSON"); blob != "" {
 		_ = e2eSharedKeyring.Set(keyringService, keyringUser, blob)
 	}
 
 	// Endpoint overrides. Each var has its own production default, so an
 	// unset env var leaves the override empty and the production default
 	// (real Google endpoints) is used.
-	if v := os.Getenv("GOMAPI_E2E_GMAIL_BASE_URL"); v != "" {
+	if v := os.Getenv("SENDARC_E2E_GMAIL_BASE_URL"); v != "" {
 		gmailBaseURLOverride = v
 	}
-	if v := os.Getenv("GOMAPI_E2E_TOKEN_ENDPOINT"); v != "" {
+	if v := os.Getenv("SENDARC_E2E_TOKEN_ENDPOINT"); v != "" {
 		tokenEndpointOverride = v
 	}
-	if v := os.Getenv("GOMAPI_E2E_REVOKE_ENDPOINT"); v != "" {
+	if v := os.Getenv("SENDARC_E2E_REVOKE_ENDPOINT"); v != "" {
 		revokeEndpointOverride = v
+	}
+	if v := os.Getenv("SENDARC_E2E_USERINFO_ENDPOINT"); v != "" {
+		userinfoEndpointOverride = v
 	}
 }

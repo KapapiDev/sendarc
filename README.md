@@ -1,78 +1,66 @@
-# go-mapi
+# SendArc
 
-> Right-click any file in Windows Explorer, click "Send to → Mail recipient",
-> and the email appears ready to send in Gmail.
->
-> No configuration. No subscription fees. [Completely open source](https://github.com/marcfargas/go-mapi).
+> Keep your old apps. Use modern email.
 
-[![Watch the demo](https://img.youtube.com/vi/gxTpMXVdP40/maxresdefault.jpg)](https://youtu.be/gxTpMXVdP40)
+SendArc is a Windows Simple MAPI bridge for Gmail and Google Workspace. A legacy Windows application hands an outgoing message to SendArc, SendArc shows the message locally for review, and nothing is transmitted until the user clicks **Send**. The desktop app then sends the message directly to the Gmail API.
 
-## What it does
+SendArc is a **KaPaPi product** and independent open-source project. The KaPaPi product directory is `https://kapapi.dev/sendarc/`. SendArc is not affiliated with Google, Affixa, Notably Good Ltd., or the original go-mapi author.
 
-go-mapi connects the "Send to Mail recipient" feature in Windows to your
-Gmail account. Any Windows app that has that option — File Explorer, Word,
-Excel, legacy line-of-business software — will route the email to Gmail
-instead of Outlook, as a draft you can review before sending.
+## Beta status
 
-**Nothing about how you work changes.** You keep using your apps the way
-you always have. go-mapi sits quietly in the background and the draft just
-shows up in your Gmail inbox.
+The repository is preparing `v0.1.0-beta`. Install only a tagged SendArc release that contains both a versioned installer and its checksum manifest. If the [latest release page](https://github.com/KapapiDev/sendarc/releases/latest) does not contain `SendArc-Setup-0.1.0-beta.exe`, the public beta is not yet available.
 
-- Works with any Windows app that uses "Send to Mail recipient"
-- Drafts land in Gmail — review and send normally, nothing is sent automatically
-- Manual or automatic draft creation (your choice)
-- Your emails go directly to Gmail's servers — nowhere else. No third-party
-  servers, no telemetry, no analytics.
+The initial beta is deliberately narrow:
 
-## Before you install
+- Gmail and Google Workspace only; Microsoft 365 is not supported.
+- One connected Google account.
+- Simple MAPI callers on Windows 10/11, with application-specific compatibility still being validated.
+- Local preview with To, Cc, Bcc, subject, body, and attachments.
+- Explicit Send or Cancel/Discard; no automatic sending and no Gmail draft creation in the launch path.
+- Manual update notification through the official GitHub release page; no silent self-update.
 
-You'll need a Gmail or Google Workspace account. The first time you launch
-go-mapi it will open a Google sign-in page in your browser so it can create
-drafts on your behalf. That's the only sign-in step.
+See [Implementation status](IMPLEMENTATION_STATUS.md) and the [requirements matrix](docs/REQUIREMENTS_MATRIX.md) before treating any unverified item as release-ready.
 
 ## Install
 
-1. Download `go-mapi-setup.exe` from the [latest release](https://github.com/marcfargas/go-mapi/releases/latest)
-2. Run it. Windows will ask for permission (UAC dialog) — click **Yes** to
-   continue. go-mapi needs this to register itself as the Windows mail
-   handler; you don't need to call IT.
-3. Sign in with your Gmail or Google Workspace account when prompted
-4. Done
+After a tagged beta is published:
 
-go-mapi runs in the Windows notification area (the icons next to your
-clock). Click its icon to open the window or change settings.
+1. Download `SendArc-Setup-0.1.0-beta.exe` and `SHA256SUMS.txt` from the same [GitHub release](https://github.com/KapapiDev/sendarc/releases).
+2. Verify the installer's SHA-256 value against `SHA256SUMS.txt`.
+3. Run the installer and approve the Windows elevation request needed to register a machine-wide mail handler.
+4. Start SendArc and connect a Gmail or Google Workspace account in the system browser.
 
-> **Upgrading from go-mapi v2.x?**
-> Uninstall v2.x first via **Settings → Apps → Installed apps**, then install
-> the new version. Running both side-by-side is not supported.
+The no-payment beta may be unsigned. Windows SmartScreen or an organization policy can therefore warn about or block it. Do not disable Microsoft Defender, SmartScreen, AppLocker, or WDAC to install SendArc; use the checksum and your organization's normal software-approval process. See [code-signing status](docs/CODE_SIGNING.md).
 
-## How to use it
+## Use
 
-Once installed, trigger "Send to Mail recipient" in any Windows app as you
-normally would. go-mapi intercepts the request and shows you the draft in its
-window before anything goes to Gmail.
+1. In a Windows application that supports Simple MAPI, choose its email action, such as **Send to → Mail recipient**.
+2. Review the local SendArc preview, including recipients, subject, body, and attachments.
+3. Click **Send** to transmit directly to Gmail, or cancel without transmitting. Discard removes the queued local item.
+4. Wait for SendArc's success or failure result. The originating application only knows that SendArc accepted the local MAPI request; it does not know whether Gmail accepted the final send.
 
-**Manual mode** (default): go-mapi shows you each email and waits for you to
-click "Create draft". Nothing reaches Gmail until you say so.
+Compatibility varies because some applications do not implement Simple MAPI consistently. Please use the [compatibility report](https://github.com/KapapiDev/sendarc/issues/new?template=compatibility_report.yml) with sanitized test data.
 
-**Auto mode**: go-mapi creates the draft immediately and tells you it's ready
-in your inbox. Switch between modes in the go-mapi window.
+## Gmail permission and privacy
 
-## Updates
+SendArc requests only:
 
-go-mapi tells you when a new version is available. You choose when to
-install it — updates are never installed without your say-so. When a new
-version is ready, click the banner to open the download page and run the
-new installer yourself.
+`https://www.googleapis.com/auth/gmail.send`
 
-## License
+It does not request inbox-read, mailbox-search, contacts, calendar, `gmail.modify`, `gmail.compose`, or `mail.google.com` access. OAuth tokens are stored through Windows Credential Manager. Pending messages and copied attachments stay in a per-user local queue until sent or discarded. When the user clicks Send, the MIME message goes directly from the Windows app to Google's Gmail API over HTTPS; there is no SendArc email relay or message-content server.
 
-LGPL-3.0-or-later — free and open source, anyone can inspect the code.
-See [LICENSE](LICENSE).
+The desktop beta has no hidden telemetry and does not send recipients, subjects, bodies, attachment names, local paths, OAuth tokens, or Gmail response bodies to SendArc analytics. Read the full [privacy policy](PRIVACY.md) and [security policy](SECURITY.md).
 
----
+## Updates and uninstall
 
-For IT departments and admins deploying go-mapi at scale (RDS, Citrix, silent
-install, group policy), see [ENTERPRISE.md](ENTERPRISE.md).
+SendArc can notify the user that a newer GitHub release exists. Updating is manual: download the new installer, verify its checksum, and run it. The beta does not silently replace installed binaries.
 
-For contributors and maintainers, see [DEVELOPMENT.md](DEVELOPMENT.md).
+Uninstall through **Settings → Apps → Installed apps**. The installer is designed to restore the previous default mail handler when it is safe to do so and must not remove Affixa, go-mapi, Outlook, Thunderbird, or another mail client. Installer/uninstaller verification must be green for the tagged release; current evidence is tracked in the [requirements matrix](docs/REQUIREMENTS_MATRIX.md).
+
+## Source, license, and upstream
+
+SendArc incorporates and modifies [go-mapi](https://github.com/marcfargas/go-mapi) by Marc Fargas. The exact starting baseline is commit [`b90fcb08754f910fc318cbc922cbf24702582463`](https://github.com/marcfargas/go-mapi/commit/b90fcb08754f910fc318cbc922cbf24702582463), with Git history and the `upstream` remote preserved.
+
+The repository declares `LGPL-3.0-or-later`; see [LICENSE](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md). Matching source must accompany every distributed binary through the corresponding public tag/release. SendArc is independent and the upstream author does not endorse it.
+
+For contributors, see [DEVELOPMENT.md](DEVELOPMENT.md). For cautious IT evaluation of the beta, see [ENTERPRISE.md](ENTERPRISE.md).

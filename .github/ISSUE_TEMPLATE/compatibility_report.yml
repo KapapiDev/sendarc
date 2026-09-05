@@ -1,0 +1,88 @@
+name: Compatibility report
+description: Report a Windows application that does or does not work with SendArc.
+title: "[Compatibility] "
+labels: [compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not post email bodies, OAuth tokens, private attachments, recipient addresses, or confidential client data. Use sanitized test messages and diagnostics.
+  - type: input
+    id: sendarc_version
+    attributes:
+      label: SendArc version
+      placeholder: 0.1.0-beta
+    validations:
+      required: true
+  - type: input
+    id: windows_version
+    attributes:
+      label: Windows version
+      placeholder: Windows 10 22H2 or Windows 11 24H2
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: Application name and version
+    validations:
+      required: true
+  - type: input
+    id: email_action
+    attributes:
+      label: Email action used
+      description: Name the exact menu/button/workflow that invokes Simple MAPI.
+      placeholder: File → Send by email
+    validations:
+      required: true
+  - type: dropdown
+    id: architecture
+    attributes:
+      label: Application architecture
+      options:
+        - 32-bit
+        - 64-bit
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Explain how the application's email action was triggered, using sanitized data.
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Outcome
+      options:
+        - Works
+        - Partially works
+        - Does not work
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostic output
+      description: Remove message content, addresses, tokens, private filenames, and confidential data.
+  - type: checkboxes
+    id: fields_tested
+    attributes:
+      label: Sanitized fields tested
+      description: Select only fields you actually exercised.
+      options:
+        - label: To
+        - label: Cc
+        - label: Bcc
+        - label: Subject/body
+        - label: Attachment
+        - label: Unicode text or filename
+  - type: checkboxes
+    id: privacy_confirmation
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I used a sanitized test message and removed email bodies, recipient addresses, OAuth tokens, private attachments, confidential client data, and other secrets.
+          required: true

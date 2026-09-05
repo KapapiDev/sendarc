@@ -40,9 +40,11 @@ static bool CopyAttachmentsForStem(MailMessage& msg, const std::wstring& stem) {
             // will skip empty-path attachments). Still counts as success.
             continue;
         }
-        // Basename fallback: prefer explicit filename, else message_converter
-        // already derived it from the path via FilenameFromPath.
-        std::string basename = !att.filename.empty() ? att.filename : att.path;
+        // Basename fallback: message_converter normally derives this already;
+        // repeat it here so no full source path can become a destination name.
+        std::string basename = !att.filename.empty()
+            ? att.filename
+            : message_converter::FilenameFromPath(att.path);
 
         std::wstring newPath;
         uint32_t newSize = 0;
@@ -62,14 +64,17 @@ static bool CopyAttachmentsForStem(MailMessage& msg, const std::wstring& stem) {
 
         // Rewrite attachment path/size so the Gmail client reads from the
         // stable copy instead of the caller's about-to-be-deleted TEMP.
-        int n = WideCharToMultiByte(CP_UTF8, 0, newPath.c_str(), -1,
-                                    nullptr, 0, nullptr, nullptr);
-        if (n > 0) {
-            std::string newPathUtf8(n - 1, 0);
-            WideCharToMultiByte(CP_UTF8, 0, newPath.c_str(), -1,
-                                &newPathUtf8[0], n, nullptr, nullptr);
-            att.path = newPathUtf8;
+        std::string newPathUtf8 = message_converter::WideToUtf8(newPath.c_str());
+        if (newPathUtf8.empty()) {
+            for (const auto& p : landed) {
+                DeleteFileW(p.c_str());
+            }
+            RemoveDirectoryW(attachDir.c_str());
+            FsUtils::WriteErrorForStem(stem,
+                "failed to encode queued attachment path");
+            return false;
         }
+        att.path = newPathUtf8;
         att.size = newSize;
     }
     return true;
@@ -88,11 +93,8 @@ std::string MapiImpl::GetOriginApplicationName() {
             filename = processPath;
         }
 
-        // Convert to UTF-8
-        int size_needed = WideCharToMultiByte(CP_UTF8, 0, filename, -1, NULL, 0, NULL, NULL);
-        std::string result(size_needed - 1, 0);
-        WideCharToMultiByte(CP_UTF8, 0, filename, -1, &result[0], size_needed, NULL, NULL);
-        return result;
+        std::string result = message_converter::WideToUtf8(filename);
+        return result.empty() ? "unknown.exe" : result;
     }
 
     return "unknown.exe";
@@ -155,7 +157,7 @@ ULONG MapiImpl::MAPISendMailW(
         msg.originApp = GetOriginApplicationName();
 
         // QUICK-260423-tk6: same lifetime fix as the ANSI path — copy
-        // attachments into %LOCALAPPDATA%\go-mapi\queue\<stem>\ before the
+        // attachments into %LOCALAPPDATA%\SendArc\queue\<stem>\ before the
         // caller's TEMP dir disappears on return.
         std::wstring stem = FsUtils::GenerateUniqueStem();
         if (!CopyAttachmentsForStem(msg, stem)) {

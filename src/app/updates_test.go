@@ -5,6 +5,8 @@ package main
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,7 +48,7 @@ func (s *stubReleaseFetcher) FetchLatestRelease(ctx context.Context) (*latestRel
 // an empty last-checked value. Confirms D-08 default-enabled semantics.
 func TestSettingsUpdateDefaultsEnabled(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GOMAPI_APPDATA_DIR", dir)
+	t.Setenv("SENDARC_APPDATA_DIR", dir)
 
 	got := loadSettings()
 	if !got.UpdateChecksEnabled {
@@ -61,7 +63,7 @@ func TestSettingsUpdateDefaultsEnabled(t *testing.T) {
 // with UpdateChecksEnabled=true (flat-fields back-compat for D-05).
 func TestSettingsUpdateBackCompatPartialJSON(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GOMAPI_APPDATA_DIR", dir)
+	t.Setenv("SENDARC_APPDATA_DIR", dir)
 
 	// Write a settings file that pre-dates the update fields (Phase 9 shape).
 	if err := saveSettingsRaw(dir, `{"mode":"manual"}`); err != nil {
@@ -81,7 +83,7 @@ func TestSettingsUpdateBackCompatPartialJSON(t *testing.T) {
 // UpdateChecksEnabled=true) without surfacing an error.
 func TestSettingsUpdateCorruptFallsBackToDefaults(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("GOMAPI_APPDATA_DIR", dir)
+	t.Setenv("SENDARC_APPDATA_DIR", dir)
 
 	if err := saveSettingsRaw(dir, `{ this is not json`); err != nil {
 		t.Fatalf("saveSettingsRaw: %v", err)
@@ -154,7 +156,7 @@ func TestUpdateServiceStaleCheckTriggersFetch(t *testing.T) {
 	stub := &stubReleaseFetcher{
 		release: &latestRelease{
 			Version:    "3.0.0",
-			ReleaseURL: "https://github.com/marcfargas/go-mapi/releases/tag/v3.0.0",
+			ReleaseURL: "https://github.com/KapapiDev/sendarc/releases/tag/v3.0.0",
 		},
 	}
 	svc := newUpdateService("0.0.0-dev", stub, nopLogger)
@@ -185,7 +187,7 @@ func TestUpdateServiceDetectsAvailableUpdate(t *testing.T) {
 	stub := &stubReleaseFetcher{
 		release: &latestRelease{
 			Version:    "3.0.0",
-			ReleaseURL: "https://github.com/marcfargas/go-mapi/releases/tag/v3.0.0",
+			ReleaseURL: "https://github.com/KapapiDev/sendarc/releases/tag/v3.0.0",
 		},
 	}
 	svc := newUpdateService("2.1.0", stub, nopLogger)
@@ -200,11 +202,11 @@ func TestUpdateServiceDetectsAvailableUpdate(t *testing.T) {
 	if state.LatestVersion != "3.0.0" {
 		t.Errorf("expected LatestVersion=3.0.0, got %q", state.LatestVersion)
 	}
-	if state.LatestReleaseURL != "https://github.com/marcfargas/go-mapi/releases/tag/v3.0.0" {
+	if state.LatestReleaseURL != "https://github.com/KapapiDev/sendarc/releases/tag/v3.0.0" {
 		t.Errorf("unexpected LatestReleaseURL: %q", state.LatestReleaseURL)
 	}
-	if state.InstallerURL != "https://github.com/marcfargas/go-mapi/releases/latest/download/go-mapi-setup.exe" {
-		t.Errorf("InstallerURL must be the stable installer URL (D-02), got %q", state.InstallerURL)
+	if state.InstallerURL != "https://github.com/KapapiDev/sendarc/releases/latest" {
+		t.Errorf("InstallerURL must be the manual release page URL, got %q", state.InstallerURL)
 	}
 	if state.CurrentVersion != "2.1.0" {
 		t.Errorf("expected CurrentVersion=2.1.0, got %q", state.CurrentVersion)
@@ -223,7 +225,7 @@ func TestUpdateServiceNoUpdateWhenCurrentIsLatest(t *testing.T) {
 	stub := &stubReleaseFetcher{
 		release: &latestRelease{
 			Version:    "3.0.0",
-			ReleaseURL: "https://github.com/marcfargas/go-mapi/releases/tag/v3.0.0",
+			ReleaseURL: "https://github.com/KapapiDev/sendarc/releases/tag/v3.0.0",
 		},
 	}
 	svc := newUpdateService("3.0.0", stub, nopLogger)
@@ -353,4 +355,102 @@ func TestUpdateServiceNoReplacementSurface(t *testing.T) {
 	_ = empty.UpdateAvailable
 	_ = empty.LastCheckedAt
 	_ = empty.Enabled
+}
+
+func TestGitHubReleaseFetcherReturnsStableMetadata(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("method = %q, want GET", r.Method)
+		}
+		if r.URL.Path != "/repos/KapapiDev/sendarc/releases/latest" {
+			t.Errorf("path = %q, want latest-release endpoint", r.URL.Path)
+		}
+		if got := r.Header.Get("Accept"); got != "application/vnd.github+json" {
+			t.Errorf("Accept = %q", got)
+		}
+		if got := r.Header.Get("X-GitHub-Api-Version"); got != gitHubAPIVersion {
+			t.Errorf("X-GitHub-Api-Version = %q", got)
+		}
+		if got := r.Header.Get("User-Agent"); got == "" {
+			t.Error("User-Agent must be present")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"tag_name":" v3.1.0 ",
+			"html_url":"https://github.com/KapapiDev/sendarc/releases/tag/v3.1.0",
+			"draft":false,
+			"prerelease":false
+		}`))
+	}))
+	t.Cleanup(server.Close)
+
+	fetcher := &gitHubReleaseFetcher{client: server.Client(), endpoint: server.URL + "/repos/KapapiDev/sendarc/releases/latest"}
+	release, err := fetcher.FetchLatestRelease(context.Background())
+	if err != nil {
+		t.Fatalf("FetchLatestRelease: %v", err)
+	}
+	if release == nil {
+		t.Fatal("FetchLatestRelease returned nil release")
+	}
+	if release.Version != "3.1.0" {
+		t.Errorf("Version = %q, want 3.1.0", release.Version)
+	}
+	if release.ReleaseURL != "https://github.com/KapapiDev/sendarc/releases/tag/v3.1.0" {
+		t.Errorf("ReleaseURL = %q", release.ReleaseURL)
+	}
+}
+
+func TestGitHubReleaseFetcherTreatsNotFoundAsNoRelease(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(server.Close)
+
+	fetcher := &gitHubReleaseFetcher{client: server.Client(), endpoint: server.URL}
+	release, err := fetcher.FetchLatestRelease(context.Background())
+	if err != nil {
+		t.Fatalf("FetchLatestRelease: %v", err)
+	}
+	if release != nil {
+		t.Errorf("release = %#v, want nil", release)
+	}
+}
+
+func TestGitHubReleaseFetcherRejectsUnexpectedReleaseOrigin(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"tag_name":"v3.1.0",
+			"html_url":"https://example.invalid/sendarc/releases/tag/v3.1.0"
+		}`))
+	}))
+	t.Cleanup(server.Close)
+
+	fetcher := &gitHubReleaseFetcher{client: server.Client(), endpoint: server.URL}
+	release, err := fetcher.FetchLatestRelease(context.Background())
+	if err == nil {
+		t.Fatal("FetchLatestRelease should reject an unexpected release origin")
+	}
+	if release != nil {
+		t.Errorf("release = %#v, want nil", release)
+	}
+}
+
+func TestGitHubReleaseFetcherIgnoresPrerelease(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"tag_name":"v3.1.0-beta.1",
+			"html_url":"https://github.com/KapapiDev/sendarc/releases/tag/v3.1.0-beta.1",
+			"prerelease":true
+		}`))
+	}))
+	t.Cleanup(server.Close)
+
+	fetcher := &gitHubReleaseFetcher{client: server.Client(), endpoint: server.URL}
+	release, err := fetcher.FetchLatestRelease(context.Background())
+	if err != nil {
+		t.Fatalf("FetchLatestRelease: %v", err)
+	}
+	if release != nil {
+		t.Errorf("release = %#v, want nil for prerelease", release)
+	}
 }

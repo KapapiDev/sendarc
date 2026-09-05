@@ -9,8 +9,13 @@ std::string WideToUtf8(const wchar_t* wide) {
     if (!wide || !wide[0]) return "";
     int size = WideCharToMultiByte(CP_UTF8, 0, wide, -1, NULL, 0, NULL, NULL);
     if (size <= 0) return "";
-    std::string result(size - 1, 0);
-    WideCharToMultiByte(CP_UTF8, 0, wide, -1, &result[0], size, NULL, NULL);
+    // Include space for the terminator while Win32 writes, then remove it.
+    // Allocating size-1 and passing size is a one-byte buffer overflow.
+    std::string result(size, 0);
+    int converted = WideCharToMultiByte(
+        CP_UTF8, 0, wide, -1, result.data(), size, NULL, NULL);
+    if (converted != size) return "";
+    result.resize(static_cast<size_t>(converted - 1));
     return result;
 }
 
@@ -19,8 +24,11 @@ std::string AnsiToUtf8(const char* ansi) {
     // Step 1: ANSI (system codepage) → UTF-16
     int wideLen = MultiByteToWideChar(CP_ACP, 0, ansi, -1, NULL, 0);
     if (wideLen <= 0) return ansi;  // fallback: return raw bytes
-    std::wstring wide(wideLen - 1, 0);
-    MultiByteToWideChar(CP_ACP, 0, ansi, -1, &wide[0], wideLen);
+    std::wstring wide(wideLen, 0);
+    int converted = MultiByteToWideChar(
+        CP_ACP, 0, ansi, -1, wide.data(), wideLen);
+    if (converted != wideLen) return ansi;
+    wide.resize(static_cast<size_t>(converted - 1));
     // Step 2: UTF-16 → UTF-8
     return WideToUtf8(wide.c_str());
 }
@@ -28,10 +36,22 @@ std::string AnsiToUtf8(const char* ansi) {
 std::string FilenameFromPath(const std::string& path) {
     // Extract filename from a Windows path (backslash or forward slash)
     auto pos = path.find_last_of("\\/");
-    if (pos != std::string::npos && pos + 1 < path.size()) {
-        return path.substr(pos + 1);
-    }
-    return path;
+    std::string filename = pos == std::string::npos ? path : path.substr(pos + 1);
+    if (filename == "." || filename == "..") return "";
+    return filename;
+}
+
+// MAPI callers control lpszFileName. It is a display name, not a destination
+// path, so ignore path-like values and derive a safe basename from the source
+// path instead. The filesystem copy layer repeats this validation at its trust
+// boundary before joining the name to the queue directory.
+static std::string AttachmentFilename(const std::string& explicitFilename,
+                                      const std::string& sourcePath) {
+    bool isPlainFilename = !explicitFilename.empty()
+        && explicitFilename != "."
+        && explicitFilename != ".."
+        && explicitFilename.find_first_of("\\/:") == std::string::npos;
+    return isPlainFilename ? explicitFilename : FilenameFromPath(sourcePath);
 }
 
 // QUICK-260423-qpx: many legacy Simple MAPI callers (Spanish SendEmail-style
@@ -102,12 +122,13 @@ MailMessage ConvertAnsiMessage(const MapiMessage& msg) {
             if (file.lpszPathName) {
                 attach.path = AnsiToUtf8(file.lpszPathName);
             }
+            std::string explicitFilename;
             if (file.lpszFileName) {
-                attach.filename = AnsiToUtf8(file.lpszFileName);
-            } else if (!attach.path.empty()) {
-                // Windows often leaves lpszFileName NULL — extract from path
-                attach.filename = FilenameFromPath(attach.path);
+                explicitFilename = AnsiToUtf8(file.lpszFileName);
             }
+            // Windows often leaves lpszFileName NULL; unsafe path-like values
+            // are likewise ignored in favor of the source path's basename.
+            attach.filename = AttachmentFilename(explicitFilename, attach.path);
             attach.size = 0;
 
             result.attachments.push_back(attach);
@@ -171,12 +192,13 @@ MailMessage ConvertWideMessage(const MapiMessageW& msg) {
             if (file.lpszPathName) {
                 attach.path = WideToUtf8(file.lpszPathName);
             }
+            std::string explicitFilename;
             if (file.lpszFileName) {
-                attach.filename = WideToUtf8(file.lpszFileName);
-            } else if (!attach.path.empty()) {
-                // Windows often leaves lpszFileName NULL — extract from path
-                attach.filename = FilenameFromPath(attach.path);
+                explicitFilename = WideToUtf8(file.lpszFileName);
             }
+            // Windows often leaves lpszFileName NULL; unsafe path-like values
+            // are likewise ignored in favor of the source path's basename.
+            attach.filename = AttachmentFilename(explicitFilename, attach.path);
             attach.size = 0;
 
             result.attachments.push_back(attach);

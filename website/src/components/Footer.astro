@@ -1,0 +1,60 @@
+---
+import Logo from "./Logo.astro";
+import {
+  BUG_REPORT_URL,
+  COMPATIBILITY_REPORT_URL,
+  FEATURE_REQUEST_URL,
+  KAPAPI_SENDARC_URL,
+  KAPAPI_URL,
+  REPOSITORY_URL,
+  SUPPORT_EMAIL,
+} from "../lib/site";
+
+const year = new Date().getUTCFullYear();
+---
+
+<footer class="site-footer">
+  <div class="shell footer-grid">
+    <div class="footer-brand">
+      <a href="/" aria-label="SendArc home"><Logo compact /></a>
+      <p>The focused Gmail bridge for legacy Windows email actions.</p>
+      <p class="footer-operator"><a href={KAPAPI_SENDARC_URL}>A KaPaPi product</a> · Operated by 장형진</p>
+    </div>
+
+    <nav aria-label="Product links">
+      <h2>Product</h2>
+      <a href="/#how-it-works">How it works</a>
+      <a href="/download/">Download</a>
+      <a href="/affixa-alternative/">Affixa alternative</a>
+      <a href="/docs/">Documentation</a>
+    </nav>
+
+    <nav aria-label="Trust links">
+      <h2>Trust</h2>
+      <a href="/privacy/">Privacy</a>
+      <a href="/security/">Security</a>
+      <a href="/licenses/">Licenses</a>
+      <a href="/terms/">Terms</a>
+    </nav>
+
+    <nav aria-label="Support links">
+      <h2>Support</h2>
+      <a href="/support/">Support center</a>
+      <a href={BUG_REPORT_URL}>Report a bug</a>
+      <a href={COMPATIBILITY_REPORT_URL}>Compatibility report</a>
+      <a href={FEATURE_REQUEST_URL}>Request a feature</a>
+    </nav>
+
+    <nav aria-label="Project links">
+      <h2>Project</h2>
+      <a href={REPOSITORY_URL}>Source code</a>
+      <a href={KAPAPI_URL}>KaPaPi product family</a>
+      <a href={`mailto:${SUPPORT_EMAIL}`}>Email support</a>
+      <a href="/privacy/#beta-data">Delete beta data</a>
+    </nav>
+  </div>
+  <div class="shell footer-bottom">
+    <p>© {year} SendArc, a KaPaPi product. Source available under LGPL-3.0-or-later.</p>
+    <p>SendArc is independent and is not affiliated with Affixa or Notably Good Ltd.</p>
+  </div>
+</footer>

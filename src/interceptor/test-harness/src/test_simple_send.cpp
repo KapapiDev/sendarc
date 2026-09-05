@@ -10,9 +10,8 @@ int test_simple_send() {
     std::cout << "\nTest: Simple Send (basic email)" << std::endl;
 
     // Load the DLL
-    HMODULE hDll = LoadLibraryA("go-mapi.dll");
+    HMODULE hDll = TestUtilities::LoadInterceptorDll();
     if (!hDll) {
-        std::cerr << "Failed to load go-mapi.dll" << std::endl;
         return 1;
     }
 
@@ -28,7 +27,7 @@ int test_simple_send() {
 
     // Create a simple message
     char subject[] = "Test Email - Simple Send";
-    char body[] = "This is a test email from the go-mapi test harness.";
+    char body[] = "This is a test email from the SendArc test harness.";
     char toAddress[] = "test@example.com";
     char toName[] = "Test User";
 
@@ -51,17 +50,12 @@ int test_simple_send() {
     std::cout << "MAPISendMail returned: " << result << std::endl;
 
     // Verify JSON file was created
-    std::string tempDir = TestUtilities::GetGoMapiTempDir();
+    std::string tempDir = TestUtilities::GetSendArcQueueDir();
     bool success = TestUtilities::VerifyJsonFileCreated(tempDir);
 
     if (success) {
-        // Find and validate the JSON file
-        for (const auto& entry : std::filesystem::directory_iterator(tempDir)) {
-            if (entry.path().extension() == ".json") {
-                success = TestUtilities::ValidateJsonFile(entry.path().string());
-                break;
-            }
-        }
+        std::string jsonPath = TestUtilities::GetNewestJsonPath(tempDir);
+        success = !jsonPath.empty() && TestUtilities::ValidateJsonFile(jsonPath);
     }
 
     FreeLibrary(hDll);

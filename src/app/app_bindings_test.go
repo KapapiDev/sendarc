@@ -9,11 +9,19 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/marcfargas/go-mapi/internal/mapi"
 )
+
+// nopWatcherCallback discards watcher callbacks in binding tests.
+type nopWatcherCallback struct{}
+
+func (*nopWatcherCallback) OnQueueChanged(_ []mapi.EmailWithId) {}
+func (*nopWatcherCallback) OnError(_ error)                     {}
 
 // ---- shared helper for binding tests ----
 
@@ -58,8 +66,11 @@ func setupAppForBindingTests(t *testing.T) (*App, string) {
 	// Default settings.
 	app.settings = AppSettings{Mode: defaultMode}
 
-	// Set GOMAPI_APPDATA_DIR so SaveSettings writes to a temp dir (not real %APPDATA%).
-	t.Setenv("GOMAPI_APPDATA_DIR", t.TempDir())
+	// Keep binding-test settings outside the real per-user profile.
+	t.Setenv("SENDARC_APPDATA_DIR", t.TempDir())
+	// Register this after TempDir/Setenv cleanups so it runs first (LIFO) and
+	// releases the Windows file handle before testing removes the directory.
+	t.Cleanup(closeLog)
 
 	return app, watchDir
 }
@@ -126,25 +137,34 @@ func TestValidateEmailID_NormalIDReturnsNil(t *testing.T) {
 	}
 }
 
-// ---- CreateDraftForID ----
+// ---- SendMessageForID ----
 
-func TestCreateDraftForID_EmptyIDReturnsError(t *testing.T) {
+func TestSendMessageForID_EmptyIDReturnsError(t *testing.T) {
 	app, _ := setupAppForBindingTests(t)
-	if err := app.CreateDraftForID(""); err == nil {
+	if err := app.SendMessageForID(""); err == nil {
 		t.Error("expected error for empty id")
 	}
 }
 
-func TestCreateDraftForID_UnknownIDReturnsNilIdempotent(t *testing.T) {
+func TestSendMessageForID_InvalidIDReturnsError(t *testing.T) {
+	app, _ := setupAppForBindingTests(t)
+	for _, id := range []string{"short", strings.Repeat("A", 64), strings.Repeat("g", 64)} {
+		if err := app.SendMessageForID(id); err == nil {
+			t.Errorf("expected error for invalid id %q", id)
+		}
+	}
+}
+
+func TestSendMessageForID_UnknownIDReturnsNilIdempotent(t *testing.T) {
 	// An id not in the queue should return nil (idempotency — already processed).
 	app, _ := setupAppForBindingTests(t)
 	id := "a3f2c1b4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2"
-	if err := app.CreateDraftForID(id); err != nil {
+	if err := app.SendMessageForID(id); err != nil {
 		t.Errorf("expected nil for unknown id (idempotent), got %v", err)
 	}
 }
 
-func TestCreateDraftForID_UnauthenticatedReturnsError(t *testing.T) {
+func TestSendMessageForID_UnauthenticatedReturnsError(t *testing.T) {
 	app, watchDir := setupAppForBindingTests(t)
 
 	// Seed an email.
@@ -153,13 +173,13 @@ func TestCreateDraftForID_UnauthenticatedReturnsError(t *testing.T) {
 	// Clear tokens — simulate signed-out state.
 	app.auth.tokens = nil
 
-	err := app.CreateDraftForID(id)
+	err := app.SendMessageForID(id)
 	if err == nil {
 		t.Fatal("expected error when not authenticated, got nil")
 	}
 }
 
-func TestCreateDraftForID_SuccessMarkProcessed(t *testing.T) {
+func TestSendMessageForID_SuccessMarkProcessed(t *testing.T) {
 	app, watchDir := setupAppForBindingTests(t)
 
 	// Gmail stub — returns success.
@@ -173,7 +193,7 @@ func TestCreateDraftForID_SuccessMarkProcessed(t *testing.T) {
 
 	id := seedBindingEmail(t, app, watchDir, "email1.json", "Test Success")
 
-	if err := app.CreateDraftForID(id); err != nil {
+	if err := app.SendMessageForID(id); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
 
@@ -192,10 +212,55 @@ func TestCreateDraftForID_SuccessMarkProcessed(t *testing.T) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	t.Error("email still in snapshot after successful CreateDraftForID — MarkProcessed should have removed it")
+	t.Error("email still in snapshot after successful SendMessageForID — MarkProcessed should have removed it")
 }
 
-func TestCreateDraftForID_InvalidGrantDoesNotBacklogSkip(t *testing.T) {
+func TestSendMessageForID_DuplicateConcurrentCallSendsOnce(t *testing.T) {
+	app, watchDir := setupAppForBindingTests(t)
+
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	var requests atomic.Int32
+	gmailSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		entered <- struct{}{}
+		<-release
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"sent-once"}`))
+	}))
+	t.Cleanup(gmailSrv.Close)
+	gmailBaseURLOverride = gmailSrv.URL
+	t.Cleanup(func() { gmailBaseURLOverride = "" })
+
+	id := seedBindingEmail(t, app, watchDir, "duplicate.json", "Send once")
+	firstDone := make(chan error, 1)
+	go func() { firstDone <- app.SendMessageForID(id) }()
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("first send did not reach Gmail stub")
+	}
+	secondDone := make(chan error, 1)
+	go func() { secondDone <- app.SendMessageForID(id) }()
+	select {
+	case err := <-secondDone:
+		if err != nil {
+			t.Fatalf("duplicate call should be an idempotent no-op, got %v", err)
+		}
+	case <-time.After(500 * time.Millisecond):
+		close(release)
+		t.Fatal("duplicate call blocked instead of returning idempotently")
+	}
+	close(release)
+	if err := <-firstDone; err != nil {
+		t.Fatalf("first send failed: %v", err)
+	}
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("Gmail requests = %d, want 1", got)
+	}
+}
+
+func TestSendMessageForID_InvalidGrantDoesNotBacklogSkip(t *testing.T) {
 	// Token endpoint returns invalid_grant; Gmail returns 401 to trigger refresh.
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(400)
@@ -219,14 +284,14 @@ func TestCreateDraftForID_InvalidGrantDoesNotBacklogSkip(t *testing.T) {
 
 	id := seedBindingEmail(t, app, watchDir, "email1.json", "Test InvalidGrant")
 
-	err := app.CreateDraftForID(id)
+	err := app.SendMessageForID(id)
 	if err == nil {
 		t.Fatal("expected error from invalid_grant path, got nil")
 	}
 
-	// KEY assertion: manual CreateDraftForID must NOT populate backlogSkip (D-10).
+	// Explicit SendMessageForID must not populate the legacy backlogSkip set.
 	if app.isBacklogSkipped(id) {
-		t.Error("manual CreateDraftForID must not populate backlogSkip (D-10) — automode path only")
+		t.Error("explicit SendMessageForID must not populate backlogSkip")
 	}
 }
 
@@ -284,16 +349,16 @@ func TestGetSettings_DefaultsToManual(t *testing.T) {
 	}
 }
 
-func TestGetSettings_ReflectsSaveSettings(t *testing.T) {
+func TestSaveSettings_RejectsAutomaticMode(t *testing.T) {
 	app, _ := setupAppForBindingTests(t)
 
-	if err := app.SaveSettings(AppSettings{Mode: "auto-draft"}); err != nil {
-		t.Fatalf("SaveSettings: %v", err)
+	if err := app.SaveSettings(AppSettings{Mode: "auto-draft"}); err == nil {
+		t.Fatal("expected automatic mode to be rejected")
 	}
 
 	s := app.GetSettings()
-	if s.Mode != "auto-draft" {
-		t.Errorf("expected mode=auto-draft after SaveSettings, got %q", s.Mode)
+	if s.Mode != defaultMode {
+		t.Errorf("expected mode=%s after rejection, got %q", defaultMode, s.Mode)
 	}
 }
 
@@ -313,7 +378,7 @@ func TestSaveSettings_ValidatesMode(t *testing.T) {
 func TestSaveSettings_PersistsToDisk(t *testing.T) {
 	app, _ := setupAppForBindingTests(t)
 
-	if err := app.SaveSettings(AppSettings{Mode: "auto-draft"}); err != nil {
+	if err := app.SaveSettings(AppSettings{Mode: defaultMode}); err != nil {
 		t.Fatalf("SaveSettings: %v", err)
 	}
 
@@ -326,8 +391,8 @@ func TestSaveSettings_PersistsToDisk(t *testing.T) {
 	if err := json.Unmarshal(data, &s); err != nil {
 		t.Fatalf("Unmarshal: %v", err)
 	}
-	if s.Mode != "auto-draft" {
-		t.Errorf("expected mode=auto-draft on disk, got %q", s.Mode)
+	if s.Mode != defaultMode {
+		t.Errorf("expected mode=%s on disk, got %q", defaultMode, s.Mode)
 	}
 }
 
@@ -340,18 +405,18 @@ func TestGetMode_ReturnsCurrentMode(t *testing.T) {
 	}
 }
 
-func TestSetMode_DelegatesToSaveSettings(t *testing.T) {
+func TestSetMode_AcceptsManualAndRejectsAutomatic(t *testing.T) {
 	app, _ := setupAppForBindingTests(t)
 
-	if err := app.SetMode("auto-draft"); err != nil {
+	if err := app.SetMode(defaultMode); err != nil {
 		t.Fatalf("SetMode: %v", err)
 	}
-	if app.GetMode() != "auto-draft" {
-		t.Errorf("GetMode should return auto-draft after SetMode, got %q", app.GetMode())
+	if app.GetMode() != defaultMode {
+		t.Errorf("GetMode should remain manual, got %q", app.GetMode())
 	}
 
-	if err := app.SetMode("invalid"); err == nil {
-		t.Error("expected error for invalid mode")
+	if err := app.SetMode("auto-draft"); err == nil {
+		t.Error("expected automatic mode to be rejected")
 	}
 }
 

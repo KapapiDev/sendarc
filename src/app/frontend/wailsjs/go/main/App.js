@@ -6,10 +6,6 @@ export function CheckForUpdatesNow(arg1) {
   return window['go']['main']['App']['CheckForUpdatesNow'](arg1);
 }
 
-export function CreateDraftForID(arg1) {
-  return window['go']['main']['App']['CreateDraftForID'](arg1);
-}
-
 export function DismissEmail(arg1) {
   return window['go']['main']['App']['DismissEmail'](arg1);
 }
@@ -24,6 +20,10 @@ export function GetMode() {
 
 export function GetPausedState() {
   return window['go']['main']['App']['GetPausedState']();
+}
+
+export function GetProductStatus() {
+  return window['go']['main']['App']['GetProductStatus']();
 }
 
 export function GetQueue() {
@@ -42,8 +42,16 @@ export function MakeAuthenticatedGmailCall(arg1, arg2) {
   return window['go']['main']['App']['MakeAuthenticatedGmailCall'](arg1, arg2);
 }
 
+export function OpenDiagnosticLogs() {
+  return window['go']['main']['App']['OpenDiagnosticLogs']();
+}
+
 export function PauseWatching() {
   return window['go']['main']['App']['PauseWatching']();
+}
+
+export function RepairMAPIRegistration() {
+  return window['go']['main']['App']['RepairMAPIRegistration']();
 }
 
 export function ResumeWatching() {
@@ -52,6 +60,10 @@ export function ResumeWatching() {
 
 export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
+}
+
+export function SendMessageForID(arg1) {
+  return window['go']['main']['App']['SendMessageForID'](arg1);
 }
 
 export function SetMode(arg1) {
@@ -80,4 +92,8 @@ export function SignIn() {
 
 export function SignOut() {
   return window['go']['main']['App']['SignOut']();
+}
+
+export function TestGmailConnection() {
+  return window['go']['main']['App']['TestGmailConnection']();
 }

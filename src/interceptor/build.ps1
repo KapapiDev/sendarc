@@ -1,9 +1,9 @@
 # build.ps1
-# Build script for go-mapi interceptor using mingw-mstorsjo-llvm-ucrt
+# Build script for the SendArc interceptor using mingw-mstorsjo-llvm-ucrt
 # (triple-prefixed clang driver — x86_64-w64-mingw32-clang[++] or
 #  i686-w64-mingw32-clang[++]).
 #
-# Usage: .\build.ps1 [-Arch x64|x86] [-Config Release] [-Tests] [-Clean]
+# Usage: .\build.ps1 [-Arch x64|x86] [-Config Release] [-Version 0.1.0-beta] [-Tests] [-E2E] [-Clean]
 #
 # Why triple-prefixed clang (QUICK-260423-ntu T3a):
 #   The host machine is Windows on ARM64. The scoop-installed `gcc.exe`
@@ -18,7 +18,10 @@ param(
     [string]$Arch = "x64",
     [ValidateSet("Debug", "Release")]
     [string]$Config = "Debug",
+    [ValidatePattern('^[0-9A-Za-z][0-9A-Za-z.+-]*$')]
+    [string]$Version = "",
     [switch]$Tests,
+    [switch]$E2E,
     [switch]$Clean
 )
 
@@ -26,10 +29,11 @@ $ErrorActionPreference = "Stop"
 
 # Navigate to the interceptor directory (where this script lives)
 $interceptorRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$buildDir = Join-Path $interceptorRoot "build-$Arch"
+$buildName = if ($E2E) { "build-e2e-$Arch" } else { "build-$Arch" }
+$buildDir = Join-Path $interceptorRoot $buildName
 
 Write-Host "================================"
-Write-Host "  go-mapi Interceptor Build"
+Write-Host "  SendArc Interceptor Build"
 Write-Host "  (mingw-mstorsjo-llvm-ucrt / clang + Ninja)"
 Write-Host "  Arch: $Arch"
 Write-Host "================================"
@@ -99,25 +103,29 @@ if (-not (Test-Path $buildDir)) {
 
 Write-Host "Configuration: $Config"
 Write-Host "Build Tests: $Tests"
+Write-Host "E2E Queue Hook: $E2E"
 Write-Host "Build Directory: $buildDir"
 Write-Host ""
 
 # Configure CMake with Ninja generator
 Write-Host "Configuring CMake..."
 
-# Read version from the repo-root package.json. The old path
-# src/native-host/package.json no longer exists (v2.x pre-pivot artifact);
-# the authoritative version lives at the repo root now.
+# Prefer an explicit release/CI version. Fall back to the repo-root package.json
+# for local builds, then to a development placeholder when package.json has no
+# version field.
 $repoRoot = Split-Path -Parent (Split-Path -Parent $interceptorRoot)
 $packageJson = Join-Path $repoRoot "package.json"
-$goMapiVersion = "0.0.0-dev"
-if (Test-Path $packageJson) {
+$sendArcVersion = $Version
+if (-not $sendArcVersion -and (Test-Path $packageJson)) {
     $pkg = Get-Content $packageJson -Raw | ConvertFrom-Json
     if ($pkg.version) {
-        $goMapiVersion = $pkg.version
+        $sendArcVersion = $pkg.version
     }
 }
-Write-Host "Version: $goMapiVersion"
+if (-not $sendArcVersion) {
+    $sendArcVersion = "0.0.0-dev"
+}
+Write-Host "Version: $sendArcVersion"
 
 $cmakeArgs = @(
     "-G", "Ninja",
@@ -126,7 +134,8 @@ $cmakeArgs = @(
     "-DCMAKE_CXX_COMPILER=$gxxPath",
     "-DCMAKE_MAKE_PROGRAM=$ninjaPath",
     "-DBUILD_TESTS=$(if ($Tests) { 'ON' } else { 'OFF' })",
-    "-DGO_MAPI_VERSION=$goMapiVersion",
+    "-DSENDARC_E2E=$(if ($E2E) { 'ON' } else { 'OFF' })",
+    "-DSENDARC_VERSION=$sendArcVersion",
     "-S", $interceptorRoot,
     "-B", $buildDir
 )

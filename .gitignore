@@ -1,8 +1,17 @@
 node_modules/
 build/
+!src/app/build/
+src/app/build/*
+!src/app/build/appicon.png
+!src/app/build/windows/
+src/app/build/windows/*
+!src/app/build/windows/icon.ico
+!src/app/build/windows/info.json
 # QUICK-260423-ntu T3a: arch-specific CMake build dirs (x86_64 / i686 clang)
 build-x64/
 build-x86/
+build-e2e-x64/
+build-e2e-x86/
 # QUICK-260423-tk6: scratch CMake build dir used when running the C++
 # test harness standalone with -DBUILD_TESTS=ON (see tk6-PLAN.md verification).
 build-x64-test/
@@ -54,11 +63,6 @@ PLANNING_AGENT.md
 
 # Phase 8: OAuth credentials — must never be committed
 /.env.local
-
-# Phase 11 smoke: sandbox evidence bundles (screenshots, logs, app.log copies)
-# and locally-built RC installers. Ledger stays tracked via 11-SMOKE-EVIDENCE.md.
-tests/sandbox/phase11/evidence-*/
-tests/sandbox/phase11/installer/
 
 # Phase 11 plan 06: Playwright e2e workspace artifacts
 tests/e2e/node_modules/

@@ -1,0 +1,10 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import LegalShell from "../components/LegalShell.astro";
+---
+<BaseLayout title="Documentation" path="/docs/"><LegalShell eyebrow="Product guide" title="SendArc documentation" description="Install, connect, preview, send, and troubleshoot the Windows beta.">
+  <h2>Before you install</h2><p>SendArc currently supports 64-bit Windows 10 and 11, Gmail or Google Workspace, and Windows applications that invoke Simple MAPI. Keep your existing mail-handler configuration until you have tested your workflow.</p>
+  <h2>Install and connect</h2><ol><li>Download the versioned installer and compare its SHA-256 hash with <code>SHA256SUMS.txt</code>.</li><li>Install as an administrator so both 64-bit and 32-bit MAPI registrations can be configured.</li><li>Open SendArc and connect Google. The app requests only <code>gmail.send</code>.</li></ol>
+  <h2>Send safely</h2><p>Start an email action in your legacy application. SendArc shows recipients, subject, body, and attachment names locally. Nothing is sent until you press Send in that preview.</p>
+  <h2>Troubleshooting</h2><p>If a message does not appear, confirm your application uses Simple MAPI and report the application name, version, Windows architecture, and sanitized reproduction steps through the <a href="/support/">support page</a>. Never attach private mail or OAuth tokens.</p>
+</LegalShell></BaseLayout>

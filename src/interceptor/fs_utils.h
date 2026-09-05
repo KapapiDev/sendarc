@@ -8,7 +8,7 @@ namespace go_mapi {
 
 class FsUtils {
 public:
-    // Get the queue directory path (e.g., %LOCALAPPDATA%\go-mapi\queue\) — invariant
+    // Get the queue directory path (e.g., %LOCALAPPDATA%\SendArc\queue\) — invariant
     // regardless of the calling process's TEMP/TMP environment.
     static std::wstring GetQueueDirectory();
 
@@ -31,7 +31,7 @@ public:
     // The legacy Spanish MAPI app deletes its own TEMP dir (C:\TEMP\<user>\<pid>\)
     // as soon as MAPISendMail returns, so by the time the Wails app processes
     // the queue the attachment is gone. Fix: the DLL copies attachments into
-    // a stable, queue-owned sibling dir (%LOCALAPPDATA%\go-mapi\queue\<stem>\)
+    // a stable, queue-owned sibling dir (%LOCALAPPDATA%\SendArc\queue\<stem>\)
     // *before* writing the JSON. See plan 260423-tk6 for the full design.
 
     // Sibling dir for a given JSON stem (no trailing separator).
@@ -41,24 +41,25 @@ public:
     // exists. Returns false on real filesystem failure.
     static bool EnsureDirExists(const std::wstring& path);
 
-    // Copy a file from srcUtf8 into destDir under destBasenameUtf8. On success
-    // sets outNewPath (the wide full path) and outSize (byte count of the copy).
-    // destDir must already exist (use EnsureDirExists). Never overwrites an
-    // existing destination file.
+    // Copy a file from srcUtf8 into destDir under destBasenameUtf8. The
+    // destination name must be a plain basename: path separators, drive/ADS
+    // colons, ".", and ".." are rejected. On success sets outNewPath (the wide
+    // full path) and outSize (byte count of the copy). destDir must already
+    // exist (use EnsureDirExists). Never overwrites an existing destination.
     static bool CopyFileToDir(const std::string& srcUtf8,
                               const std::wstring& destDir,
                               const std::string& destBasenameUtf8,
                               std::wstring& outNewPath,
                               uint32_t& outSize);
 
-    // Write a short, UTF-8 reason string to %LOCALAPPDATA%\go-mapi\queue\errors\<stem>.error.
+    // Write a short, UTF-8 reason string to %LOCALAPPDATA%\SendArc\queue\errors\<stem>.error.
     // Used when the DLL cannot land an attachment copy and must abort before
     // writing the JSON (see mapi_impl.cpp MAPISendMailA/W orchestration).
     static bool WriteErrorForStem(const std::wstring& stem,
                                   const std::string& reason);
 
 private:
-    // Get base queue directory (%LOCALAPPDATA%\go-mapi\queue) without trailing separator.
+    // Get base queue directory (%LOCALAPPDATA%\SendArc\queue) without trailing separator.
     static std::wstring GetBaseQueueDir();
 
     // Get 6 random hex characters

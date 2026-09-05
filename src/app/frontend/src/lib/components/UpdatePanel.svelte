@@ -5,7 +5,7 @@
   - Opened from UpdateBanner "View update" action in the root shell.
   - Exposes BOTH required links (D-02):
     1. GitHub release page (human-readable release notes)
-    2. Stable installer URL (direct download of go-mapi-setup.exe)
+    2. Stable installer URL (direct download of the SendArc installer)
     Both route through Wails' BrowserOpenURL — we must NOT use plain
     <a href> because WebView2 would open the URL inside the app window
     rather than the user's system browser.
@@ -24,7 +24,9 @@
     install", no staged installer helper.
 -->
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime';
+  import { activateModal, handleModalKeydown } from '../modal';
   import { checkForUpdatesNow, type UpdateState } from '../settings';
 
   interface Props {
@@ -38,6 +40,9 @@
   let { update, onClose }: Props = $props();
 
   let checking = $state(false);
+  let panel: HTMLDivElement;
+
+  onMount(() => activateModal(panel));
 
   /** Render the last-checked timestamp in a user-friendly form. */
   const lastCheckedLabel = $derived(formatLastChecked(update.lastCheckedAt));
@@ -73,28 +78,40 @@
   }
 </script>
 
-<div class="backdrop" role="dialog" aria-modal="true" aria-labelledby="update-panel-title">
-  <div class="panel">
+<div class="backdrop">
+  <div
+    class="panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="update-panel-title"
+    tabindex="-1"
+    bind:this={panel}
+    onkeydown={(event) => handleModalKeydown(event, panel, onClose)}
+  >
     <header>
       <h2 id="update-panel-title">
         {#if update.updateAvailable}
           Update available
         {:else}
-          go-mapi is up to date
+          SendArc is up to date
         {/if}
       </h2>
-      <button type="button" class="close" aria-label="Close" onclick={onClose}>×</button>
+      <button type="button" class="close" aria-label="Close update panel" onclick={onClose}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6 6 18" />
+        </svg>
+      </button>
     </header>
 
     <section class="body">
       {#if update.updateAvailable}
         <p class="lede">
           A newer release is available:
-          <strong>go-mapi {update.latestVersion}</strong>.
+          <strong>SendArc {update.latestVersion}</strong>.
         </p>
         <p>
-          Download and run the installer manually to update — go-mapi does not
-          install updates automatically in v3.0.
+          Download and run the installer manually to update. SendArc never
+          installs updates in the background.
         </p>
         <div class="actions">
           <button
@@ -102,7 +119,7 @@
             class="primary link"
             onclick={openInstaller}
           >
-            Download installer (go-mapi-setup.exe)
+            Download SendArc installer
           </button>
           <button
             type="button"
@@ -159,8 +176,9 @@
     border-radius: 8px;
     max-width: 32rem;
     width: calc(100% - 2rem);
+    max-height: calc(100vh - 2rem);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    overflow: hidden;
+    overflow-y: auto;
   }
   header {
     display: flex;
@@ -174,13 +192,16 @@
     font-size: 1.05rem;
   }
   .close {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
     background: transparent;
     border: 0;
-    font-size: 1.5rem;
-    line-height: 1;
     cursor: pointer;
     color: var(--c-text);
-    padding: 0 0.25rem;
+    padding: 0;
+    border-radius: 6px;
   }
   .body {
     padding: 1rem;
@@ -195,6 +216,7 @@
     margin: 0.5rem 0 1rem;
   }
   .link {
+    min-height: 40px;
     padding: 0.5rem 0.85rem;
     border-radius: 4px;
     border: 0;
@@ -237,6 +259,7 @@
     margin-top: 0.75rem;
   }
   .check {
+    min-height: 40px;
     background: transparent;
     border: 1px solid var(--c-border);
     padding: 0.4rem 0.85rem;
@@ -248,4 +271,5 @@
     opacity: 0.6;
     cursor: default;
   }
+  button:active:not(:disabled) { opacity: 0.8; }
 </style>

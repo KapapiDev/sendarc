@@ -1,7 +1,7 @@
 name: Go Nightly Race Detector
 
 # GOTEST-03: Dedicated nightly job that runs `go test -race` against
-# ./internal/mapi/... and ./src/app/... on windows-latest with CGO_ENABLED=1.
+# ./internal/mapi/... and ./src/app/... on windows-2025 with CGO_ENABLED=1.
 # As of Phase 8.1 (CONTEXT D-07), `-race` is ALSO a per-PR blocking gate in
 # build.yml's build-wails-app job; this nightly remains as defence-in-depth,
 # catching flaky races that didn't trip the per-PR run. The watcher race
@@ -15,18 +15,30 @@ on:
 
 jobs:
   go-race:
-    name: Go test -race (windows-latest)
-    runs-on: windows-latest
+    name: Go test -race (windows-2025)
+    runs-on: windows-2025
     env:
       CGO_ENABLED: '1'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.25'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      # src/app/main.go embeds frontend/dist, which is absent on a clean checkout.
+      - name: Install npm workspace dependencies
+        run: npm ci
+
+      - name: Build frontend for go:embed
+        run: npm --workspace src/app/frontend run build
 
       - name: go test -race ./internal/mapi/... ./src/app/...
         run: go test -race -v ./internal/mapi/... ./src/app/...

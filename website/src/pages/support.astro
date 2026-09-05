@@ -1,0 +1,9 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import LegalShell from "../components/LegalShell.astro";
+import { BUG_REPORT_URL, COMPATIBILITY_REPORT_URL, FEATURE_REQUEST_URL, SUPPORT_EMAIL } from "../lib/site";
+---
+<BaseLayout title="Support" path="/support/"><LegalShell title="Support center" description="Get help without exposing private email or account data.">
+  <div class="card-grid"><div class="card"><h2>Bug report</h2><p>Share sanitized steps, SendArc version, Windows version, app name, and architecture.</p><a href={BUG_REPORT_URL}>Open bug form</a></div><div class="card"><h2>Compatibility report</h2><p>Tell us which Simple MAPI workflow you tested and what happened.</p><a href={COMPATIBILITY_REPORT_URL}>Open compatibility form</a></div><div class="card"><h2>Feature request</h2><p>Describe the user problem and expected result without private business data.</p><a href={FEATURE_REQUEST_URL}>Request a feature</a></div><div class="card"><h2>Email</h2><p>For beta-data deletion or non-public coordination, contact the operator.</p><a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></div></div>
+  <h2>Never include</h2><p>Email bodies, recipient addresses, attachments, OAuth tokens, Google passwords, client secrets, or customer data.</p>
+</LegalShell></BaseLayout>

@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/marcfargas/go-mapi/internal/mapi"
+	"github.com/pkg/browser"
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -28,6 +31,10 @@ type App struct {
 	// and written by showWindow / hideWindow / beforeClose.
 	visibilityMu sync.Mutex
 	visible      bool
+	// windowShowOverride is a narrow test seam for notification actions. It is
+	// nil in production; tests use it to prove Review opens the app without
+	// requiring a live Wails window or invoking any send path.
+	windowShowOverride func()
 
 	// intentionalQuit is set true by the tray Quit menu BEFORE calling wruntime.Quit,
 	// so beforeClose can distinguish a "quit-now" from "X button = hide-to-tray".
@@ -44,13 +51,20 @@ type App struct {
 	settingsMu sync.RWMutex
 	settings   AppSettings
 
-	// Automode goroutine handle. Started in startup; stopped in shutdown.
-	automode *automode
+	// sendInflight makes the explicit-send binding idempotent under rapid
+	// double-clicks or duplicate IPC calls. Without it two callers can snapshot
+	// the same queued item before either removes it and send duplicate mail.
+	sendMu       sync.Mutex
+	sendInflight map[string]struct{}
+
+	// Non-message operational timestamps shown on the Status screen.
+	statusMu      sync.Mutex
+	runtimeStatus RuntimeStatus
 
 	// Backlog skip-set (D-10): emails that failed automode with errorCategory
 	// "signed-out" during a signed-out window stay manual after re-auth.
 	// In-memory only — NEVER persisted. Pruned on every queue-update to
-	// release memory for emails the user manually drafted or dismissed.
+	// release memory for emails the user manually sent or dismissed.
 	backlogSkipMu sync.Mutex
 	backlogSkip   map[string]struct{}
 
@@ -112,8 +126,10 @@ func NewApp() *App {
 	return &App{
 		auth:          NewAuthManager(),
 		backlogSkip:   make(map[string]struct{}),
+		sendInflight:  make(map[string]struct{}),
 		settings:      AppSettings{Mode: defaultMode},
 		trayRefreshCh: make(chan struct{}, 1),
+		runtimeStatus: loadRuntimeStatus(),
 	}
 }
 
@@ -194,16 +210,13 @@ func (a *App) startup(ctx context.Context) {
 	a.settingsMu.Unlock()
 	logInfo("settings loaded: mode=%s", a.settings.Mode)
 
-	// Phase 9: start automode goroutine. Gated on mode + paused at drain time.
-	// Wire pruneBacklogSkip after every queue-update emit (D-10: backlog cleanup).
+	// SendArc always requires a local preview and an explicit Send click. The
+	// upstream auto-draft worker is intentionally not started.
 	if a.bridge != nil {
-		a.automode = newAutomode(a, a.bridge.AutomodeWake())
-		a.automode.start()
-		logInfo("automode started")
-
 		// knownIds seeds to the current queue at startup to prevent stale emails
 		// from triggering arrival toasts (NOTIF-04: no spam on app restart).
 		initialSnap := a.watcher.Snapshot()
+		a.recordLastIntercepted(initialSnap)
 		knownIds := make(map[string]struct{}, len(initialSnap))
 		for _, e := range initialSnap {
 			knownIds[e.Id] = struct{}{}
@@ -214,6 +227,7 @@ func (a *App) startup(ctx context.Context) {
 				return
 			}
 			snap := a.watcher.Snapshot()
+			a.recordLastIntercepted(snap)
 			currentIds := make(map[string]struct{}, len(snap))
 			for _, e := range snap {
 				currentIds[e.Id] = struct{}{}
@@ -221,13 +235,20 @@ func (a *App) startup(ctx context.Context) {
 			// Detect newly arrived emails (present now but not in knownIds) and
 			// fire arrival toasts. Only emails that arrive while the app is running
 			// get toasts — seeded IDs are silently absorbed (NOTIF-04).
+			hasNewMessage := false
 			for _, e := range snap {
 				if _, seen := knownIds[e.Id]; !seen {
 					emitArrivalToast(a, e)
 					knownIds[e.Id] = struct{}{}
+					hasNewMessage = true
 				}
 			}
-			// Prune knownIds for emails that left the queue (drafted / dismissed)
+			// A MAPI action is an explicit foreground workflow: bring the local
+			// review window forward so the message cannot send without preview.
+			if hasNewMessage {
+				a.showWindow()
+			}
+			// Prune knownIds for emails that left the queue (sent / dismissed)
 			// to avoid unbounded memory growth in long-running sessions.
 			for id := range knownIds {
 				if _, ok := currentIds[id]; !ok {
@@ -280,11 +301,7 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(ctx context.Context) {
-	// Stop automode goroutine before cancelling shutdownCtx so any in-flight
-	// draftOne call has a chance to observe context cancellation cleanly.
-	if a.automode != nil {
-		a.automode.stop()
-	}
+	defer closeLog()
 	// Phase 11: stop the long-lived update scheduler before cancelling
 	// shutdownCtx so the ticker goroutine exits cleanly.
 	if a.updateSchedulerStop != nil {
@@ -361,6 +378,29 @@ func (a *App) GetQueue() []mapi.EmailWithId {
 	return a.watcher.Snapshot()
 }
 
+// OpenDiagnosticLogs opens the privacy-filtered per-user app log in the
+// system's default text viewer. The path contains operational events only;
+// message bodies, recipients, attachment paths, and OAuth tokens are never
+// written by the logging layer.
+func (a *App) OpenDiagnosticLogs() error {
+	dir := appDataDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("diagnostics: create log directory: %w", err)
+	}
+	path := filepath.Join(dir, "app.log")
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		if err := os.WriteFile(path, nil, 0o600); err != nil {
+			return fmt.Errorf("diagnostics: create log file: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("diagnostics: inspect log file: %w", err)
+	}
+	if err := browser.OpenFile(path); err != nil {
+		return fmt.Errorf("diagnostics: open log file: %w", err)
+	}
+	return nil
+}
+
 // --- Pause / mode / backlog helpers (D-10, D-14, D-15) ---
 
 // isPaused returns the current session-only pause state.
@@ -418,41 +458,24 @@ func (a *App) signalTrayRefresh() {
 	}
 }
 
-// getMode returns the current mode ("manual" or "auto-draft").
-// Falls back to defaultMode if not yet loaded (pre-startup call).
+// getMode remains for settings-file compatibility. SendArc is always manual.
 func (a *App) getMode() string {
-	a.settingsMu.RLock()
-	defer a.settingsMu.RUnlock()
-	if a.settings.Mode == "" {
-		return defaultMode
-	}
-	return a.settings.Mode
+	return defaultMode
 }
 
-// setMode updates the in-memory mode AND persists via saveSettings. Rejects
-// values other than "manual" and "auto-draft". Must be called only from a
-// Wails binding (UI thread) — single-writer invariant from settings.go (D-13).
-// Wakes automode so it immediately re-checks mode when switching to "auto-draft".
+// setMode remains for compatibility with older settings/UI builds. Automatic
+// processing is deliberately unavailable: only "manual" is accepted.
 func (a *App) setMode(mode string) error {
-	if mode != "manual" && mode != "auto-draft" {
+	if mode != defaultMode {
 		return fmt.Errorf("setMode: invalid mode %q", mode)
 	}
 	a.settingsMu.Lock()
-	a.settings.Mode = mode
+	a.settings.Mode = defaultMode
 	s := a.settings
 	a.settingsMu.Unlock()
 	if err := saveSettings(s); err != nil {
 		return err
 	}
-	// Wake automode so it re-checks mode immediately if we just switched ON.
-	// Non-blocking; harmless if automode is nil (pre-startup) or already idle.
-	if a.bridge != nil {
-		select {
-		case a.bridge.automodeWake <- struct{}{}:
-		default:
-		}
-	}
-	// Signal tray to refresh tooltip (mode segment in D-17 changes on mode flip).
 	a.signalTrayRefresh()
 	return nil
 }
@@ -475,7 +498,7 @@ func (a *App) markBacklogSkipped(id string) {
 
 // pruneBacklogSkip removes entries whose ids are absent from currentIds. Called
 // after each queue-update event (via bridge.afterDispatch) so dismissed or
-// manually-drafted rows do not permanently occupy memory for the session lifetime.
+// manually-sent rows do not permanently occupy memory for the session lifetime.
 func (a *App) pruneBacklogSkip(currentIds map[string]struct{}) {
 	a.backlogSkipMu.Lock()
 	defer a.backlogSkipMu.Unlock()
@@ -488,32 +511,43 @@ func (a *App) pruneBacklogSkip(currentIds map[string]struct{}) {
 
 // ---- Phase 9 bindings (QUEUE-02/03/04, SHELL-02) ----
 
-// validateEmailID is the shared validator for CreateDraftForID + DismissEmail.
+// validateEmailID is the shared validator for SendMessageForID + DismissEmail.
 // IDs are 64-char hex SHA256 hashes from the watcher (see internal/mapi/watcher.go).
 // Any non-hex / wrong-length input is a frontend bug or tampering — reject early
 // with a typed error (T-9-08 mitigation).
 func validateEmailID(id string) error {
-	if id == "" {
-		return errors.New("email id: empty")
+	if len(id) != 64 {
+		return errors.New("email id: invalid length")
 	}
-	if len(id) > 128 {
-		return errors.New("email id: too long")
+	for _, ch := range id {
+		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f')) {
+			return errors.New("email id: invalid encoding")
+		}
 	}
 	return nil
 }
 
-// CreateDraftForID runs the Gmail draft-creation flow for a single queued
-// email in response to a user action (row Create draft button).
-//
-// Emits `auto-draft-result` with the same shape as automode (Plan 03) so
-// the frontend can hydrate the drafted flash / error badge uniformly.
-// Unlike automode, does NOT mark the email as backlog-skipped on invalid_grant —
-// the user explicitly triggered this call; backlog-skip only applies to
-// background auto-draft attempts (D-10).
-func (a *App) CreateDraftForID(id string) error {
+// SendMessageForID sends one locally queued message after the user has reviewed
+// its preview and clicked Send. There is intentionally no background send path.
+func (a *App) SendMessageForID(id string) error {
 	if err := validateEmailID(id); err != nil {
 		return err
 	}
+	a.sendMu.Lock()
+	if a.sendInflight == nil {
+		a.sendInflight = make(map[string]struct{})
+	}
+	if _, exists := a.sendInflight[id]; exists {
+		a.sendMu.Unlock()
+		return nil
+	}
+	a.sendInflight[id] = struct{}{}
+	a.sendMu.Unlock()
+	defer func() {
+		a.sendMu.Lock()
+		delete(a.sendInflight, id)
+		a.sendMu.Unlock()
+	}()
 	if a.watcher == nil {
 		return errors.New("watcher not ready")
 	}
@@ -529,7 +563,7 @@ func (a *App) CreateDraftForID(id string) error {
 	}
 	if target == nil {
 		// Idempotency path — row already processed / dismissed. Log + return nil.
-		logInfo("CreateDraftForID: id %s no longer in queue", safeIDPrefix(id))
+		logInfo("SendMessageForID: id %s no longer in queue", safeIDPrefix(id))
 		return nil
 	}
 
@@ -538,10 +572,11 @@ func (a *App) CreateDraftForID(id string) error {
 
 	callErr := a.MakeAuthenticatedGmailCall(ctx, func(token string) (int, error) {
 		gc := mapi.NewGmailClientWithBase(token, gmailBaseURLOverride)
-		_, err := gc.CreateDraft(target.Message)
+		_, err := gc.SendMessage(ctx, target.Message)
 		if err != nil {
-			if err.Error() == "token expired" {
-				return 401, err
+			var apiErr *mapi.GmailAPIError
+			if errors.As(err, &apiErr) {
+				return apiErr.StatusCode, err
 			}
 			return 500, err
 		}
@@ -549,19 +584,17 @@ func (a *App) CreateDraftForID(id string) error {
 	})
 	if callErr != nil {
 		category := classifyAutomodeError(callErr)
-		// QUICK-260423-tk6: include the raw error alongside the category so
-		// Marc (and app.log triage) can distinguish "attachment not found"
-		// from a Gmail 5xx without tailing interceptor logs. The category
-		// set is unchanged — the reason is a diagnostic string, not a new
-		// classification axis.
-		logError("CreateDraftForID: draft %s failed: category=%s err=%v",
-			safeIDPrefix(id), category, callErr)
+		// Never copy Gmail response bodies, recipient data, attachment paths,
+		// or other message-derived details into logs or frontend events.
+		reason := safeSendErrorReason(category)
+		logError("SendMessageForID: send %s failed: category=%s",
+			safeIDPrefix(id), category)
 		if a.ctx != nil {
-			wruntime.EventsEmit(a.ctx, "auto-draft-result", map[string]any{
+			wruntime.EventsEmit(a.ctx, "send-result", map[string]any{
 				"emailId":       id,
 				"success":       false,
 				"errorCategory": category,
-				"reason":        callErr.Error(),
+				"reason":        reason,
 			})
 		}
 		// Error toast fires regardless of window state (D-11: errors always surface).
@@ -569,17 +602,18 @@ func (a *App) CreateDraftForID(id string) error {
 		return callErr
 	}
 	if err := a.watcher.MarkProcessed(id); err != nil {
-		logError("CreateDraftForID: MarkProcessed %s: %v", safeIDPrefix(id), err)
+		logError("SendMessageForID: MarkProcessed %s: %v", safeIDPrefix(id), err)
 	}
-	// Draft-success toast: only when window is hidden (D-11). Subject is safe to
+	a.recordSuccessfulSend(time.Now())
+	// Send-success toast: only when window is hidden. Subject is safe to
 	// include per UI-SPEC; privacy is preserved (no body text, no recipient email).
 	if target.Message != nil {
-		emitDraftSuccessToast(a, target.Message.Subject, id)
+		emitSendSuccessToast(a, target.Message.Subject, id)
 	}
 	// Clear the arrival + error toasts for this email from Action Center (NOTIF-05).
 	clearToastForEmail(id)
 	if a.ctx != nil {
-		wruntime.EventsEmit(a.ctx, "auto-draft-result", map[string]any{
+		wruntime.EventsEmit(a.ctx, "send-result", map[string]any{
 			"emailId": id,
 			"success": true,
 		})
@@ -587,7 +621,18 @@ func (a *App) CreateDraftForID(id string) error {
 	return nil
 }
 
-// DismissEmail removes a queued email's JSON file without creating a draft.
+func safeSendErrorReason(category string) string {
+	switch category {
+	case "signed-out":
+		return "Your Google sign-in expired. Sign in again, then retry."
+	case "network":
+		return "SendArc could not reach Gmail. Check your connection and retry."
+	default:
+		return "Gmail could not send this message. Check the preview and attachments, then retry."
+	}
+}
+
+// DismissEmail removes a queued email's JSON file without sending it.
 // Does NOT require auth (user may dismiss while signed out). Idempotent via
 // watcher.Delete (Plan 03 Task 1). Emits no event — queue-update fires
 // automatically from the watcher fsnotify path.
@@ -618,7 +663,7 @@ func (a *App) GetSettings() AppSettings {
 	return s
 }
 
-// SaveSettings persists AppSettings to %APPDATA%\go-mapi\settings.json.
+// SaveSettings persists AppSettings to %APPDATA%\SendArc\settings.json.
 // Delegates to setMode for validation + wake-automode-if-mode-flipped. In
 // Phase 9 Mode is the only field; future phases may surface more here.
 func (a *App) SaveSettings(s AppSettings) error {
@@ -854,7 +899,7 @@ func (a *App) startUpdateScheduler() {
 // goroutine — safe to call Wails bindings from here.
 //
 // args format: URL query string, e.g. "action=open&emailId=<id>"
-// Recognised actions: "create-draft", "dismiss", "open" (default: open).
+// Recognised actions: "review", "dismiss", "open" (default: open).
 func (a *App) handleToastAction(args string) {
 	q, err := url.ParseQuery(args)
 	if err != nil {
@@ -865,12 +910,8 @@ func (a *App) handleToastAction(args string) {
 	op := q.Get("action")
 	id := q.Get("emailId")
 	switch op {
-	case "create-draft":
-		if err := a.CreateDraftForID(id); err != nil {
-			logError("toast: CreateDraftForID %s: %v", safeIDPrefix(id), err)
-		}
-		// clearToastForEmail already called inside CreateDraftForID on success;
-		// on failure emitErrorToast already fired. Nothing more to do here.
+	case "review":
+		// Never send from a toast action: open the local preview first.
 		a.showWindow()
 	case "dismiss":
 		// Dismiss is a silent background action (NOTIF-05): no showWindow call.

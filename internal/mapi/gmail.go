@@ -2,20 +2,26 @@ package mapi
 
 import (
 	"bytes"
+	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
 	"net/http"
+	netmail "net/mail"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
-	GmailAPIBase = "https://www.googleapis.com/gmail/v1/users/me"
-	MaxFileSize  = 25 * 1024 * 1024 // 25MB Gmail limit
+	GmailAPIBase   = "https://www.googleapis.com/gmail/v1/users/me"
+	MaxFileSize    = 25 * 1024 * 1024 // individual attachment safety bound
+	MaxMessageSize = 25 * 1024 * 1024 // serialized MIME size bound
 )
 
 // GmailClient handles Gmail API operations
@@ -23,6 +29,16 @@ type GmailClient struct {
 	httpClient *http.Client
 	token      string
 	baseURL    string // injection point for tests and CLI flag; defaults to GmailAPIBase
+}
+
+// GmailAPIError preserves the HTTP status without copying a Gmail response
+// body (which may contain user data) into logs or the UI.
+type GmailAPIError struct {
+	StatusCode int
+}
+
+func (e *GmailAPIError) Error() string {
+	return fmt.Sprintf("Gmail API error (%d)", e.StatusCode)
 }
 
 // NewGmailClient creates a new Gmail API client with the given OAuth token
@@ -41,19 +57,65 @@ func NewGmailClientWithBase(token, baseURL string) *GmailClient {
 		baseURL = GmailAPIBase
 	}
 	return &GmailClient{
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: 30 * time.Second},
 		token:      token,
 		baseURL:    baseURL,
 	}
 }
 
-// DraftResponse represents a Gmail API draft creation response
-type DraftResponse struct {
+// MessageResponse represents the subset of a Gmail API message response used
+// by SendArc. The API returns the message id after a successful send.
+type MessageResponse struct {
 	ID string `json:"id"`
 }
 
+// SendMessage sends a MailMessage through the authenticated Gmail account.
+// The complete MIME payload is built locally and submitted in one request.
+func (gc *GmailClient) SendMessage(ctx context.Context, msg *MailMessage) (string, error) {
+	if err := ValidateMailMessage(msg); err != nil {
+		return "", fmt.Errorf("invalid message: %w", err)
+	}
+	mimeMsg, err := BuildFullMIME(msg)
+	if err != nil {
+		return "", fmt.Errorf("failed to build MIME message: %w", err)
+	}
+
+	bodyJSON, err := json.Marshal(map[string]string{
+		"raw": Base64URLEncode(mimeMsg),
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/messages/send", gc.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+gc.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := gc.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to send message: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return "", &GmailAPIError{StatusCode: resp.StatusCode}
+	}
+
+	var sent MessageResponse
+	if err := json.NewDecoder(resp.Body).Decode(&sent); err != nil {
+		return "", fmt.Errorf("failed to parse response: %w", err)
+	}
+	return sent.ID, nil
+}
+
 // CreateDraft creates a Gmail draft from a MailMessage, including attachments.
-// Builds the full MIME message locally (one API call, no round-trips).
+// Deprecated: retained only for upstream compatibility while the legacy
+// automode implementation is removed. SendArc's user-facing flow calls
+// SendMessage and never requests the gmail.compose scope.
 func (gc *GmailClient) CreateDraft(msg *MailMessage) (string, error) {
 	// Build full MIME message with attachments
 	mimeMsg, err := BuildFullMIME(msg)
@@ -95,7 +157,7 @@ func (gc *GmailClient) CreateDraft(msg *MailMessage) (string, error) {
 		return "", fmt.Errorf("Gmail API error (%d): %s", resp.StatusCode, string(respBody))
 	}
 
-	var draft DraftResponse
+	var draft MessageResponse
 	if err := json.NewDecoder(resp.Body).Decode(&draft); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
@@ -106,10 +168,16 @@ func (gc *GmailClient) CreateDraft(msg *MailMessage) (string, error) {
 // BuildFullMIME builds a complete RFC 2822 message from a MailMessage,
 // including attachments as MIME parts. Single-pass, no network calls.
 func BuildFullMIME(msg *MailMessage) ([]byte, error) {
+	if err := ValidateMailMessage(msg); err != nil {
+		return nil, fmt.Errorf("invalid message: %w", err)
+	}
 	var buf bytes.Buffer
 
 	hasAttachments := len(msg.Attachments) > 0
-	boundary := fmt.Sprintf("go_mapi_%d", os.Getpid())
+	boundary, err := randomMIMEBoundary()
+	if err != nil {
+		return nil, fmt.Errorf("generate MIME boundary: %w", err)
+	}
 
 	// Headers
 	if len(msg.Recipients.To) > 0 {
@@ -122,6 +190,10 @@ func BuildFullMIME(msg *MailMessage) ([]byte, error) {
 		buf.WriteString(fmt.Sprintf("Bcc: %s\r\n", formatRecipients(msg.Recipients.BCC)))
 	}
 	buf.WriteString(fmt.Sprintf("Subject: %s\r\n", mimeEncodeHeader(msg.Subject)))
+	buf.WriteString("MIME-Version: 1.0\r\n")
+	if sentAt, err := time.Parse(time.RFC3339, msg.Timestamp); err == nil {
+		buf.WriteString(fmt.Sprintf("Date: %s\r\n", sentAt.Format(time.RFC1123Z)))
+	}
 
 	if hasAttachments {
 		buf.WriteString(fmt.Sprintf("Content-Type: multipart/mixed; boundary=\"%s\"\r\n", boundary))
@@ -158,12 +230,17 @@ func BuildFullMIME(msg *MailMessage) ([]byte, error) {
 			if mimeType == "" {
 				mimeType = "application/octet-stream"
 			}
+			mediaType, params, err := mime.ParseMediaType(mimeType)
+			if err != nil {
+				mediaType = "application/octet-stream"
+				params = map[string]string{}
+			}
+			params["name"] = att.Filename
 
-			encodedName := mimeEncodeHeader(att.Filename)
 			buf.WriteString(fmt.Sprintf("--%s\r\n", boundary))
-			buf.WriteString(fmt.Sprintf("Content-Type: %s; name=\"%s\"\r\n", mimeType, encodedName))
+			buf.WriteString(fmt.Sprintf("Content-Type: %s\r\n", mime.FormatMediaType(mediaType, params)))
 			buf.WriteString("Content-Transfer-Encoding: base64\r\n")
-			buf.WriteString(fmt.Sprintf("Content-Disposition: attachment; filename=\"%s\"\r\n", encodedName))
+			buf.WriteString(fmt.Sprintf("Content-Disposition: %s\r\n", mime.FormatMediaType("attachment", map[string]string{"filename": att.Filename})))
 			buf.WriteString("\r\n")
 			buf.WriteString(base64Wrap(fileData))
 			buf.WriteString("\r\n")
@@ -182,18 +259,25 @@ func BuildFullMIME(msg *MailMessage) ([]byte, error) {
 		buf.WriteString(base64Wrap([]byte(msg.Body)))
 	}
 
+	if buf.Len() > MaxMessageSize {
+		return nil, fmt.Errorf("message too large (%d bytes)", buf.Len())
+	}
 	return buf.Bytes(), nil
+}
+
+func randomMIMEBoundary() (string, error) {
+	var raw [18]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "", err
+	}
+	return "sendarc_" + hex.EncodeToString(raw[:]), nil
 }
 
 // formatRecipients formats a list of recipients for an email header
 func formatRecipients(recipients []Recipient) string {
 	parts := make([]string, len(recipients))
 	for i, r := range recipients {
-		if r.Name != "" {
-			parts[i] = fmt.Sprintf("%s <%s>", mimeEncodeHeader(r.Name), r.Address)
-		} else {
-			parts[i] = r.Address
-		}
+		parts[i] = (&netmail.Address{Name: r.Name, Address: r.Address}).String()
 	}
 	return strings.Join(parts, ", ")
 }

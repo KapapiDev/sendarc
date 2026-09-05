@@ -9,19 +9,19 @@
 #   scripts/register-dev-aumid.ps1 on the stamp side).
 #
 # Why the type definition lives in a dot-sourced file:
-#   Add-Type with the same Namespace/Name is idempotent in the same PS session
-#   but noisy if repeated; isolating to a helper keeps the Pester file clean.
+#   The type guard keeps repeated dot-sourcing idempotent, while a full
+#   TypeDefinition allows the helper to declare the COM interfaces it needs.
 
 # IN-06: guard on PublicReader (the actual entry point used by Get-ShortcutAumid
-# below) rather than Reader. Add-Type -Name Reader compiles all inline types into
-# a single assembly; if a previous definition was loaded into the session,
-# checking the symbol that is actually called catches stale-definition scenarios
-# that checking `Reader` would miss.
-if (-not ('GoMapi.AumidReader.PublicReader' -as [type])) {
-    Add-Type -Namespace GoMapi.AumidReader -Name Reader -MemberDefinition @'
+# below). If a previous definition was loaded into the session, checking the
+# symbol that is actually called catches stale-definition scenarios.
+if (-not ('SendArc.AumidReader.PublicReader' -as [type])) {
+    Add-Type -TypeDefinition @'
         using System;
         using System.Runtime.InteropServices;
         using System.Text;
+
+        namespace SendArc.AumidReader {
 
         [ComImport, Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
         internal interface IPropertyStore {
@@ -101,9 +101,10 @@ if (-not ('GoMapi.AumidReader.PublicReader' -as [type])) {
                 }
             }
         }
+
+        }
 '@
 }
-
 function Get-ShortcutAumid {
     [CmdletBinding()]
     param(
@@ -112,7 +113,5 @@ function Get-ShortcutAumid {
         [string]$Path
     )
     $absPath = (Resolve-Path -LiteralPath $Path).ProviderPath
-    return [GoMapi.AumidReader.PublicReader]::GetAumid($absPath)
+    return [SendArc.AumidReader.PublicReader]::GetAumid($absPath)
 }
-
-Export-ModuleMember -Function Get-ShortcutAumid -ErrorAction SilentlyContinue

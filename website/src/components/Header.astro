@@ -1,0 +1,33 @@
+---
+import DownloadLink from "./DownloadLink.astro";
+import Logo from "./Logo.astro";
+
+const path = Astro.url.pathname;
+---
+
+<header class="site-header" data-site-header>
+  <div class="shell header-inner">
+    <a class="brand-link" href="/" aria-label="SendArc home">
+      <Logo compact />
+    </a>
+
+    <button
+      class="menu-toggle"
+      type="button"
+      aria-expanded="false"
+      aria-controls="primary-navigation"
+      aria-label="Open navigation"
+      data-nav-toggle
+    >
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="primary-nav" id="primary-navigation" aria-label="Primary navigation" data-nav>
+      <a href="/#overview" aria-current={path === "/" ? "page" : undefined}>Overview</a>
+      <a href="/#how-it-works">How it works</a>
+      <a href="/docs/" aria-current={path.startsWith("/docs") ? "page" : undefined}>Documentation</a>
+      <a href="/#faq">FAQ</a>
+      <DownloadLink variant="header" />
+    </nav>
+  </div>
+</header>

@@ -3,7 +3,7 @@
 package main
 
 // toast_windows.go is the Windows implementation of the toast notification
-// subsystem for go-mapi. Uses jackmordaunt/go-toast/v2 for COM activator
+// subsystem for SendArc. Uses jackmordaunt/go-toast/v2 for COM activator
 // registration and toast_shim_windows.go for Tag/Group/ClearToast (NOTIF-05).
 //
 // Privacy (QUAL-03): Toast payloads include ONLY:
@@ -11,7 +11,7 @@ package main
 //   - Body: subject + "📎 N attachment(s)" (never body text, filenames, recipients)
 //   - Icon: absolute path to app icon (not email content)
 //
-// D-11: Arrival + draft-success toasts suppressed when main window is visible
+// D-11: Arrival + send-success toasts suppressed when main window is visible
 // and focused; error toasts always fire.
 
 import (
@@ -54,9 +54,9 @@ func initToasts(a *App) error {
 
 // toastIconPath returns the absolute path to the app icon used in toast visuals.
 // jackmordaunt/go-toast requires an absolute path; the icon must be an .ico or .png.
-// We ship go-mapi.ico alongside the exe in both dev and prod layouts.
+// The installer ships SendArc.ico alongside the executable.
 func toastIconPath(exePath string) string {
-	return filepath.Join(filepath.Dir(exePath), "go-mapi.ico")
+	return filepath.Join(filepath.Dir(exePath), "SendArc.ico")
 }
 
 // cachedExePath is populated by initToasts; avoids repeated os.Executable calls.
@@ -111,8 +111,8 @@ func emitArrivalToast(a *App, e mapi.EmailWithId) {
 		Actions: []toast.Action{
 			{
 				Type:      toast.Foreground,
-				Content:   "Create draft",
-				Arguments: fmt.Sprintf("action=create-draft&emailId=%s", url.QueryEscape(e.Id)),
+				Content:   "Review",
+				Arguments: fmt.Sprintf("action=review&emailId=%s", url.QueryEscape(e.Id)),
 			},
 			{
 				Type:      toast.Foreground,
@@ -127,9 +127,9 @@ func emitArrivalToast(a *App, e mapi.EmailWithId) {
 	}
 }
 
-// emitDraftSuccessToast fires only when the window is hidden (D-04 + D-11).
+// emitSendSuccessToast fires only when the window is hidden.
 // No action buttons — dismissible only. Subject is included per UI-SPEC copywriting.
-func emitDraftSuccessToast(a *App, subject, emailID string) {
+func emitSendSuccessToast(a *App, subject, emailID string) {
 	if a.isVisible() && windowFocused(a) {
 		return
 	}
@@ -138,26 +138,30 @@ func emitDraftSuccessToast(a *App, subject, emailID string) {
 	}
 	n := toast.Notification{
 		AppID:               activeAUMID(),
-		Title:               "Draft created: " + subject,
+		Title:               "Sent: " + subject,
 		Icon:                toastIconPath(mustExePath()),
 		ActivationType:      toast.Foreground,
 		ActivationArguments: "action=open",
 	}
 	// Use emailID+":success" as the tag so it's distinct from the arrival toast.
 	// The ":success" toast is not cleared by clearToastForEmail — left for the
-	// user to dismiss (it confirms a successful draft).
+	// user to dismiss (it confirms a successful send).
 	tag := emailID + ":success"
 	if err := shimPushWithTagGroup(activeAUMID(), n, tag, toastGroup); err != nil {
-		logError("toast: draft-success push failed for %s: %v", safeIDPrefix(emailID), err)
+		logError("toast: send-success push failed for %s: %v", safeIDPrefix(emailID), err)
 	}
 }
+
+// Legacy upstream automode is not started in SendArc, but its implementation
+// remains temporarily buildable while the surrounding tray code is simplified.
+func emitDraftSuccessToast(_ *App, _, _ string) {}
 
 // emitErrorToast fires regardless of window state (D-11: errors always surface).
 // Per D-09: error category drives the copy via toastErrorCopy.
 func emitErrorToast(a *App, category, emailID string) {
 	n := toast.Notification{
 		AppID:               activeAUMID(),
-		Title:               "go-mapi",
+		Title:               "SendArc",
 		Body:                toastErrorCopy(category),
 		Icon:                toastIconPath(mustExePath()),
 		ActivationType:      toast.Foreground,
@@ -175,7 +179,7 @@ func emitErrorToast(a *App, category, emailID string) {
 func emitSummaryInvalidGrantToast(_ *App) {
 	n := toast.Notification{
 		AppID:               activeAUMID(),
-		Title:               "go-mapi",
+		Title:               "SendArc",
 		Body:                toastCopySummaryInvalidGrant,
 		Icon:                toastIconPath(mustExePath()),
 		ActivationType:      toast.Foreground,
@@ -216,5 +220,5 @@ func displayFrom(msg *mapi.MailMessage) string {
 	if msg.OriginApp != "" {
 		return msg.OriginApp
 	}
-	return "go-mapi"
+	return "SendArc"
 }

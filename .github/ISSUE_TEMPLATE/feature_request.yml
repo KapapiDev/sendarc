@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest a focused improvement to SendArc.
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include email content, OAuth tokens, private attachments, recipient addresses, or confidential client data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: privacy_confirmation
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I did not include email content, recipient addresses, OAuth tokens, private attachments, confidential client data, or other secrets.
+          required: true

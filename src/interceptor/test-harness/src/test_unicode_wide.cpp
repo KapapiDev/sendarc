@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <filesystem>
+#include <fstream>
 #include "../test_utils.h"
 #include "../../mapi_types.h"
 
@@ -20,13 +21,12 @@ int test_unicode_wide() {
     std::cout << "\nTest: MAPISendMailW (Wide/Unicode)" << std::endl;
 
     // Clean up before test
-    std::string tempDir = TestUtilities::GetGoMapiTempDir();
+    std::string tempDir = TestUtilities::GetSendArcQueueDir();
     TestUtilities::CleanupTestFiles(tempDir);
 
     // Load the DLL
-    HMODULE hDll = LoadLibraryA("go-mapi.dll");
+    HMODULE hDll = TestUtilities::LoadInterceptorDll();
     if (!hDll) {
-        std::cerr << "Failed to load go-mapi.dll" << std::endl;
         return 1;
     }
 
@@ -59,12 +59,24 @@ int test_unicode_wide() {
     recipients[1].lpszName = ccName;
     recipients[1].lpszAddress = ccAddress;
 
-    // Test attachment with unicode path
-    wchar_t attachPath[] = L"C:\\Users\\ren\u00e9\\Documents\\informe_2026.pdf";
+    // Test attachment with a real Unicode temporary path.
+    std::filesystem::path sourcePath = std::filesystem::temp_directory_path() /
+        (L"SendArc-harness-" + std::to_wstring(GetCurrentProcessId()) +
+         L"-inform\u00e9_2026.pdf");
+    {
+        std::ofstream source(sourcePath, std::ios::binary | std::ios::trunc);
+        source << "unicode attachment";
+        if (!source) {
+            std::cerr << "Failed to create Unicode temporary attachment" << std::endl;
+            FreeLibrary(hDll);
+            return 1;
+        }
+    }
+    std::wstring attachPath = sourcePath.wstring();
     wchar_t attachName[] = L"informe_2026.pdf";
 
     MapiFileDescW attachment = {};
-    attachment.lpszPathName = attachPath;
+    attachment.lpszPathName = attachPath.data();
     attachment.lpszFileName = attachName;
 
     MapiMessageW message = {};
@@ -81,6 +93,8 @@ int test_unicode_wide() {
 
     if (result != 0) {
         std::cerr << "MAPISendMailW returned error code " << result << std::endl;
+        std::error_code removeError;
+        std::filesystem::remove(sourcePath, removeError);
         FreeLibrary(hDll);
         return 1;
     }
@@ -89,54 +103,49 @@ int test_unicode_wide() {
     bool success = TestUtilities::VerifyJsonFileCreated(tempDir);
 
     if (success) {
-        // Find and validate the JSON file content
-        for (const auto& entry : std::filesystem::directory_iterator(tempDir)) {
-            if (entry.path().extension() == ".json") {
-                std::string path = entry.path().string();
-                success = TestUtilities::ValidateJsonFile(path);
+        std::string path = TestUtilities::GetNewestJsonPath(tempDir);
+        success = !path.empty() && TestUtilities::ValidateJsonFile(path);
 
-                // Read file to verify UTF-8 content
-                HANDLE hFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
-                    nullptr, OPEN_EXISTING, 0, nullptr);
-                if (hFile != INVALID_HANDLE_VALUE) {
-                    char buf[4096];
-                    DWORD bytesRead;
-                    if (ReadFile(hFile, buf, sizeof(buf) - 1, &bytesRead, nullptr)) {
-                        buf[bytesRead] = '\0';
-                        std::string json(buf, bytesRead);
+        // Read file to verify UTF-8 content
+        HANDLE hFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+            nullptr, OPEN_EXISTING, 0, nullptr);
+        if (hFile != INVALID_HANDLE_VALUE) {
+            char buf[4096];
+            DWORD bytesRead;
+            if (ReadFile(hFile, buf, sizeof(buf) - 1, &bytesRead, nullptr)) {
+                buf[bytesRead] = '\0';
+                std::string json(buf, bytesRead);
 
-                        // Verify key UTF-8 sequences are present
-                        // "ó" = \xc3\xb3, "ñ" = \xc3\xb1, "ü" = \xc3\xbc
-                        if (json.find("econ\\u00f3mico") != std::string::npos ||
-                            json.find("econ\xc3\xb3mico") != std::string::npos) {
-                            std::cout << "  UTF-8 content verified in JSON" << std::endl;
-                        } else {
-                            // Check if the subject is at least present
-                            if (json.find("Informe") != std::string::npos) {
-                                std::cout << "  Subject found in JSON output" << std::endl;
-                            } else {
-                                std::cerr << "  WARNING: Could not find subject in JSON" << std::endl;
-                                success = false;
-                            }
-                        }
-
-                        // Verify recipient name made it through
-                        if (json.find("Ren") != std::string::npos &&
-                            json.find("ller") != std::string::npos) {
-                            std::cout << "  Wide recipient names converted to UTF-8" << std::endl;
-                        } else {
-                            std::cerr << "  WARNING: Recipient names not found" << std::endl;
-                            success = false;
-                        }
-                    }
-                    CloseHandle(hFile);
+                // Verify key UTF-8 sequences are present
+                // "ó" = \xc3\xb3, "ñ" = \xc3\xb1, "ü" = \xc3\xbc
+                if (json.find("econ\\u00f3mico") != std::string::npos ||
+                    json.find("econ\xc3\xb3mico") != std::string::npos) {
+                    std::cout << "  UTF-8 content verified in JSON" << std::endl;
+                } else if (json.find("Informe") != std::string::npos) {
+                    std::cout << "  Subject found in JSON output" << std::endl;
+                } else {
+                    std::cerr << "  WARNING: Could not find subject in JSON" << std::endl;
+                    success = false;
                 }
-                break;
+
+                // Verify recipient name made it through
+                if (json.find("Ren") != std::string::npos &&
+                    json.find("ller") != std::string::npos) {
+                    std::cout << "  Wide recipient names converted to UTF-8" << std::endl;
+                } else {
+                    std::cerr << "  WARNING: Recipient names not found" << std::endl;
+                    success = false;
+                }
             }
+            CloseHandle(hFile);
+        } else {
+            success = false;
         }
     }
 
     TestUtilities::CleanupTestFiles(tempDir);
+    std::error_code removeError;
+    std::filesystem::remove(sourcePath, removeError);
     FreeLibrary(hDll);
     return success ? 0 : 1;
 }

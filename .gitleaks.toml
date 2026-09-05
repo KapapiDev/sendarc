@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Archived upstream planning documents contain checksum-plus-filename examples that trigger the generic API-key heuristic."
+paths = ['''^\.planning/''']

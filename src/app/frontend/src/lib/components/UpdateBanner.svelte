@@ -28,7 +28,7 @@
 
 <section class="banner" aria-label="Update available">
   <span class="msg">
-    Update available — <strong>go-mapi {latestVersion}</strong>
+    Update available — <strong>SendArc {latestVersion}</strong>
   </span>
   <button type="button" class="view" onclick={onViewUpdate}>
     View update
@@ -55,6 +55,7 @@
     background: white;
     color: var(--c-accent);
     border: 0;
+    min-height: 40px;
     padding: 0.3rem 0.75rem;
     border-radius: 4px;
     font-weight: 600;
@@ -64,4 +65,5 @@
   .view:hover {
     background: #f0f0f0;
   }
+  .view:focus-visible { outline: 3px solid white; outline-offset: 2px; }
 </style>

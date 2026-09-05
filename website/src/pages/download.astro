@@ -1,0 +1,16 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { RELEASES_URL } from "../lib/site";
+---
+<BaseLayout title="Download" description="Download the latest SendArc Windows beta." path="/download/">
+  <section class="page-hero"><div class="shell page-hero-inner"><p class="eyebrow">Windows beta</p><h1>Download SendArc</h1><p>Install the latest public beta for 64-bit Windows 10 or 11. The beta may be unsigned; verify its SHA-256 checksum before installing.</p></div></section>
+  <section class="legal-wrap"><div class="shell"><div class="download-card" data-release-card>
+    <h2>Latest release</h2><p data-release-status>Checking GitHub Releases for a verified installer…</p>
+    <a class="button button--primary" href={RELEASES_URL} data-release-link data-track="release_download">View releases</a>
+    <p><small>SendArc never charges during this beta. Windows SmartScreen may warn about an unsigned publisher.</small></p>
+  </div></div></section>
+  <script is:inline define:vars={{ releasesUrl: RELEASES_URL }}>
+    const status=document.querySelector('[data-release-status]'); const link=document.querySelector('[data-release-link]');
+    fetch('https://api.github.com/repos/KapapiDev/sendarc/releases/latest',{headers:{Accept:'application/vnd.github+json'}}).then(async r=>{if(!r.ok)throw new Error();const release=await r.json();const asset=release.assets?.find(a=>/^SendArc-Setup-.*\.exe$/i.test(a.name));if(!asset)throw new Error();status.textContent=`${release.tag_name} · ${asset.name}`;link.href=asset.browser_download_url;link.textContent='Download for Windows';}).catch(()=>{status.textContent='No downloadable beta has been published yet. Follow the Releases page for availability.';link.href=releasesUrl;link.textContent='View release status';});
+  </script>
+</BaseLayout>

@@ -14,14 +14,15 @@ on:
         required: false
         default: 'false'
 
-# D-27 release pipeline. Tag-triggered on v* (e.g. v3.0.0). Produces a signed
-# go-mapi-setup.exe and attaches it to the GitHub Release.
+# D-27 release pipeline. Tag-triggered on v* (e.g. v3.0.0). Produces a
+# versioned SendArc installer and attaches it to the GitHub Release. The installer remains
+# explicitly unsigned when the optional SignPath credentials are absent.
 #
 # SignPath is gated on secrets.SIGNPATH_API_TOKEN (D-24) — if empty, the pipeline
 # publishes unsigned. Required SignPath secrets: SIGNPATH_API_TOKEN, SIGNPATH_ORG_ID,
 # SIGNPATH_PROJECT_SLUG, SIGNPATH_SIGNING_POLICY_SLUG.
 #
-# OAuth secrets (GOMAPI_OAUTH_CLIENT_ID, GOMAPI_OAUTH_CLIENT_SECRET) come from repo
+# OAuth credentials (SENDARC_OAUTH_CLIENT_ID, SENDARC_OAUTH_CLIENT_SECRET) come from repo
 # secrets set during Phase 8 (D-09) and injected via ldflags.
 
 permissions:
@@ -30,60 +31,30 @@ permissions:
 
 jobs:
   release:
-    name: Build + sign + publish installer
-    runs-on: windows-latest
+    name: Build + optional sign + publish installer
+    runs-on: windows-2025
 
     env:
-      GOMAPI_OAUTH_CLIENT_ID:     ${{ secrets.GOMAPI_OAUTH_CLIENT_ID }}
-      GOMAPI_OAUTH_CLIENT_SECRET: ${{ secrets.GOMAPI_OAUTH_CLIENT_SECRET }}
+      SENDARC_OAUTH_CLIENT_ID:     ${{ secrets.SENDARC_OAUTH_CLIENT_ID }}
+      SENDARC_OAUTH_CLIENT_SECRET: ${{ secrets.SENDARC_OAUTH_CLIENT_SECRET }}
       HAS_SIGNPATH:               ${{ secrets.SIGNPATH_API_TOKEN != '' }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Go 1.25
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.25'
 
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
-
-      - name: Install mingw-mstorsjo-llvm-ucrt (interceptor build toolchain)
-        shell: pwsh
-        run: |
-          # build.ps1 (since QUICK-260423-ntu) requires the triple-prefixed clang driver
-          # from scoop's mingw-mstorsjo-llvm-ucrt package — choco's mingw uses a different
-          # driver layout and is unusable for our x64 + x86 dual build. The package also
-          # bundles cmake + ninja, so no separate cmake/ninja install is needed here.
-          Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
-          # windows-latest pwsh sessions run elevated (as runneradmin); scoop's installer
-          # aborts under elevation unless SCOOP_INSTALL_AS_ADMIN=1 is set (or -RunAsAdmin
-          # is passed). Setting the env var is a no-op when non-elevated and clears the
-          # gate when elevated, so it's safe in both modes.
-          $env:SCOOP_INSTALL_AS_ADMIN = "1"
-          Invoke-WebRequest -UseBasicParsing https://get.scoop.sh -OutFile "$env:TEMP\install-scoop.ps1"
-          & "$env:TEMP\install-scoop.ps1"
-          scoop install mingw-mstorsjo-llvm-ucrt
-          if ($LASTEXITCODE -ne 0) { throw "scoop install mingw-mstorsjo-llvm-ucrt failed (exit $LASTEXITCODE)" }
-          # Sanity check — fail fast if either triple-prefixed driver is missing.
-          # build.ps1 reads from this exact path; it is hardcoded, not PATH-derived.
-          $bin = "$env:USERPROFILE\scoop\apps\mingw-mstorsjo-llvm-ucrt\current\bin"
-          foreach ($exe in @('x86_64-w64-mingw32-clang.exe','i686-w64-mingw32-clang.exe')) {
-            if (-not (Test-Path "$bin\$exe")) { throw "Missing $exe in $bin" }
-          }
-          Write-Host "scoop mingw-mstorsjo-llvm-ucrt installed:"
-          Get-ChildItem "$bin\*-w64-mingw32-clang*.exe" | ForEach-Object { Write-Host "  $($_.Name)" }
-          # Persist scoop's shims dir on PATH for subsequent steps (GitHub Actions
-          # only auto-propagates system PATH between steps; scoop appends to user
-          # PATH, which a fresh pwsh session will not see without this echo).
-          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - name: Install npm workspaces
         run: npm ci
@@ -95,13 +66,13 @@ jobs:
       - name: Derive version + patch wails.json
         id: version
         shell: pwsh
+        env:
+          RAW_RELEASE_VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
         run: |
-          if ("${{ github.event_name }}" -eq 'push') {
-            $version = "${{ github.ref_name }}" -replace '^v',''
-          } else {
-            $version = "${{ inputs.version }}"
+          $version = $env:RAW_RELEASE_VERSION -replace '^v',''
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') {
+            throw "Invalid release version. Expected SemVer without build metadata."
           }
-          if (-not $version) { throw "Empty version — refusing to build." }
 
           # Patch wails.json so Wails picks the right value for PE metadata
           # (FileVersion / ProductVersion resources). Ephemeral — not committed.
@@ -118,17 +89,22 @@ jobs:
           Write-Host "Release version: $version (prerelease: $preStr)"
 
       # Phase 11 plan 06 guard: prove this workflow would not ship e2e hooks.
-      # Fails fast if '-tags e2e', GOMAPI_DEBUG_BROWSER_ARGS, or any GOMAPI_E2E_*
+      # Fails fast if '-tags e2e', GOMAPI_DEBUG_BROWSER_ARGS, or any SENDARC_E2E_*
       # marker is present in the build definition.
       - name: Verify release hygiene (no e2e hooks)
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release-hygiene.ps1
 
       - name: Build frontend
-        run: npm run -w @marcfargas/go-mapi-app-frontend build
+        run: npm --workspace src/app/frontend run build
 
-      - name: Build interceptor DLL
-        run: npm run build:interceptor
+      - name: Build interceptor DLLs with release version
+        shell: pwsh
+        env:
+          INTERCEPTOR_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          .\src\interceptor\build-msvc.ps1 -Arch x64 -Config Release -Version $env:INTERCEPTOR_VERSION -Tests -Clean
+          .\src\interceptor\build-msvc.ps1 -Arch x86 -Config Release -Version $env:INTERCEPTOR_VERSION -Tests -Clean
 
       # PATTERNS.md §Shared Pattern 4: all four injectable vars are in `package main`
       # at src/app/. Use -X main.<var>=<value>. CONTEXT D-15's `github.com/marcfargas/go-mapi/src/app`
@@ -137,25 +113,39 @@ jobs:
         working-directory: src/app
         shell: pwsh
         run: |
-          $ldf = "-X main.Version=${{ steps.version.outputs.version }} -X main.aumidOverride=com.marcfargas.gomapi -X main.oauthClientID=$env:GOMAPI_OAUTH_CLIENT_ID -X main.oauthClientSecret=$env:GOMAPI_OAUTH_CLIENT_SECRET"
-          wails build -platform windows/amd64 -ldflags "$ldf"
+          if (-not $env:SENDARC_OAUTH_CLIENT_ID -or -not $env:SENDARC_OAUTH_CLIENT_SECRET) {
+            throw "Required SendArc OAuth repository secrets are not configured."
+          }
+          $ldf = "-X main.Version=${{ steps.version.outputs.version }} -X main.aumidOverride=app.sendarc.desktop -X main.oauthClientID=$env:SENDARC_OAUTH_CLIENT_ID -X main.oauthClientSecret=$env:SENDARC_OAUTH_CLIENT_SECRET"
+          # Wails' normal summary prints the full ldflags value. GitHub masks
+          # repository secrets, but quiet mode prevents relying on masking.
+          wails build -v 0 -platform windows/amd64 -ldflags "$ldf"
+
+      - name: Verify compiled release binaries contain no E2E hooks
+        shell: pwsh
+        run: |
+          & scripts/verify-release-hygiene.ps1 -ArtifactPaths @(
+            'src/app/build/bin/SendArc.exe',
+            'src/interceptor/build-x64/bin/SendArc.dll',
+            'src/interceptor/build-x86/bin/SendArc.dll'
+          )
 
       - name: Stage unsigned binaries
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force staged | Out-Null
-          Copy-Item src/app/build/bin/go-mapi.exe staged/
-          Copy-Item src/interceptor/build-x64/bin/go-mapi.dll staged/go-mapi-x64.dll
-          Copy-Item src/interceptor/build-x86/bin/go-mapi.dll staged/go-mapi-x86.dll
+          Copy-Item src/app/build/bin/SendArc.exe staged/
+          Copy-Item src/interceptor/build-x64/bin/SendArc.dll staged/SendArc-x64.dll
+          Copy-Item src/interceptor/build-x86/bin/SendArc.dll staged/SendArc-x86.dll
 
       # SignPath v2 (errata: CONTEXT D-23 referenced @v1 — PATTERNS.md §Planner-Facing
       # Correction Log entry 2 mandates @v2).
       - name: Upload binaries for SignPath (pass 1)
         if: ${{ env.HAS_SIGNPATH == 'true' }}
         id: upload-binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: go-mapi-binaries-unsigned
+          name: sendarc-binaries-unsigned
           path: staged/
 
       - name: SignPath — sign binaries (pass 1 of 2)
@@ -174,17 +164,20 @@ jobs:
         if: ${{ env.HAS_SIGNPATH == 'true' }}
         shell: pwsh
         run: |
-          Copy-Item staged-signed/go-mapi.exe src/app/build/bin/go-mapi.exe -Force
-          Copy-Item staged-signed/go-mapi-x64.dll src/interceptor/build-x64/bin/go-mapi.dll -Force
-          Copy-Item staged-signed/go-mapi-x86.dll src/interceptor/build-x86/bin/go-mapi.dll -Force
+          Copy-Item staged-signed/SendArc.exe src/app/build/bin/SendArc.exe -Force
+          Copy-Item staged-signed/SendArc-x64.dll src/interceptor/build-x64/bin/SendArc.dll -Force
+          Copy-Item staged-signed/SendArc-x86.dll src/interceptor/build-x86/bin/SendArc.dll -Force
 
-      - name: Install NSIS via scoop (extras bucket)
+      - name: Install pinned NSIS via Chocolatey
         shell: pwsh
         run: |
-          scoop bucket add extras
-          scoop install nsis
-          if ($LASTEXITCODE -ne 0) { throw "scoop install nsis failed (exit $LASTEXITCODE)" }
-          makensis /VERSION
+          choco install nsis --version=3.12.0 --yes --no-progress --limit-output
+          if ($LASTEXITCODE -ne 0) { throw "choco install nsis failed (exit $LASTEXITCODE)" }
+          $nsisExe = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
+          if (-not (Test-Path -LiteralPath $nsisExe)) { throw "Pinned NSIS executable not found: $nsisExe" }
+          Split-Path -Parent $nsisExe | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $nsisVersion = (& $nsisExe /VERSION).Trim()
+          if ($nsisVersion -ne 'v3.12') { throw "Expected NSIS v3.12, got $nsisVersion; refresh the audited installer inventory before upgrading" }
 
       - name: Compile installer
         shell: pwsh
@@ -196,18 +189,18 @@ jobs:
         # steps that follow.
         run: |
           Push-Location src/installer
-          makensis /DGOMAPI_VERSION=${{ steps.version.outputs.version }} go-mapi.nsi
+          makensis /DSENDARC_VERSION=${{ steps.version.outputs.version }} SendArc.nsi
           if ($LASTEXITCODE -ne 0) { Pop-Location; throw "makensis failed (exit $LASTEXITCODE)" }
           Pop-Location
-          Move-Item src/installer/go-mapi-setup.exe go-mapi-setup.exe -Force
+          Move-Item src/installer/SendArc-Setup.exe "SendArc-Setup-${{ steps.version.outputs.version }}.exe" -Force
 
       - name: Upload installer for SignPath (pass 2)
         if: ${{ env.HAS_SIGNPATH == 'true' }}
         id: upload-installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: go-mapi-setup-unsigned
-          path: go-mapi-setup.exe
+          name: sendarc-setup-unsigned
+          path: SendArc-Setup-${{ steps.version.outputs.version }}.exe
 
       - name: SignPath — sign installer (pass 2 of 2)
         if: ${{ env.HAS_SIGNPATH == 'true' }}
@@ -225,32 +218,72 @@ jobs:
         id: final
         shell: pwsh
         run: |
-          $signed = 'final/go-mapi-setup.exe'
-          $unsigned = 'go-mapi-setup.exe'
+          $signed = 'final/SendArc-Setup-${{ steps.version.outputs.version }}.exe'
+          $unsigned = 'SendArc-Setup-${{ steps.version.outputs.version }}.exe'
           if (Test-Path $signed) {
             "path=$signed" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding ascii -Append
             Write-Host "Using SIGNED installer: $signed"
           } else {
             "path=$unsigned" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding ascii -Append
+            "signed=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding ascii -Append
             Write-Host "Using UNSIGNED installer: $unsigned (SIGNPATH_API_TOKEN absent or signing skipped)"
           }
+
+          if (Test-Path $signed) {
+            "signed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding ascii -Append
+          }
+
+      - name: Record signing status
+        shell: pwsh
+        run: |
+          if ('${{ steps.final.outputs.signed }}' -eq 'true') {
+            "### Code signing: signed`nSignPath produced the published installer." | Add-Content $env:GITHUB_STEP_SUMMARY
+          } else {
+            "### Code signing: unsigned beta`nNo signing credential was configured; the beta artifacts are intentionally unsigned." | Add-Content $env:GITHUB_STEP_SUMMARY
+          }
+
+      # Exercise the exact signed-or-unsigned installer that would be published,
+      # not a separately rebuilt smoke artifact. This runs only on the ephemeral
+      # Windows runner and restores the planted previous mail client on teardown.
+      - name: Install Pester 5 for release acceptance
+        shell: pwsh
+        run: |
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+            Register-PSRepository -Default
+          }
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run installer round-trip against exact release artifact
+        shell: pwsh
+        env:
+          SENDARC_EXPECTED_PRODUCT_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $source = '${{ steps.final.outputs.path }}'
+          Copy-Item -LiteralPath $source -Destination 'SendArc-Setup.exe' -Force
+          $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
+          $testHash = (Get-FileHash -LiteralPath 'SendArc-Setup.exe' -Algorithm SHA256).Hash
+          if ($sourceHash -ne $testHash) { throw 'Release acceptance copy does not match the final installer.' }
+
+          Import-Module Pester -RequiredVersion 5.7.1 -Force
+          $config = New-PesterConfiguration
+          $config.Run.Path         = 'src/installer/tests/installer.Tests.ps1'
+          $config.Run.Exit         = $true
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config
+
+      - name: Run visible installer and uninstaller against exact release artifact
+        shell: pwsh
+        run: |
+          ./src/installer/tests/interactive-installer.ps1 -SetupExe ./SendArc-Setup.exe
 
       - name: Generate SHA256SUMS.txt
         shell: pwsh
         run: |
-          # D-17 (Phase 11.1): publish a SHA-256 manifest alongside release assets
-          # so the silent updater (Plan 11.1-04) can verify integrity via
-          # selfupdate.ChecksumValidator with UniqueFilename SHA256SUMS.txt.
-          # Format: lowercase-64-char-hex + two spaces + filename. sha256sum
-          # convention (matches go-selfupdate / goreleaser parser expectations).
-          # Filenames here MUST match the basenames at the GitHub Release URL
-          # (https://github.com/marcfargas/go-mapi/releases/latest/download/<name>).
-
+          # The beta updater is notify-only. Publish a checksum for the exact
+          # versioned installer users download manually from GitHub Releases.
           $assets = @(
-            @{ Path = '${{ steps.final.outputs.path }}';              Name = 'go-mapi-setup.exe' }
-            @{ Path = 'src/app/build/bin/go-mapi.exe';                Name = 'go-mapi.exe' }
-            @{ Path = 'src/interceptor/build-x64/bin/go-mapi.dll';    Name = 'go-mapi-x64.dll' }
-            @{ Path = 'src/interceptor/build-x86/bin/go-mapi.dll';    Name = 'go-mapi-x86.dll' }
+            @{ Path = '${{ steps.final.outputs.path }}'; Name = 'SendArc-Setup-${{ steps.version.outputs.version }}.exe' }
           )
 
           $lines = foreach ($a in $assets) {
@@ -269,24 +302,6 @@ jobs:
           Write-Host "Generated SHA256SUMS.txt:"
           Get-Content SHA256SUMS.txt | Write-Host
 
-      - name: Stage release binaries (signed-or-unsigned)
-        shell: pwsh
-        run: |
-          # REL-09 fix (todo 2026-04-28): the Phase 11.1 silent updater
-          # (src/app/updates_silent.go) downloads go-mapi.exe + go-mapi-x64.dll +
-          # go-mapi-x86.dll from releases/latest/download/<name>. They were never
-          # attached to the release until now, causing 404 on every silent run.
-          # Pick the signed branch when SignPath ran, else fall back to the
-          # unsigned staged/ tree. Filenames must match the SHA256SUMS.txt
-          # manifest (already produced above).
-          $src = if (Test-Path 'staged-signed') { 'staged-signed' } else { 'staged' }
-          New-Item -ItemType Directory -Force release-bins | Out-Null
-          Copy-Item "$src/go-mapi.exe"     release-bins/
-          Copy-Item "$src/go-mapi-x64.dll" release-bins/
-          Copy-Item "$src/go-mapi-x86.dll" release-bins/
-          Write-Host "Staged release binaries from ${src}:"
-          Get-ChildItem release-bins | ForEach-Object { Write-Host "  $($_.Name)  $($_.Length) bytes" }
-
       - name: Attach installer + SHA256SUMS.txt to GitHub Release
         if: ${{ github.event_name == 'push' && (github.event.inputs.dry_run != 'true') }}
         uses: softprops/action-gh-release@v2
@@ -294,17 +309,16 @@ jobs:
           files: |
             ${{ steps.final.outputs.path }}
             SHA256SUMS.txt
-            release-bins/go-mapi.exe
-            release-bins/go-mapi-x64.dll
-            release-bins/go-mapi-x86.dll
           draft: false
           prerelease: ${{ steps.version.outputs.prerelease }}
           body_path: .github/release-template.md
 
       - name: Upload release artifact (workflow_dispatch dry-run debug)
         if: ${{ github.event_name == 'workflow_dispatch' || github.event.inputs.dry_run == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: go-mapi-setup-release-${{ github.sha }}
-          path: ${{ steps.final.outputs.path }}
+          name: sendarc-setup-release-${{ github.sha }}
+          path: |
+            ${{ steps.final.outputs.path }}
+            SHA256SUMS.txt
           retention-days: 7

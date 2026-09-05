@@ -6,8 +6,6 @@ import {mapi} from '../models';
 
 export function CheckForUpdatesNow(arg1:context.Context):Promise<void>;
 
-export function CreateDraftForID(arg1:string):Promise<void>;
-
 export function DismissEmail(arg1:string):Promise<void>;
 
 export function GetAuthStatus():Promise<main.AuthStatus>;
@@ -15,6 +13,8 @@ export function GetAuthStatus():Promise<main.AuthStatus>;
 export function GetMode():Promise<string>;
 
 export function GetPausedState():Promise<boolean>;
+
+export function GetProductStatus():Promise<main.ProductStatus>;
 
 export function GetQueue():Promise<Array<mapi.EmailWithId>>;
 
@@ -24,11 +24,17 @@ export function GetUpdateState():Promise<main.UpdateState>;
 
 export function MakeAuthenticatedGmailCall(arg1:context.Context,arg2:main.GmailCall):Promise<void>;
 
+export function OpenDiagnosticLogs():Promise<void>;
+
 export function PauseWatching():Promise<void>;
+
+export function RepairMAPIRegistration():Promise<void>;
 
 export function ResumeWatching():Promise<void>;
 
 export function SaveSettings(arg1:main.AppSettings):Promise<void>;
+
+export function SendMessageForID(arg1:string):Promise<void>;
 
 export function SetMode(arg1:string):Promise<void>;
 
@@ -43,3 +49,5 @@ export function SetUpdateChecksEnabled(arg1:boolean):Promise<void>;
 export function SignIn():Promise<void>;
 
 export function SignOut():Promise<void>;
+
+export function TestGmailConnection():Promise<main.ConnectionTestResult>;

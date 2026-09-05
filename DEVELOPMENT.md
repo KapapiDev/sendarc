@@ -1,111 +1,179 @@
-# go-mapi — Development Guide
+# SendArc development guide
 
-Audience: contributors and maintainers. End users do not need any of this — see [README](./README.md) for installation. IT admins deploying at scale should see [ENTERPRISE.md](./ENTERPRISE.md).
+This guide is for contributors and release maintainers. End users should start with the [README](README.md).
 
 ## Architecture
 
-Two components linked by a filesystem drop:
-
-```
-┌─────────────────────┐       ┌─────────────────┐       ┌────────────────────┐
-│ Any Windows app     │       │ %LOCALAPPDATA%\ │       │ go-mapi (Wails)    │
-│ (Word, Excel,       │──────▶│ go-mapi\queue\  │──────▶│  • Go backend      │
-│  Outlook Express,   │       │ *.json (DLL     │       │  • Svelte 5 UI     │
-│  etc.)              │       │  writes one     │       │  • WebView2 window │
-└─────────────────────┘       └─────────────────┘       └────────────────────┘
-         │                                                       │
-         │ MAPISendMail / MAPISendMailW                          │ Gmail API (PKCE + Credential Manager)
-         ▼                                                       ▼
-┌─────────────────────┐                                  ┌────────────────────┐
-│ go-mapi.dll (C++)   │                                  │ Gmail drafts       │
-└─────────────────────┘                                  └────────────────────┘
+```text
+Windows application (x86 or x64)
+  -> MAPISendMail / MAPISendMailW
+  -> architecture-matched SendArc.dll
+  -> %LOCALAPPDATA%\SendArc\queue\ (JSON + copied attachments)
+  -> SendArc.exe (Go/Wails + Svelte/WebView2)
+  -> local preview
+  -> explicit user Send
+  -> Gmail users.messages.send
 ```
 
-### Components
+The originating application receives the result of local queue acceptance, not the eventual Gmail result. The desktop UI owns the send result. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for trust boundaries and lifecycle details.
 
-| Component | Language | Location | Role |
-|-----------|----------|----------|------|
-| MAPI interceptor | C++17 | `src/interceptor/` | Intercepts `MAPISendMail`/`W`, writes email JSON to `%LOCALAPPDATA%\go-mapi\queue\`. Unchanged from v1. |
-| Shared core | Go 1.25 | `internal/mapi/` | Email parsing, validation, watcher (`fsnotify`), Gmail HTTP client + RFC 2822 MIME builder |
-| Wails app (backend) | Go 1.25 | `src/app/` | Tray + window lifecycle, auth (OAuth PKCE loopback + Windows Credential Manager via `zalando/go-keyring`), watcher bridge, App-struct bindings |
-| Frontend | TypeScript + Svelte 5 | `src/app/frontend/` | WebView2 UI: welcome / sign-in / queue / Auto-draft toggle |
+| Component | Location | Responsibility |
+|---|---|---|
+| MAPI interceptor | `src/interceptor/` | C++17 x86/x64 DLL, MAPI conversion, safe attachment copying, atomic queue write |
+| Shared Go core | `internal/mapi/` | Queue protocol/validation, watcher, MIME construction, Gmail `messages.send` transport |
+| Desktop host | `src/app/` | Wails lifecycle, OAuth PKCE loopback, Credential Manager, tray/toasts, queue coordination, update notification |
+| Desktop UI | `src/app/frontend/` | Svelte local preview, explicit Send/Cancel/Discard, auth and update surfaces |
+| Installer | `src/installer/` | NSIS install, MAPI registration, previous-handler backup/restoration, uninstall |
+| Website | `website/` | Cloudflare-hosted product/legal/support/market-validation site |
 
-## Why Wails
-
-- **Desktop OAuth without a browser dependency.** WebView2 is the Edge runtime, not Chrome/Edge — the v2.x browser-extension flow could not satisfy enterprise "no Chrome" environments.
-- **System tray + native toasts + background Auto-draft mode are first-class.** The browser-extension sandbox blocked all three.
-- **WebView2 shares the Edge runtime on Windows**, so RAM cost per instance is measurable and low (43.24 MB mean / 80 MB gate PASS in Phase 7 on 5 concurrent RDS sessions — see `.planning/phases/07-wails-shell-ram-gate/07-VERIFICATION.md`).
-- **Go stays the primary language.** The v2.x Go RFC 2822 MIME builder + Gmail client + watcher code survives the pivot and lives in `internal/mapi/`.
-
-## Repository layout
-
-```
-src/interceptor/             # C++ MAPI DLL (unchanged from v1)
-internal/mapi/               # Shared Go core: watcher, protocol, Gmail client + MIME builder
-src/app/                     # Wails Go backend (tray, auth, App bindings, watcher bridge)
-src/app/frontend/            # Svelte 5 UI
-scripts/                     # Dev + measurement scripts (dev-wails, azure-ram-gate, measure-ram, test-drop-email)
-tests/sandbox/               # MAPI DLL sandbox tests
-tests/protocol-fixtures/     # JSON fixtures consumed by internal/mapi integration tests
-.planning/                   # GSD planning artifacts (phase contexts, roadmap, requirements)
-```
+The Go module paths still contain `github.com/marcfargas/go-mapi`. They are internal source identifiers inherited from upstream, not the public product name. Changing them is not required for the SendArc user-facing rebrand and would create avoidable import churn.
 
 ## Prerequisites
 
 - Windows 10/11
-- Go 1.25+
-- Node 20+, npm 9+
-- MinGW + CMake 3.16+ + Ninja (for the C++ DLL)
-- Wails CLI: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
+- Git
+- Go 1.25.x
+- Node.js 24.x and npm
+- Wails CLI 2.12.0
+- CMake 3.16+ and Ninja
+- the MinGW/LLVM UCRT toolchain used by `src/interceptor/build.ps1`, with both x86 and x64 cross-compilers
+- NSIS for a local installer build
+- Microsoft Edge WebView2 runtime for the desktop UI
 
-## Clone + install dependencies
+Install the pinned Wails CLI:
 
-```
-git clone https://github.com/marcfargas/go-mapi.git
-cd go-mapi
-npm install
-```
-
-## OAuth credentials (local dev)
-
-Copy `.env.local.example` to `.env.local` at the repo root and fill in your own GCP OAuth desktop client ID + secret. See `.planning/phases/08-oauth-credentials/08-CONTEXT.md` for the GCP setup walkthrough.
-
-## Build the MAPI DLL (once)
-
-```
-npm run build:interceptor
+```powershell
+go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 ```
 
-## Dev loop
+Do not use `@latest` in a reproducible build.
 
-```
-# Wails hot-reload dev server (Go + Svelte)
-scripts/dev-wails.ps1
+## Clone and remotes
 
-# Run the test suite locally (matches CI per-PR gate)
-npm run test      # Go test (./internal/mapi/... ./src/app/...) + Vitest
-npm run check     # go vet + svelte-check
-```
-
-## Wails build (release artifact)
-
-```
-cd src/app && wails build -platform windows/amd64
-# → src/app/build/bin/go-mapi.exe
+```powershell
+git clone https://github.com/KapapiDev/sendarc.git
+Set-Location sendarc
+git remote add upstream https://github.com/marcfargas/go-mapi.git
+git remote -v
+npm ci
 ```
 
-## Race detector
+The SendArc fork began at upstream commit `b90fcb08754f910fc318cbc922cbf24702582463`. Preserve upstream copyright history and never rewrite a published source tag.
 
+## OAuth development configuration
+
+Create a separate Google Cloud **Desktop app** OAuth client for SendArc. Enable the Gmail API and configure only:
+
+`https://www.googleapis.com/auth/gmail.send`
+
+Copy `.env.local.example` to the ignored `.env.local` file and set:
+
+```dotenv
+SENDARC_OAUTH_CLIENT_ID=...
+SENDARC_OAUTH_CLIENT_SECRET=...
 ```
+
+Never commit that file, paste its values into issues, or print them in build logs. A desktop client secret is extractable from a distributed binary and is not a confidential security boundary; PKCE, exact loopback redirect handling, and least privilege remain required. See [docs/OAUTH.md](docs/OAUTH.md).
+
+## Common checks
+
+Use path-based npm workspace selectors so internal package-scope renames do not break contributor commands:
+
+```powershell
+npm ci
+npm --workspace src/app/frontend run build
+npm --workspace src/app/frontend run check
+npm --workspace src/app/frontend run test:run
+
+go vet ./internal/mapi/... ./src/app/...
+go test ./internal/mapi/... ./src/app/...
 go test -race ./internal/mapi/... ./src/app/...
 ```
 
-Matches the per-PR CI gate and the nightly race-detector workflow.
+The Go race detector may require a working native compiler. A local check is useful, but the clean `windows-2025` GitHub Actions run is the release authority.
 
-## IPC protocol
+Build and test both MAPI architectures:
 
-The C++ DLL writes JSON files to `%LOCALAPPDATA%\go-mapi\queue\`; the Go core in `internal/mapi/protocol.go` validates and consumes them. The `MailMessage` struct in that file is the canonical schema.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File src/interceptor/build.ps1 -Arch x64 -Config Release -Tests -Clean -Version 0.1.0-beta
+ctest --test-dir src/interceptor/build-x64 --output-on-failure -C Release
 
-## Planning artifacts
+powershell -NoProfile -ExecutionPolicy Bypass -File src/interceptor/build.ps1 -Arch x86 -Config Release -Tests -Clean -Version 0.1.0-beta
+ctest --test-dir src/interceptor/build-x86 --output-on-failure -C Release
+```
 
-GSD phase artifacts live in `.planning/`. Start with `STATE.md` and `ROADMAP.md` for the milestone breakdown.
+The deterministic harness must load the exact DLL path passed on its command line and verify that all expected queue items are produced. A zero-test or zero-artifact harness run is a failure, not a pass.
+
+Run the real Windows desktop flow against hermetic local OAuth and Gmail
+stand-ins:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-e2e.ps1
+```
+
+The seven Playwright scenarios launch the e2e-tagged Wails/WebView2 binary and
+verify a real x64 `MAPISendMailW` call through the test-only interceptor into
+the live queue and local preview, explicit `users.messages.send`,
+To/Cc/Bcc, Unicode body and attachment MIME preservation, Cancel/Dismiss with
+zero Gmail requests, multi-arrival behavior, Gmail 503 retry, offline queue
+retention, and the expired-sign-in banner.
+The fake Gmail server records and rejects every draft attempt. E2E settings
+disable update checks and all Google endpoints are replaced, so this suite does
+not use real credentials, contact Gmail, or touch Windows Credential Manager.
+The native interceptor is compiled with `SENDARC_E2E` only for this suite so it
+can target a per-test temporary queue. Normal app, installer, and release builds
+do not contain the environment-variable queue redirection hook.
+GitHub Actions runs the same suite on `windows-2025` for every pull request.
+
+The real Windows Credential Manager integration is opt-in so routine local
+tests can never touch a user's SendArc login. It creates a unique fake entry,
+proves save, fresh-store reload, delete, and `AuthManager` clear behavior, then
+removes the entry:
+
+```powershell
+Set-Location src/app
+go test -tags credentialstore_integration -run '^(TestRealKeyring_WindowsRoundTrip|TestAuthManagerKeyringRoundTrip_RealKeyring)$' -count=1 -v .
+```
+
+## Desktop development and builds
+
+For hot reload:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-wails.ps1
+```
+
+For a release-style desktop build:
+
+```powershell
+npm --workspace src/app/frontend run build
+Set-Location src/app
+wails build -platform windows/amd64
+```
+
+The rebranded output is `src/app/build/bin/SendArc.exe`. x86/x64 interceptor and installer names are defined by the build/installer scripts; the release-facing names are documented in [docs/RELEASE.md](docs/RELEASE.md).
+
+## Security review before a release
+
+- Search source, history, logs, artifacts, and screenshots for secrets.
+- Confirm the authorization URL requests exactly `gmail.send`.
+- Confirm notifications cannot send and auto-draft/auto-send modes remain unavailable.
+- Verify message-derived data and Gmail response bodies do not enter logs or UI errors.
+- Run attachment traversal, header injection, invalid-recipient, offline, auth-expiry, and cancellation tests.
+- Audit `npm audit`, Go modules, vendored code, and bundled licenses; record rather than hide unresolved findings.
+- Verify SHA-256 checksums from downloaded, final immutable artifacts.
+
+## Release
+
+Do not publish from a developer workstation. A release must come from a clean `v0.1.0-beta` tag through the pinned `windows-2025` workflow, after required CI is green. The release is manual-update only and may be unsigned under the no-payment constraint. Follow [docs/RELEASE.md](docs/RELEASE.md), [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md), and the [requirements matrix](docs/REQUIREMENTS_MATRIX.md).
+
+## Upstream and LGPL maintenance
+
+Fetch upstream deliberately and review changes rather than performing blind merges:
+
+```powershell
+git fetch upstream --tags
+git log --oneline --decorate HEAD..upstream/main
+```
+
+Keep `LICENSE`, applicable source headers, `THIRD_PARTY_NOTICES.md`, Git history, and a matching public source tag for every binary release. Do not imply that Marc Fargas or the go-mapi project endorses SendArc.

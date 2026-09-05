@@ -1,10 +1,8 @@
 package main
 
 import (
-	"context"
 	"embed"
 	"os"
-	"time"
 
 	"github.com/pkg/browser"
 	"github.com/wailsapp/wails/v2"
@@ -18,15 +16,17 @@ var assets embed.FS
 var Version = "0.0.0-dev" // overridden via -ldflags "-X main.Version=..."
 
 func main() {
-	// PHASE 11.1 (D-10, RESEARCH §Pitfall 7): silent-update guard. MUST be the
-	// first statement in main(). The Task Scheduler runs us as SYSTEM in
-	// session 0 — WebView2 init would crash there, single-instance acquire is
-	// not needed (separate session namespace), and no user is present to
-	// approve OAuth re-auth. The silent path runs its own routine and exits.
-	if len(os.Args) >= 2 && os.Args[1] == "--update-check-silent" {
-		ctx, cancel := context.WithTimeout(context.Background(), 12*time.Hour)
-		defer cancel()
-		os.Exit(runSilentUpdate(ctx))
+	// Repair runs in the short-lived elevated child launched by the Status
+	// screen. Handle it before the single-instance guard so the normal tray app
+	// can remain open while Windows applies the machine-wide registration fix.
+	if len(os.Args) == 2 && os.Args[1] == repairMAPIArg {
+		if err := repairMAPIRegistrationNow(); err != nil {
+			logError("MAPI repair failed: %v", err)
+			closeLog()
+			os.Exit(1)
+		}
+		closeLog()
+		os.Exit(0)
 	}
 
 	raised, siErr := acquireSingleInstance()
@@ -74,7 +74,7 @@ func main() {
 	// the X button fire OnBeforeClose, and our beforeClose hides the window AND updates
 	// visibility (return true = prevent the actual close).
 	err := wails.Run(&options.App{
-		Title:         "go-mapi",
+		Title:         "SendArc",
 		Width:         480,
 		Height:        600,
 		MinWidth:      360,

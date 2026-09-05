@@ -1,6 +1,6 @@
 import { test as base, chromium, type Page, type BrowserContext, type Browser } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { existsSync } from 'node:fs';
@@ -18,8 +18,8 @@ import { WatchDirHelper } from './email';
 //   1. Start fake-gmail + fake-oauth servers on ephemeral ports.
 //   2. Pick a free CDP port (try 9223..9233).
 //   3. Build a one-hour-from-now OAuth token blob and stash it in env.
-//   4. Spawn build/bin/go-mapi.exe with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
-//      pointed at our chosen CDP port and the four GOMAPI_E2E_* overrides.
+//   4. Spawn build/bin/SendArc.exe with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
+//      pointed at our chosen CDP port and the four SENDARC_E2E_* overrides.
 //   5. Poll http://127.0.0.1:$PORT/json/version until CDP responds (≤ 20s).
 //   6. chromium.connectOverCDP → grab the first non-empty page.
 //
@@ -35,13 +35,51 @@ import { WatchDirHelper } from './email';
 export interface WailsAppFixture {
   page: Page;
   watchDir: WatchDirHelper;
+  nativeMAPI: {
+    emitMessage(): Promise<void>;
+  };
   gmail: FakeGmailControl;
   oauth: FakeOAuthControl;
   appLogPath: string;
 }
 
 const REPO_ROOT = resolve(__dirname, '..', '..', '..');
-const APP_BINARY = join(REPO_ROOT, 'src', 'app', 'build', 'bin', 'go-mapi.exe');
+const APP_BINARY = join(REPO_ROOT, 'src', 'app', 'build', 'bin', 'SendArc.exe');
+const NATIVE_E2E_DIR = join(REPO_ROOT, 'src', 'interceptor', 'build-e2e-x64', 'bin');
+const NATIVE_HARNESS = join(NATIVE_E2E_DIR, 'SendArc-test-harness.exe');
+const NATIVE_DLL = join(NATIVE_E2E_DIR, 'SendArc.dll');
+
+function runNativeMAPIProbe(watchDir: string): Promise<void> {
+  if (!existsSync(NATIVE_HARNESS) || !existsSync(NATIVE_DLL)) {
+    throw new Error(
+      `e2e: native MAPI probe missing under ${NATIVE_E2E_DIR} — build via scripts/run-e2e.ps1`,
+    );
+  }
+  return new Promise((resolveProbe, rejectProbe) => {
+    const probe = spawn(NATIVE_HARNESS, ['--emit-e2e', NATIVE_DLL], {
+      env: {
+        ...process.env,
+        SENDARC_E2E_QUEUE_DIR: watchDir,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    let stdout = '';
+    let stderr = '';
+    probe.stdout?.on('data', (chunk) => { stdout += chunk.toString(); });
+    probe.stderr?.on('data', (chunk) => { stderr += chunk.toString(); });
+    probe.on('error', rejectProbe);
+    probe.on('exit', (code) => {
+      if (code === 0) {
+        resolveProbe();
+        return;
+      }
+      rejectProbe(new Error(
+        `native MAPI probe exited ${code}\nstdout:\n${stdout}\nstderr:\n${stderr}`,
+      ));
+    });
+  });
+}
 
 function isPortFree(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -119,6 +157,13 @@ export const test = base.extend<{ app: WailsAppFixture }>({
     const oauth = await startFakeOAuth();
     const cdpPort = await pickCdpPort();
 
+    // Keep the runtime test hermetic. A fresh app enables update checks by
+    // default, which would otherwise contact GitHub during startup.
+    await writeFile(join(appDataDir, 'settings.json'), JSON.stringify({
+      mode: 'manual',
+      update_checks_enabled: false,
+    }), 'utf8');
+
     // Token expiry one hour out so refreshIfNeededLocked is a no-op.
     const tokenBlob = JSON.stringify({
       access_token: 'e2e-fake-token-do-not-use',
@@ -129,17 +174,18 @@ export const test = base.extend<{ app: WailsAppFixture }>({
 
     const env: NodeJS.ProcessEnv = {
       ...process.env,
-      // GOMAPI_DEBUG_BROWSER_ARGS is honored by our vendored go-webview2 fork
+      // Legacy GOMAPI_DEBUG_BROWSER_ARGS is honored by the vendored go-webview2 fork.
       // (src/app/vendor/go-webview2-e2e/). The upstream wipes WebView2's own
       // WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS at package init so that route
       // does not work. See 11-06-SUMMARY.md for the full audit trail.
       GOMAPI_DEBUG_BROWSER_ARGS: `--remote-debugging-port=${cdpPort} --no-first-run`,
-      GOMAPI_E2E_FAKE_TOKEN_JSON: tokenBlob,
-      GOMAPI_E2E_GMAIL_BASE_URL: gmail.url,
-      GOMAPI_E2E_TOKEN_ENDPOINT: oauth.tokenURL,
-      GOMAPI_E2E_REVOKE_ENDPOINT: oauth.revokeURL,
-      GOMAPI_WATCH_DIR: watchDir,
-      GOMAPI_APPDATA_DIR: appDataDir,
+      SENDARC_E2E_FAKE_TOKEN_JSON: tokenBlob,
+      SENDARC_E2E_GMAIL_BASE_URL: gmail.url,
+      SENDARC_E2E_TOKEN_ENDPOINT: oauth.tokenURL,
+      SENDARC_E2E_REVOKE_ENDPOINT: oauth.revokeURL,
+      SENDARC_E2E_USERINFO_ENDPOINT: oauth.userinfoURL,
+      SENDARC_WATCH_DIR: watchDir,
+      SENDARC_APPDATA_DIR: appDataDir,
     };
 
     const child: ChildProcess = spawn(APP_BINARY, [], {
@@ -153,9 +199,10 @@ export const test = base.extend<{ app: WailsAppFixture }>({
     child.stderr?.on('data', (b) => process.stderr.write(`[app!] ${b}`));
 
     let appExitedEarly = false;
+    let teardownStarted = false;
     child.on('exit', (code, sig) => {
-      appExitedEarly = true;
-      if (code !== 0 && code !== null) {
+      if (!teardownStarted) appExitedEarly = true;
+      if (!teardownStarted && code !== 0 && code !== null) {
         process.stderr.write(`[app] exited code=${code} signal=${sig}\n`);
       }
     });
@@ -177,11 +224,15 @@ export const test = base.extend<{ app: WailsAppFixture }>({
       await use({
         page,
         watchDir: new WatchDirHelper(watchDir),
+        nativeMAPI: {
+          emitMessage: () => runNativeMAPIProbe(watchDir),
+        },
         gmail,
         oauth,
         appLogPath,
       });
     } finally {
+      teardownStarted = true;
       try {
         if (browser) await browser.close();
       } catch {

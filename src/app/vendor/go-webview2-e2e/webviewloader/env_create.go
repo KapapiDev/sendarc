@@ -43,26 +43,10 @@ func CreateCoreWebView2EnvironmentWithOptions(environmentCompletedHandler ICoreW
 		opt(&params)
 	}
 
-	// go-mapi Phase 11 plan 06 patch: the upstream go-webview2 wipes
-	// WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS in package init AND inside
-	// createWebViewEnvironmentWithClientDll (preventEnvAndRegistryOverrides).
-	// That makes injecting --remote-debugging-port=... from outside the
-	// process impossible, which blocks Playwright/CDP automation.
-	//
-	// We read a project-scoped env var (not the protected WebView2 one) BEFORE
-	// preventEnvAndRegistryOverrides fires and append it to the COM-side
-	// additionalBrowserArguments. Inert when the env var is unset, which is
-	// the production case — release installers never set it.
-	//
-	// See .planning/phases/11-autoupdate-release/11-06-SUMMARY.md for the
-	// full audit trail.
-	if extra := os.Getenv("GOMAPI_DEBUG_BROWSER_ARGS"); extra != "" {
-		if params.additionalBrowserArguments == "" {
-			params.additionalBrowserArguments = extra
-		} else {
-			params.additionalBrowserArguments = params.additionalBrowserArguments + " " + extra
-		}
-	}
+	// The helper is a compile-time no-op outside `-tags e2e`; production
+	// binaries contain neither the environment-variable name nor an external
+	// path for enabling WebView2 remote debugging.
+	params.additionalBrowserArguments = appendSendArcE2EBrowserArgs(params.additionalBrowserArguments)
 
 	var err error
 	var dllPath string

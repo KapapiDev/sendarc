@@ -1,6 +1,6 @@
 # SendArc OAuth verification package
 
-Prepared 2026-09-04. This is a submission preparation packet, **not evidence of
+Prepared 2026-09-04 and re-audited read-only on 2026-09-05. This is a submission preparation packet, **not evidence of
 Google approval or a completed verification submission**. Keep [REQUIREMENTS_MATRIX.md](REQUIREMENTS_MATRIX.md)
 as the release gate. Never include OAuth client secrets, access/refresh tokens,
 private mailbox contents or real customer attachments in the submission media.
@@ -27,11 +27,26 @@ and links to the matching privacy notice. The separate full product site remains
 at `sendarc.pages.dev` pending consolidation under the owner's chosen path.
 The root/other product pages must not be changed to impersonate SendArc.
 
-The authenticated 2026-09-04 inspection showed External / Testing, the dedicated
-Windows Desktop client and exactly `gmail.send`. Branding still used the
-`sendarc.pages.dev` homepage/policy/terms URLs, listed only `sendarc.pages.dev` as
-an authorized domain, and did not have an uploaded logo. No transition to
-Production or verification submission is recorded as complete.
+The authenticated 2026-09-05 inspection showed project `sendarc` / SendArc,
+External / Testing, one controlled test user, the dedicated active client and
+exactly the sensitive `gmail.send` scope, with no non-sensitive or restricted
+scopes. The Branding screen has the correct SendArc name, support email and
+developer contact, but still uses the `sendarc.pages.dev` homepage/policy/terms
+URLs, lists only `sendarc.pages.dev` as an authorized domain, and has no uploaded
+logo. The Verification Center states that verification is not required while the
+app remains in Testing; Google exposes `Publish app` on the Audience screen as
+the prerequisite for preparing a verification submission. No transition to
+Production, branding save, logo upload or verification submission is recorded
+as complete.
+
+The current Project Checkup also reports no associated Cloud billing account and
+fewer project owners/editors than its recommended contact-resilience threshold.
+Google's Auth Platform overview describes billing association as a recommendation
+because some APIs charge; it is not treated here as permission to enable billing,
+and the owner's no-payment rule remains in force. The developer contact itself is
+reported up to date, the client is active, only modern operating systems/browsers
+are in use, system-browser authentication is detected, and the OAuth flow is
+reported secure. [Google Auth Platform checkup guidance](https://support.google.com/cloud/answer/15548748?hl=en)
 
 Google Search Console independently showed `kapapi.dev` as an active Domain
 property, 장형진 as the current account, and “You are a verified owner.” The
@@ -110,13 +125,14 @@ a completed reconnect or verification demonstration.
 
 ## Before submission
 
-- Revalidate the actual console state and all four public URLs.
+- Save and then revalidate the KaPaPi branding values and all four public URLs.
 - Recheck the already-verified `kapapi.dev` Domain-property owner label.
 - Confirm the branding is saved and the consent screen matches it.
 - Repeat reconnect/consent after the unverified warning is removed.
 - Create and check the real demonstration recording.
-- Use Google's current verification workflow; do not report approval from the
-  Testing-mode message that verification is not yet required.
+- Publish the app from Testing to Production, then use Google's current
+  verification workflow; do not report approval from the Testing-mode message
+  that verification is not yet required.
 - If Google requires an identity/legal attestation or human challenge, prepare
   the exact remaining step without asserting it was performed.
 - Keep installer/UAC, final release artifact and end-to-end acceptance gates

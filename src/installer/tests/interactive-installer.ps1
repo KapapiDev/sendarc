@@ -124,10 +124,12 @@ function Invoke-SendArcButton {
     Start-Sleep -Milliseconds 350
 }
 
-function Wait-SendArcWindow {
+function Wait-SendArcLaunch {
     param(
         [Parameter(Mandatory)]
         [System.Diagnostics.Process]$Process,
+        [Parameter(Mandatory)]
+        [string]$LogPath,
         [int]$TimeoutSeconds = 30
     )
 
@@ -137,13 +139,21 @@ function Wait-SendArcWindow {
         if ($Process.HasExited) {
             throw "SendArc exited before presenting its main window (exit $($Process.ExitCode))."
         }
-        if ($Process.MainWindowHandle -ne [IntPtr]::Zero) {
-            Write-Host "[interactive-installer] SendArc application window opened (PID $($Process.Id))."
-            return
+        if (Test-Path -LiteralPath $LogPath -PathType Leaf) {
+            $log = Get-Content -LiteralPath $LogPath -Raw -ErrorAction SilentlyContinue
+            if ($log -match 'tray ready: menu items registered') {
+                $windowState = if ($Process.MainWindowHandle -eq [IntPtr]::Zero) {
+                    'hidden as configured by StartHidden'
+                } else {
+                    'main window handle exposed'
+                }
+                Write-Host "[interactive-installer] SendArc application and tray started (PID $($Process.Id); $windowState)."
+                return
+            }
         }
         Start-Sleep -Milliseconds 200
     } while ((Get-Date) -lt $deadline)
-    throw 'Timed out waiting for the installed SendArc application window.'
+    throw 'Timed out waiting for the installed SendArc application and tray-ready log marker.'
 }
 
 function Get-MailState {
@@ -235,8 +245,10 @@ try {
         $base.Dispose()
     }
 
+    $appLog = Join-Path $env:APPDATA 'SendArc\app.log'
+    Remove-Item -LiteralPath $appLog -Force -ErrorAction SilentlyContinue
     $app = Start-Process -FilePath $appPath -PassThru
-    Wait-SendArcWindow -Process $app
+    Wait-SendArcLaunch -Process $app -LogPath $appLog
     Stop-Process -Id $app.Id -Force
     $app.WaitForExit(15000) | Out-Null
 

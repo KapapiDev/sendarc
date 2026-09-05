@@ -1,6 +1,6 @@
 # SendArc security audit
 
-Last audited: 2026-09-02
+Last audited: 2026-09-05
 
 This is a reproducible engineering audit of the current beta candidate. It is
 not a penetration-test certificate and does not replace the immutable release
@@ -20,7 +20,7 @@ Both Go scans reported one advisory in an imported package that the compiled
 SendArc paths do not call. `govulncheck` reported zero affected symbols and
 zero vulnerable required modules.
 
-The latest-head [security and repository policy run 33627281229](https://github.com/KapapiDev/sendarc/actions/runs/33627281229) reproduced the dependency inventories and passed the secret/history and policy gates at `7840d89`. The no-publish [release run 33628247764](https://github.com/KapapiDev/sendarc/actions/runs/33628247764) also passed release-hygiene checks before and after compilation at the same functional commit; its downloaded two-file artifact independently matched `SHA256SUMS.txt` at `9c1e8ffe91a59f80c719f9fb39af0e18e3d571d13af5d873c4a2b3195c3eb1de` and was confirmed unsigned.
+The latest functional-candidate [security and repository policy run 33935310054](https://github.com/KapapiDev/sendarc/actions/runs/33935310054) reproduced the dependency inventories and passed the secret/history and policy gates at `f8413c5`. The no-publish [release run 33935592008](https://github.com/KapapiDev/sendarc/actions/runs/33935592008) also passed release-hygiene checks before and after compilation at that commit, followed by 31/31 installed-system tests and the visible installer/uninstaller flow. Its independently downloaded artifact `9960144791` matched the LF-only `SHA256SUMS.txt` at `2f2253a6d87a936b57460ea94e5222d8f007ec3888956b9aed0691c6eed6d26e`; the installer, app, x64 DLL, and x86 DLL were confirmed unsigned, and the compiled payloads contained no E2E override markers.
 
 The audit initially found reachable OpenPGP and SSH advisories introduced by
 `github.com/creativeprojects/go-selfupdate`. SendArc never applied updates, so
